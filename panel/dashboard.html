@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestión PQRS — Dashboard</title>
+<link rel="stylesheet" href="../css/panel.css">
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>Gestión PQRS</h1>
+      <div class="sub">Peticiones, Quejas, Reclamos y Sugerencias</div>
+    </div>
+    <nav>
+      <a href="dashboard.html" class="active">PQRS</a>
+      <a href="encuestas.html">Encuestas</a>
+      <a href="usuarios.html" class="auth-admin-only" data-display="inline" style="display:none">Usuarios</a>
+    </nav>
+    <div id="auth-info"></div>
+  </div>
+
+  <div id="main">
+    <div class="stats" id="stats"></div>
+
+    <div class="filters">
+      <div class="fg"><label>Empresa</label>
+        <select id="f-empresa"><option value="">Todas</option>
+          <option value="PARCELAR">PARCELAR</option><option value="GREEN">GREEN</option>
+          <option value="RESO">RESO</option><option value="IASO">IASO</option><option value="IAS">IAS</option>
+        </select>
+      </div>
+      <div class="fg"><label>Tipo</label>
+        <select id="f-tipo"><option value="">Todos</option>
+          <option value="Peticion">Petición</option><option value="Queja">Queja</option>
+          <option value="Reclamo">Reclamo</option><option value="Sugerencia">Sugerencia</option>
+        </select>
+      </div>
+      <div class="fg"><label>Estado</label>
+        <select id="f-estado"><option value="">Todos</option>
+          <option value="Nuevo">Nuevo</option><option value="En proceso">En proceso</option>
+          <option value="Resuelto">Resuelto</option><option value="Cerrado">Cerrado</option>
+        </select>
+      </div>
+      <div class="fg"><label>Urgencia</label>
+        <select id="f-urgencia"><option value="">Todas</option>
+          <option value="ALTO">Alto</option><option value="MEDIO">Medio</option><option value="BAJA">Baja</option>
+        </select>
+      </div>
+      <div class="fg"><label>Responsable</label>
+        <select id="f-responsable"><option value="">Todos</option></select>
+      </div>
+      <div class="fg"><label>Buscar</label>
+        <input type="text" id="f-buscar" placeholder="Folio, contacto, descripción…">
+      </div>
+      <button class="btn-clear-filters" id="btn-clear-filters">Limpiar filtros</button>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Solicitudes</h3><span id="count-tag" style="font-size:0.8rem;color:#718096"></span></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Folio</th><th>Empresa</th><th>Tipo</th><th>Área</th><th>Urgencia</th>
+              <th>Estado</th><th>Responsable</th><th>Fecha</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="empty" id="empty-msg" style="display:none">No hay solicitudes con estos filtros.</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../js/shared/supabase-client.js"></script>
+  <script src="auth.js"></script>
+  <script src="../js/panel/dashboard.js"></script>
+</body>
+</html>

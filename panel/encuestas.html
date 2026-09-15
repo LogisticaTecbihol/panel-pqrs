@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestión PQRS — Encuesta de Satisfacción</title>
+<link rel="stylesheet" href="../css/panel.css">
+</head>
+<body>
+  <div class="header">
+    <div><h1>Gestión PQRS</h1><div class="sub">Encuesta de Satisfacción</div></div>
+    <nav>
+      <a href="dashboard.html">PQRS</a>
+      <a href="encuestas.html" class="active">Encuestas</a>
+      <a href="usuarios.html" class="auth-admin-only" data-display="inline" style="display:none">Usuarios</a>
+    </nav>
+    <div id="auth-info"></div>
+  </div>
+
+  <div id="main">
+    <div class="filters">
+      <div class="fg"><label>Empresa</label>
+        <select id="f-empresa"><option value="">Todas</option>
+          <option value="PARCELAR">PARCELAR</option><option value="GREEN">GREEN</option>
+          <option value="RESO">RESO</option><option value="IASO">IASO</option><option value="IAS">IAS</option>
+        </select>
+      </div>
+      <div class="fg"><label>Desde</label><input type="date" id="f-desde"></div>
+      <div class="fg"><label>Hasta</label><input type="date" id="f-hasta"></div>
+      <button class="btn-clear-filters" id="btn-clear-filters">Limpiar filtros</button>
+    </div>
+
+    <div class="kpi-row" id="kpi-row"></div>
+
+    <div class="card">
+      <div class="card-head"><h3>Respuestas</h3><span id="count-tag" style="font-size:0.8rem;color:#718096"></span></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Empresa</th><th>Municipio</th><th>Asesor</th><th>Canal</th>
+              <th>Producto</th><th>Asesor téc.</th><th>Logística</th><th>Tiempos</th><th>Precio</th><th>General</th>
+              <th>Comentarios</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="empty" id="empty-msg" style="display:none">No hay respuestas con estos filtros.</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../js/shared/supabase-client.js"></script>
+  <script src="auth.js"></script>
+  <script src="../js/panel/encuestas.js"></script>
+</body>
+</html>

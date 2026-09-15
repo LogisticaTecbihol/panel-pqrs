@@ -1,0 +1,22 @@
+name: Keep Supabase project alive
+
+# El plan Free de Supabase pausa proyectos con muy poca actividad en 7 días.
+# Este workflow hace una llamada trivial y de solo lectura a la API REST del
+# proyecto cada 3 días para que nunca se cumpla ese umbral. No requiere ningún
+# secreto: usa la anon key pública, protegida por RLS (no puede leer ni
+# escribir nada sensible).
+
+on:
+  schedule:
+    - cron: '0 12 */3 * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          curl -sS -o /dev/null -w "HTTP %{http_code}\n" \
+            "https://kvfqcymeihglohkcckdp.supabase.co/rest/v1/pqrs?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt2ZnFjeW1laWhnbG9oa2Nja2RwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0OTQyNjksImV4cCI6MjEwNTA3MDI2OX0.kdutwtsqpUDC6v9r7FPWTSKLFW62SMGy_1F41Fcv8Mk' }}"

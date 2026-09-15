@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestión PQRS — Detalle</title>
+<link rel="stylesheet" href="../css/panel.css">
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1 id="titulo-folio">PQRS</h1>
+      <div class="sub"><a href="dashboard.html" style="color:white">&larr; Volver al listado</a></div>
+    </div>
+    <nav>
+      <a href="dashboard.html">PQRS</a>
+      <a href="encuestas.html">Encuestas</a>
+      <a href="usuarios.html" class="auth-admin-only" data-display="inline" style="display:none">Usuarios</a>
+    </nav>
+    <div id="auth-info"></div>
+  </div>
+
+  <div id="main">
+    <div class="empty" id="not-found" style="display:none">No se encontró esta solicitud.</div>
+
+    <div id="content" style="display:none">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head">
+          <h3>Datos de la solicitud</h3>
+          <span id="badges"></span>
+        </div>
+        <div class="mbody">
+          <div class="form-grid" id="datos-grid"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head"><h3>Gestión interna</h3></div>
+        <div class="mbody">
+          <div class="form-grid">
+            <div>
+              <label class="ef-label">Estado</label>
+              <select class="ef" id="g-estado">
+                <option value="Nuevo">Nuevo</option>
+                <option value="En proceso">En proceso</option>
+                <option value="Resuelto">Resuelto</option>
+                <option value="Cerrado">Cerrado</option>
+              </select>
+            </div>
+            <div>
+              <label class="ef-label">Responsable</label>
+              <select class="ef" id="g-responsable"><option value="">Sin asignar</option></select>
+            </div>
+            <div>
+              <label class="ef-label">Fecha límite</label>
+              <input type="date" class="ef" id="g-fecha-limite">
+            </div>
+          </div>
+          <button class="btn-primary" id="btn-guardar-gestion">Guardar cambios</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head"><h3>Adjuntos</h3></div>
+        <div class="mbody">
+          <div id="adjuntos-list"></div>
+          <div id="adjuntos-empty" class="no-lines" style="display:none">Sin adjuntos.</div>
+          <div class="auth-edit-only" data-display="block" style="display:none;margin-top:10px">
+            <label class="btn-load" for="file-adjunto">📎 Agregar adjunto de gestión</label>
+            <input type="file" id="file-adjunto" style="display:none">
+            <span id="upload-status" style="font-size:0.8rem;color:#718096;margin-left:8px"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Bitácora</h3></div>
+        <div class="mbody">
+          <div class="auth-edit-only" data-display="block" style="display:none;margin-bottom:16px">
+            <textarea class="ef" id="nueva-nota" rows="2" placeholder="Agregar una nota…" style="margin-bottom:8px"></textarea>
+            <button class="btn-secondary" id="btn-agregar-nota">Agregar nota</button>
+          </div>
+          <div id="bitacora-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../js/shared/supabase-client.js"></script>
+  <script src="auth.js"></script>
+  <script src="../js/panel/detalle.js"></script>
+</body>
+</html>

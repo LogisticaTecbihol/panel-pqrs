@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestión PQRS — Usuarios</title>
+<link rel="stylesheet" href="../css/panel.css">
+</head>
+<body>
+  <div class="header">
+    <div><h1>Gestión PQRS</h1><div class="sub">Usuarios internos</div></div>
+    <nav>
+      <a href="dashboard.html">PQRS</a>
+      <a href="encuestas.html">Encuestas</a>
+      <a href="usuarios.html" class="active">Usuarios</a>
+    </nav>
+    <div id="auth-info"></div>
+  </div>
+
+  <div id="main">
+    <div class="empty" id="no-access" style="display:none">Esta sección es solo para administradores.</div>
+
+    <div id="content" style="display:none">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head"><h3>Nuevo usuario</h3></div>
+        <div class="mbody">
+          <div class="form-grid">
+            <div><label class="ef-label">Nombre</label><input class="ef" id="n-nombre"></div>
+            <div><label class="ef-label">Correo</label><input class="ef" id="n-email" type="email"></div>
+            <div><label class="ef-label">Contraseña</label><input class="ef" id="n-password" type="password"></div>
+            <div><label class="ef-label">Rol</label>
+              <select class="ef" id="n-rol">
+                <option value="lector">Lector</option>
+                <option value="gestor">Gestor</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn-primary" id="btn-crear">Crear usuario</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Equipo</h3></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Activo</th><th></th></tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../js/shared/supabase-client.js"></script>
+  <script src="auth.js"></script>
+  <script src="../js/panel/usuarios.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "importar-historico-pqrs",
+  "private": true,
+  "type": "module",
+  "description": "Script de un solo uso para importar el histórico del Google Form a Supabase.",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "csv-parse": "^5.5.6"
+  }
+}
