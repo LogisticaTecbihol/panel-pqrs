@@ -45,10 +45,10 @@ const COL = {
   branch: 'Su solicitud es: (seleccione al que corresponda)',
   branchEncuesta: 'Encuesta de Satisfacción del servicio',
 
-  nombreCompleto: 'Nombre Completo',
+  nombreCompletoPrefijo: 'Nombre Completo', // por prefijo: varía "Nombre Completo" / "Nombre Completo o Razón Social"
   contacto: 'Correo electrónico o Celular (Para dar respuesta y seguimiento a su solicitud)',
   tipoSolicitud: 'Tipo de solicitud',
-  fechaEvento: 'Fecha del evento o situación',
+  fechaEvento: 'Fecha del evento de situación',
   areaRelacionada: 'Área o servicio relacionado',
   descripcion: 'Descripción detallada de la situación',
   urgencia: 'Nivel de urgencia o impacto',
@@ -72,26 +72,64 @@ const COL = {
   comentariosEncuesta: 'Comentarios o sugerencias adicionales',
 };
 
+// Normaliza espacios (colapsa espacios/saltos de línea múltiples y recorta los
+// extremos) -- los CSV reales traen encabezados con espacios extra al inicio/fin
+// que no se ven a simple vista en el Form.
+function normalizarEspacios(s) {
+  return (s || '').replace(/\s+/g, ' ').trim();
+}
+
+// Construye un lookup por título normalizado, ya que las claves del objeto
+// `row` (tal como las entrega csv-parse) son el encabezado tal cual del CSV.
+function normalizarFila(row) {
+  const out = {};
+  for (const key of Object.keys(row)) {
+    out[normalizarEspacios(key)] = row[key];
+  }
+  return out;
+}
+
+function getVal(rowNorm, titulo) {
+  return rowNorm[normalizarEspacios(titulo)];
+}
+
+function getValPrefijo(rowNorm, prefijo) {
+  const prefijoNorm = normalizarEspacios(prefijo);
+  const key = Object.keys(rowNorm).find((k) => k.indexOf(prefijoNorm) === 0);
+  return key ? rowNorm[key] : undefined;
+}
+
 function parseTimestamp(raw) {
   if (!raw) return new Date();
-  let d = new Date(raw);
-  if (!isNaN(d)) return d;
-  // Fallback: formato "DD/MM/YYYY HH:mm:ss" (Sheets en configuración regional Colombia)
-  const m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})/);
+  // Formato real de "Marca temporal" en la exportación de Google Forms:
+  // "2025/11/24 8:52:58 a.m. GMT-5" (AM/PM en español + offset explícito).
+  const m = raw.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2}):(\d{2})\s*(a\.\s*m\.|p\.\s*m\.|am|pm)\.?\s*GMT([+-]\d+)/i);
   if (m) {
-    const [, dd, mm, yyyy, hh, mi, ss] = m;
-    return new Date(`${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T${hh.padStart(2, '0')}:${mi}:${ss}`);
+    let [, yyyy, mm, dd, hh, mi, ss, ampm, offset] = m;
+    hh = parseInt(hh, 10);
+    const isPM = /p/i.test(ampm);
+    if (isPM && hh !== 12) hh += 12;
+    if (!isPM && hh === 12) hh = 0;
+    const utcMs = Date.UTC(+yyyy, +mm - 1, +dd, hh - parseInt(offset, 10), +mi, +ss);
+    return new Date(utcMs);
   }
-  return new Date();
+  const d = new Date(raw);
+  return isNaN(d) ? new Date() : d;
 }
 
 function extraerLinksDrive(texto) {
   if (!texto) return [];
-  const urls = texto.match(/https?:\/\/drive\.google\.com\/\S+/g) || [];
-  return urls.map((url) => {
-    const idMatch = url.match(/[-\w]{25,}/);
-    return { drive_file_id: idMatch ? idMatch[0] : null, nombre: null, tipo_mime: null, tamano_bytes: null, url };
-  });
+  // Google separa varios adjuntos con ";" SIN espacio -- un regex \S+ los uniría
+  // en un solo "link" gigante, así que se separa primero por ; o , y luego se
+  // valida cada trozo.
+  return texto
+    .split(/[;,]\s*/)
+    .map((s) => s.trim())
+    .filter((s) => /^https?:\/\/drive\.google\.com\//.test(s))
+    .map((url) => {
+      const idMatch = url.match(/[-\w]{25,}/);
+      return { drive_file_id: idMatch ? idMatch[0] : null, nombre: null, tipo_mime: null, tamano_bytes: null, url };
+    });
 }
 
 function mapAreaRelacionada(valor) {
@@ -123,11 +161,7 @@ function mapCanal(valor) {
   return 'Otro';
 }
 
-function buscarColumnaSatisfaccionGeneral(headers) {
-  return headers.find((h) => h.startsWith('En general, qué tan satisfecho está con la experiencia'));
-}
-
-async function importarPqrs(row, fecha) {
+async function importarPqrs(rowNorm, fecha) {
   const { data: folio, error: folioError } = await sb.rpc('generar_consecutivo_pqrs', { p_empresa_sigla: empresaSigla });
   if (folioError) throw folioError;
 
@@ -136,15 +170,19 @@ async function importarPqrs(row, fecha) {
     .insert({
       folio,
       empresa_sigla: empresaSigla,
-      nombre_completo: row[COL.nombreCompleto] || null,
-      contacto: row[COL.contacto] || '(sin contacto registrado)',
-      tipo_solicitud: row[COL.tipoSolicitud] || 'Peticion',
-      fecha_evento: row[COL.fechaEvento] || null,
-      area_relacionada: mapAreaRelacionada(row[COL.areaRelacionada]),
-      descripcion: row[COL.descripcion] || '(sin descripción)',
-      urgencia: mapUrgencia(row[COL.urgencia]),
-      desea_respuesta: row[COL.deseaRespuesta] === 'Sí',
-      comentarios_adicionales: row[COL.comentariosPqrs] || null,
+      nombre_completo: getValPrefijo(rowNorm, COL.nombreCompletoPrefijo) || null,
+      contacto: getVal(rowNorm, COL.contacto) || '(sin contacto registrado)',
+      tipo_solicitud: getVal(rowNorm, COL.tipoSolicitud) || 'Petición',
+      fecha_evento: getVal(rowNorm, COL.fechaEvento) || null,
+      area_relacionada: mapAreaRelacionada(getVal(rowNorm, COL.areaRelacionada)),
+      descripcion: getVal(rowNorm, COL.descripcion) || '(sin descripción)',
+      urgencia: mapUrgencia(getVal(rowNorm, COL.urgencia)),
+      desea_respuesta: getVal(rowNorm, COL.deseaRespuesta) === 'Sí',
+      comentarios_adicionales: getVal(rowNorm, COL.comentariosPqrs) || null,
+      identificacion_cliente: getVal(rowNorm, COL.identificacion) || null,
+      referencia_pedido: getVal(rowNorm, COL.referenciaPedido) || null,
+      producto_lote: getVal(rowNorm, COL.productoLote) || null,
+      ciudad_departamento: getVal(rowNorm, COL.ciudadDepartamento) || null,
       estado: 'Cerrado', // histórico: se asume ya atendido por fuera del sistema
       creado_en: fecha.toISOString(),
     })
@@ -152,7 +190,7 @@ async function importarPqrs(row, fecha) {
     .single();
   if (insertError) throw insertError;
 
-  const adjuntos = extraerLinksDrive(row[COL.adjuntos]);
+  const adjuntos = extraerLinksDrive(getVal(rowNorm, COL.adjuntos));
   if (adjuntos.length) {
     const { error } = await sb.from('pqrs_adjuntos').insert(
       adjuntos.map((a) => ({
@@ -176,21 +214,21 @@ async function importarPqrs(row, fecha) {
   return pqrsRow.folio;
 }
 
-async function importarEncuesta(row, fecha, colSatisfaccionGeneral) {
-  const canal = mapCanal(row[COL.canalAdquisicion]);
+async function importarEncuesta(rowNorm, fecha) {
+  const canal = mapCanal(getVal(rowNorm, COL.canalAdquisicion));
   const { error } = await sb.from('encuestas_satisfaccion').insert({
     empresa_sigla: empresaSigla,
-    municipio: row[COL.municipio] || '(sin municipio)',
-    asesor_nombre: row[COL.asesorNombre] || null,
+    municipio: getVal(rowNorm, COL.municipio) || '(sin municipio)',
+    asesor_nombre: getVal(rowNorm, COL.asesorNombre) || null,
     canal_adquisicion: canal,
-    canal_adquisicion_otro: canal === 'Otro' ? row[COL.canalAdquisicionOtro] || null : null,
-    calificacion_calidad_producto: parseInt(row[COL.califCalidadProducto], 10) || 3,
-    calificacion_atencion_asesor_tecnico: parseInt(row[COL.califAsesorTecnico], 10) || 3,
-    calificacion_atencion_servicio_logistica: parseInt(row[COL.califServicioLogistica], 10) || 3,
-    calificacion_tiempos_respuesta: parseInt(row[COL.califTiemposRespuesta], 10) || 3,
-    calificacion_relacion_calidad_precio: parseInt(row[COL.califCalidadPrecio], 10) || 3,
-    calificacion_satisfaccion_general: parseInt(row[colSatisfaccionGeneral], 10) || 3,
-    comentarios_adicionales: row[COL.comentariosEncuesta] || null,
+    canal_adquisicion_otro: canal === 'Otro' ? getVal(rowNorm, COL.canalAdquisicionOtro) || null : null,
+    calificacion_calidad_producto: parseInt(getVal(rowNorm, COL.califCalidadProducto), 10) || 3,
+    calificacion_atencion_asesor_tecnico: parseInt(getVal(rowNorm, COL.califAsesorTecnico), 10) || 3,
+    calificacion_atencion_servicio_logistica: parseInt(getVal(rowNorm, COL.califServicioLogistica), 10) || 3,
+    calificacion_tiempos_respuesta: parseInt(getVal(rowNorm, COL.califTiemposRespuesta), 10) || 3,
+    calificacion_relacion_calidad_precio: parseInt(getVal(rowNorm, COL.califCalidadPrecio), 10) || 3,
+    calificacion_satisfaccion_general: parseInt(getValPrefijo(rowNorm, 'En general, qué tan satisfecho está con la experiencia'), 10) || 3,
+    comentarios_adicionales: getVal(rowNorm, COL.comentariosEncuesta) || null,
     creado_en: fecha.toISOString(),
   });
   if (error) throw error;
@@ -199,22 +237,23 @@ async function importarEncuesta(row, fecha, colSatisfaccionGeneral) {
 async function main() {
   const csvContent = fs.readFileSync(csvPath, 'utf8');
   const records = parse(csvContent, { columns: true, skip_empty_lines: true });
-  const headers = Object.keys(records[0] || {});
-  const colSatisfaccionGeneral = buscarColumnaSatisfaccionGeneral(headers);
 
-  const conFecha = records.map((row) => ({ row, fecha: parseTimestamp(row[COL.timestamp]) }));
+  const conFecha = records.map((row) => {
+    const rowNorm = normalizarFila(row);
+    return { rowNorm, fecha: parseTimestamp(getVal(rowNorm, COL.timestamp)) };
+  });
   conFecha.sort((a, b) => a.fecha - b.fecha);
 
   let pqrsOk = 0, pqrsError = 0, encuestaOk = 0, encuestaError = 0;
 
-  for (const { row, fecha } of conFecha) {
-    const esEncuesta = row[COL.branch] === COL.branchEncuesta;
+  for (const { rowNorm, fecha } of conFecha) {
+    const esEncuesta = getVal(rowNorm, COL.branch) === COL.branchEncuesta;
     try {
       if (esEncuesta) {
-        await importarEncuesta(row, fecha, colSatisfaccionGeneral);
+        await importarEncuesta(rowNorm, fecha);
         encuestaOk++;
       } else {
-        const folio = await importarPqrs(row, fecha);
+        const folio = await importarPqrs(rowNorm, fecha);
         pqrsOk++;
         console.log(`  PQRS importado: ${folio} (${fecha.toISOString().slice(0, 10)})`);
       }

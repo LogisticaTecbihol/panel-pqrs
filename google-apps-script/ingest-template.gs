@@ -30,10 +30,12 @@ var QUESTION_TITLES = {
   branchEncuesta: 'Encuesta de Satisfacción del servicio',
 
   // Rama PQRS
-  nombreCompleto: 'Nombre Completo',
+  // "Nombre Completo" se busca por PREFIJO (getRespuestaParcial), no exacto:
+  // algunos Forms usan "Nombre Completo" y otros "Nombre Completo o Razón Social".
+  nombreCompletoPrefijo: 'Nombre Completo',
   contacto: 'Correo electrónico o Celular (Para dar respuesta y seguimiento a su solicitud)',
   tipoSolicitud: 'Tipo de solicitud',
-  fechaEvento: 'Fecha del evento o situación',
+  fechaEvento: 'Fecha del evento de situación',
   areaRelacionada: 'Área o servicio relacionado',
   descripcion: 'Descripción detallada de la situación',
   urgencia: 'Nivel de urgencia o impacto',
@@ -101,7 +103,7 @@ function construirPayloadPqrs(itemResponses) {
   return {
     tipo_registro: 'pqrs',
     empresa_sigla: EMPRESA_SIGLA,
-    nombre_completo: getRespuestaExacta(itemResponses, QUESTION_TITLES.nombreCompleto),
+    nombre_completo: getRespuestaParcial(itemResponses, QUESTION_TITLES.nombreCompletoPrefijo),
     contacto: getRespuestaExacta(itemResponses, QUESTION_TITLES.contacto),
     identificacion_cliente: getRespuestaExacta(itemResponses, QUESTION_TITLES.identificacion),
     tipo_solicitud: getRespuestaExacta(itemResponses, QUESTION_TITLES.tipoSolicitud),
@@ -140,9 +142,17 @@ function construirPayloadEncuesta(itemResponses) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
+// Normaliza espacios (colapsa espacios/saltos de línea múltiples y recorta los
+// extremos) -- los Forms reales traen títulos con espacios extra al inicio/fin
+// de la pregunta que no se ven a simple vista en el editor.
+function normalizarEspacios(s) {
+  return (s || '').replace(/\s+/g, ' ').trim();
+}
+
 function getRespuestaExacta(itemResponses, titulo) {
+  var tituloNorm = normalizarEspacios(titulo);
   for (var i = 0; i < itemResponses.length; i++) {
-    if (itemResponses[i].getItem().getTitle() === titulo) {
+    if (normalizarEspacios(itemResponses[i].getItem().getTitle()) === tituloNorm) {
       var v = itemResponses[i].getResponse();
       return Array.isArray(v) ? v.join(', ') : v;
     }
@@ -150,10 +160,13 @@ function getRespuestaExacta(itemResponses, titulo) {
   return null;
 }
 
-// Para preguntas cuyo título varía por Form (ej. incluye el nombre de la empresa).
+// Para preguntas cuyo título varía por Form (ej. incluye el nombre de la
+// empresa, o una redacción ligeramente distinta como "Nombre Completo" vs
+// "Nombre Completo o Razón Social").
 function getRespuestaParcial(itemResponses, prefijo) {
+  var prefijoNorm = normalizarEspacios(prefijo);
   for (var i = 0; i < itemResponses.length; i++) {
-    if (itemResponses[i].getItem().getTitle().indexOf(prefijo) === 0) {
+    if (normalizarEspacios(itemResponses[i].getItem().getTitle()).indexOf(prefijoNorm) === 0) {
       return itemResponses[i].getResponse();
     }
   }
@@ -161,8 +174,9 @@ function getRespuestaParcial(itemResponses, prefijo) {
 }
 
 function getAdjuntos(itemResponses, titulo) {
+  var tituloNorm = normalizarEspacios(titulo);
   for (var i = 0; i < itemResponses.length; i++) {
-    if (itemResponses[i].getItem().getTitle() === titulo) {
+    if (normalizarEspacios(itemResponses[i].getItem().getTitle()) === tituloNorm) {
       var v = itemResponses[i].getResponse();
       var ids = Array.isArray(v) ? v : (v ? [v] : []);
       return ids.map(function (id) {

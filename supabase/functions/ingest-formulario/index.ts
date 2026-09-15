@@ -18,7 +18,7 @@ const corsHeaders = {
 }
 
 const EMPRESAS_VALIDAS = ['PARCELAR', 'GREEN', 'RESO', 'IASO', 'IAS']
-const TIPOS_SOLICITUD = ['Peticion', 'Queja', 'Reclamo', 'Sugerencia']
+const TIPOS_SOLICITUD = ['Petición', 'Queja', 'Reclamo', 'Sugerencia']
 const AREAS = ['Produccion', 'Servicio al cliente', 'Ventas', 'Estado del producto', 'Logistica', 'Pos venta', 'Otro']
 const URGENCIAS = ['ALTO', 'MEDIO', 'BAJA']
 const CANALES = ['Directo', 'Distribuidor autorizado', 'Tienda agropecuaria local', 'Otro']
