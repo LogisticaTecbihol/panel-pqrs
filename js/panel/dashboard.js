@@ -110,6 +110,7 @@
         '<td><span class="sigla-badge sigla-' + r.empresa_sigla + '">' + r.empresa_sigla + '</span></td>' +
         '<td>' + escHtml(r.tipo_solicitud) + '</td>' +
         '<td>' + escHtml(r.area_relacionada) + '</td>' +
+        '<td>' + escHtml(r.producto_lote || '') + '</td>' +
         '<td><span class="badge ' + (URGENCIA_BADGE[r.urgencia] || '') + '">' + r.urgencia + '</span></td>' +
         '<td><span class="badge ' + (ESTADO_BADGE[r.estado] || '') + '">' + escHtml(r.estado) + '</span></td>' +
         '<td>' + escHtml(nombreResponsable(r.responsable_id)) + '</td>' +
