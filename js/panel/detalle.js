@@ -8,7 +8,6 @@
 
   var ESTADO_BADGE = { 'Nuevo': 'b-nuevo', 'En proceso': 'b-proceso', 'Resuelto': 'b-resuelto', 'Cerrado': 'b-cerrado' };
   var URGENCIA_BADGE = { 'ALTO': 'b-alerta', 'MEDIO': 'b-medio', 'BAJA': 'b-baja' };
-  var TIPO_LABEL = { 'Peticion': 'Petición', 'Queja': 'Queja', 'Reclamo': 'Reclamo', 'Sugerencia': 'Sugerencia' };
   var BUCKET = 'pqrs-gestion-adjuntos';
 
   document.querySelectorAll('.auth-edit-only').forEach(function (e) {
@@ -59,6 +58,50 @@
     return '<div><label class="ef-label">' + label + '</label><div class="ef readonly" style="min-height:34px">' + (valor ? escHtml(valor) : '<span style="color:#a0aec0">&mdash;</span>') + '</div></div>';
   }
 
+  // Campos editables de "Datos de la solicitud": solo admin los ve como
+  // input/select/textarea (candado también reforzado en la base de datos por
+  // el trigger guard_pqrs_datos_remitente); el resto de roles ve el valor
+  // de solo lectura, igual que antes.
+  function campoInput(id, label, valor, tipo) {
+    if (!AUTH.isAdmin()) return campo(label, valor);
+    return '<div><label class="ef-label">' + label + '</label><input class="ef" id="' + id + '" type="' + (tipo || 'text') + '" value="' + escHtml(valor || '') + '"></div>';
+  }
+
+  function campoTextarea(id, label, valor) {
+    if (!AUTH.isAdmin()) return '<div style="grid-column:1/-1">' + campo(label, valor) + '</div>';
+    return '<div style="grid-column:1/-1"><label class="ef-label">' + label + '</label><textarea class="ef" id="' + id + '" rows="3">' + escHtml(valor || '') + '</textarea></div>';
+  }
+
+  function campoSelect(id, label, valor, opciones, labelVisible) {
+    if (!AUTH.isAdmin()) return campo(label, labelVisible || valor);
+    var opts = opciones.map(function (o) {
+      return '<option value="' + escHtml(o.value) + '"' + (o.value === valor ? ' selected' : '') + '>' + escHtml(o.label) + '</option>';
+    }).join('');
+    return '<div><label class="ef-label">' + label + '</label><select class="ef" id="' + id + '">' + opts + '</select></div>';
+  }
+
+  var TIPO_OPCIONES = ['Petición', 'Queja', 'Reclamo', 'Sugerencia'].map(function (v) { return { value: v, label: v }; });
+  var AREA_OPCIONES = [
+    { value: 'Produccion', label: 'Producción' },
+    { value: 'Servicio al cliente', label: 'Servicio al cliente' },
+    { value: 'Ventas', label: 'Ventas' },
+    { value: 'Estado del producto', label: 'Estado del producto' },
+    { value: 'Logistica', label: 'Logística (entregas, despachos)' },
+    { value: 'Pos venta', label: 'Pos venta' },
+    { value: 'Otro', label: 'Otro' },
+  ];
+  var URGENCIA_OPCIONES = [
+    { value: 'ALTO', label: 'Alto' },
+    { value: 'MEDIO', label: 'Medio' },
+    { value: 'BAJA', label: 'Baja' },
+  ];
+  var SI_NO_OPCIONES = [{ value: 'si', label: 'Sí' }, { value: 'no', label: 'No' }];
+
+  function valOrNull(id) {
+    var v = document.getElementById(id).value.trim();
+    return v || null;
+  }
+
   function render() {
     document.getElementById('titulo-folio').textContent = _row.folio;
     document.title = 'PQRS ' + _row.folio;
@@ -68,19 +111,22 @@
       '<span class="badge ' + (ESTADO_BADGE[_row.estado] || '') + '">' + escHtml(_row.estado) + '</span>';
 
     document.getElementById('datos-grid').innerHTML =
-      campo('Tipo de solicitud', TIPO_LABEL[_row.tipo_solicitud] || _row.tipo_solicitud) +
-      campo('Área relacionada', _row.area_relacionada) +
-      campo('Fecha del evento', fmtDate(_row.fecha_evento)) +
-      campo('Nombre completo', _row.nombre_completo) +
-      campo('Contacto (correo/celular)', _row.contacto) +
-      campo('Identificación (NIT/Cédula)', _row.identificacion_cliente) +
-      campo('N° pedido/factura/remisión', _row.referencia_pedido) +
-      campo('Producto/lote relacionado', _row.producto_lote) +
-      campo('Ciudad/Departamento', _row.ciudad_departamento) +
-      campo('¿Desea respuesta?', _row.desea_respuesta ? 'Sí' : 'No') +
+      campo('Folio', _row.folio) +
+      campo('Empresa', _row.empresa_sigla) +
       campo('Recibido', fmtDateTime(_row.creado_en)) +
-      '<div style="grid-column:1/-1">' + campo('Descripción', _row.descripcion) + '</div>' +
-      (_row.comentarios_adicionales ? '<div style="grid-column:1/-1">' + campo('Comentarios adicionales', _row.comentarios_adicionales) + '</div>' : '');
+      campoSelect('d-tipo_solicitud', 'Tipo de solicitud', _row.tipo_solicitud, TIPO_OPCIONES) +
+      campoSelect('d-area_relacionada', 'Área relacionada', _row.area_relacionada, AREA_OPCIONES) +
+      campoInput('d-fecha_evento', 'Fecha del evento', _row.fecha_evento, 'date') +
+      campoInput('d-nombre_completo', 'Nombre completo', _row.nombre_completo) +
+      campoInput('d-contacto', 'Contacto (correo/celular)', _row.contacto) +
+      campoInput('d-identificacion_cliente', 'Identificación (NIT/Cédula)', _row.identificacion_cliente) +
+      campoInput('d-referencia_pedido', 'N° pedido/factura/remisión', _row.referencia_pedido) +
+      campoInput('d-producto_lote', 'Producto/lote relacionado', _row.producto_lote) +
+      campoInput('d-ciudad_departamento', 'Ciudad/Departamento', _row.ciudad_departamento) +
+      campoSelect('d-urgencia', 'Nivel de urgencia', _row.urgencia, URGENCIA_OPCIONES) +
+      campoSelect('d-desea_respuesta', '¿Desea respuesta?', _row.desea_respuesta ? 'si' : 'no', SI_NO_OPCIONES, _row.desea_respuesta ? 'Sí' : 'No') +
+      campoTextarea('d-descripcion', 'Descripción', _row.descripcion) +
+      campoTextarea('d-comentarios_adicionales', 'Comentarios adicionales', _row.comentarios_adicionales);
 
     document.getElementById('g-estado').value = _row.estado;
     document.getElementById('g-responsable').value = _row.responsable_id || '';
@@ -123,6 +169,7 @@
     nota: 'Nota',
     notificacion_enviada: 'Aviso enviado al equipo',
     adjunto_agregado: 'Adjunto agregado',
+    edicion_datos: 'Datos de la solicitud corregidos',
   };
 
   function renderBitacora(rows) {
@@ -162,6 +209,42 @@
     showToast('Cambios guardados');
     cargar();
   });
+
+  var btnGuardarDatos = document.getElementById('btn-guardar-datos');
+  if (btnGuardarDatos) {
+    btnGuardarDatos.addEventListener('click', async function () {
+      if (!AUTH.isAdmin()) return;
+
+      var cambios = {
+        nombre_completo: valOrNull('d-nombre_completo'),
+        contacto: document.getElementById('d-contacto').value.trim(),
+        identificacion_cliente: valOrNull('d-identificacion_cliente'),
+        tipo_solicitud: document.getElementById('d-tipo_solicitud').value,
+        fecha_evento: document.getElementById('d-fecha_evento').value || null,
+        area_relacionada: document.getElementById('d-area_relacionada').value,
+        referencia_pedido: valOrNull('d-referencia_pedido'),
+        producto_lote: valOrNull('d-producto_lote'),
+        ciudad_departamento: valOrNull('d-ciudad_departamento'),
+        urgencia: document.getElementById('d-urgencia').value,
+        descripcion: document.getElementById('d-descripcion').value.trim(),
+        desea_respuesta: document.getElementById('d-desea_respuesta').value === 'si',
+        comentarios_adicionales: valOrNull('d-comentarios_adicionales'),
+      };
+      if (!cambios.contacto) { showToast('El contacto es requerido', '#e74c3c'); return; }
+      if (!cambios.descripcion) { showToast('La descripción es requerida', '#e74c3c'); return; }
+
+      var res = await _sb.from('pqrs').update(cambios).eq('id', pqrsId);
+      if (res.error) { showToast('Error al guardar: ' + res.error.message, '#e74c3c'); return; }
+
+      var profile = AUTH.getProfile();
+      await _sb.from('pqrs_bitacora').insert({
+        pqrs_id: pqrsId, tipo_evento: 'edicion_datos', usuario_id: profile.id, usuario_nombre: profile.nombre || profile.email, detalle: {},
+      });
+
+      showToast('Datos guardados');
+      cargar();
+    });
+  }
 
   document.getElementById('btn-agregar-nota').addEventListener('click', async function () {
     var texto = document.getElementById('nueva-nota').value.trim();
