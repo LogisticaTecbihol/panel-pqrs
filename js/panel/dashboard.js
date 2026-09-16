@@ -108,6 +108,7 @@
       return '<tr>' +
         '<td><strong>' + escHtml(r.folio) + '</strong></td>' +
         '<td><span class="sigla-badge sigla-' + r.empresa_sigla + '">' + r.empresa_sigla + '</span></td>' +
+        '<td>' + escHtml(r.nombre_completo || '') + '</td>' +
         '<td>' + escHtml(r.tipo_solicitud) + '</td>' +
         '<td>' + escHtml(r.area_relacionada) + '</td>' +
         '<td>' + escHtml(r.producto_lote || '') + '</td>' +
