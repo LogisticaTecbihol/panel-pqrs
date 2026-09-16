@@ -32,8 +32,16 @@
       </div>
       <div class="fg"><label>Tipo</label>
         <select id="f-tipo"><option value="">Todos</option>
-          <option value="Peticion">Petición</option><option value="Queja">Queja</option>
+          <option value="Petición">Petición</option><option value="Queja">Queja</option>
           <option value="Reclamo">Reclamo</option><option value="Sugerencia">Sugerencia</option>
+        </select>
+      </div>
+      <div class="fg"><label>Área</label>
+        <select id="f-area"><option value="">Todas</option>
+          <option value="Produccion">Producción</option><option value="Servicio al cliente">Servicio al cliente</option>
+          <option value="Ventas">Ventas</option><option value="Estado del producto">Estado del producto</option>
+          <option value="Logistica">Logística</option><option value="Pos venta">Pos venta</option>
+          <option value="Otro">Otro</option>
         </select>
       </div>
       <div class="fg"><label>Estado</label>
@@ -62,8 +70,15 @@
         <table>
           <thead>
             <tr>
-              <th>Folio</th><th>Empresa</th><th>Tipo</th><th>Área</th><th>Urgencia</th>
-              <th>Estado</th><th>Responsable</th><th>Fecha</th><th></th>
+              <th class="sortable" data-sort="folio">Folio<span class="sort-icon"></span></th>
+              <th class="sortable" data-sort="empresa_sigla">Empresa<span class="sort-icon"></span></th>
+              <th class="sortable" data-sort="tipo_solicitud">Tipo<span class="sort-icon"></span></th>
+              <th class="sortable" data-sort="area_relacionada">Área<span class="sort-icon"></span></th>
+              <th class="sortable" data-sort="urgencia">Urgencia<span class="sort-icon"></span></th>
+              <th class="sortable" data-sort="estado">Estado<span class="sort-icon"></span></th>
+              <th class="sortable" data-sort="responsable">Responsable<span class="sort-icon"></span></th>
+              <th class="sortable" data-sort="creado_en">Fecha<span class="sort-icon"></span></th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>

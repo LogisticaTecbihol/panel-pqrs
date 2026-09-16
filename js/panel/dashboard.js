@@ -6,7 +6,11 @@
 
   var ESTADO_BADGE = { 'Nuevo': 'b-nuevo', 'En proceso': 'b-proceso', 'Resuelto': 'b-resuelto', 'Cerrado': 'b-cerrado' };
   var URGENCIA_BADGE = { 'ALTO': 'b-alerta', 'MEDIO': 'b-medio', 'BAJA': 'b-baja' };
-  var TIPO_LABEL = { 'Peticion': 'Petición', 'Queja': 'Queja', 'Reclamo': 'Reclamo', 'Sugerencia': 'Sugerencia' };
+  var URGENCIA_RANK = { 'ALTO': 3, 'MEDIO': 2, 'BAJA': 1 };
+  var ESTADO_RANK = { 'Nuevo': 1, 'En proceso': 2, 'Resuelto': 3, 'Cerrado': 4 };
+
+  var _sortKey = 'creado_en';
+  var _sortDir = 'desc';
 
   async function cargar() {
     var [usuariosRes, pqrsRes] = await Promise.all([
@@ -41,6 +45,7 @@
   function filtrar() {
     var fe = document.getElementById('f-empresa').value;
     var ft = document.getElementById('f-tipo').value;
+    var fa = document.getElementById('f-area').value;
     var fs = document.getElementById('f-estado').value;
     var fu = document.getElementById('f-urgencia').value;
     var fr = document.getElementById('f-responsable').value;
@@ -49,6 +54,7 @@
     return _all.filter(function (r) {
       if (fe && r.empresa_sigla !== fe) return false;
       if (ft && r.tipo_solicitud !== ft) return false;
+      if (fa && r.area_relacionada !== fa) return false;
       if (fs && r.estado !== fs) return false;
       if (fu && r.urgencia !== fu) return false;
       if (fr && r.responsable_id !== fr) return false;
@@ -60,8 +66,31 @@
     });
   }
 
+  function ordenar(rows) {
+    var key = _sortKey;
+    var dir = _sortDir === 'asc' ? 1 : -1;
+    return rows.slice().sort(function (a, b) {
+      var va, vb;
+      if (key === 'urgencia') { va = URGENCIA_RANK[a.urgencia] || 0; vb = URGENCIA_RANK[b.urgencia] || 0; }
+      else if (key === 'estado') { va = ESTADO_RANK[a.estado] || 0; vb = ESTADO_RANK[b.estado] || 0; }
+      else if (key === 'responsable') { va = nombreResponsable(a.responsable_id).toLowerCase(); vb = nombreResponsable(b.responsable_id).toLowerCase(); }
+      else if (key === 'creado_en') { va = new Date(a.creado_en).getTime(); vb = new Date(b.creado_en).getTime(); }
+      else { va = (a[key] || '').toString().toLowerCase(); vb = (b[key] || '').toString().toLowerCase(); }
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+      return 0;
+    });
+  }
+
+  function actualizarIconosOrden() {
+    document.querySelectorAll('thead th.sortable').forEach(function (th) {
+      th.classList.remove('sort-asc', 'sort-desc');
+      if (th.getAttribute('data-sort') === _sortKey) th.classList.add(_sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+    });
+  }
+
   function render() {
-    var rows = filtrar();
+    var rows = ordenar(filtrar());
 
     var stats = { Nuevo: 0, 'En proceso': 0, Resuelto: 0, Cerrado: 0 };
     _all.forEach(function (r) { if (stats[r.estado] !== undefined) stats[r.estado]++; });
@@ -79,7 +108,7 @@
       return '<tr>' +
         '<td><strong>' + escHtml(r.folio) + '</strong></td>' +
         '<td><span class="sigla-badge sigla-' + r.empresa_sigla + '">' + r.empresa_sigla + '</span></td>' +
-        '<td>' + (TIPO_LABEL[r.tipo_solicitud] || r.tipo_solicitud) + '</td>' +
+        '<td>' + escHtml(r.tipo_solicitud) + '</td>' +
         '<td>' + escHtml(r.area_relacionada) + '</td>' +
         '<td><span class="badge ' + (URGENCIA_BADGE[r.urgencia] || '') + '">' + r.urgencia + '</span></td>' +
         '<td><span class="badge ' + (ESTADO_BADGE[r.estado] || '') + '">' + escHtml(r.estado) + '</span></td>' +
@@ -90,15 +119,30 @@
     }).join('');
   }
 
-  ['f-empresa', 'f-tipo', 'f-estado', 'f-urgencia', 'f-responsable'].forEach(function (id) {
+  ['f-empresa', 'f-tipo', 'f-area', 'f-estado', 'f-urgencia', 'f-responsable'].forEach(function (id) {
     document.getElementById(id).addEventListener('change', render);
   });
   document.getElementById('f-buscar').addEventListener('input', render);
   document.getElementById('btn-clear-filters').addEventListener('click', function () {
-    ['f-empresa', 'f-tipo', 'f-estado', 'f-urgencia', 'f-responsable'].forEach(function (id) { document.getElementById(id).value = ''; });
+    ['f-empresa', 'f-tipo', 'f-area', 'f-estado', 'f-urgencia', 'f-responsable'].forEach(function (id) { document.getElementById(id).value = ''; });
     document.getElementById('f-buscar').value = '';
     render();
   });
+
+  document.querySelectorAll('thead th.sortable').forEach(function (th) {
+    th.addEventListener('click', function () {
+      var key = th.getAttribute('data-sort');
+      if (_sortKey === key) {
+        _sortDir = _sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        _sortKey = key;
+        _sortDir = key === 'creado_en' ? 'desc' : 'asc';
+      }
+      actualizarIconosOrden();
+      render();
+    });
+  });
+  actualizarIconosOrden();
 
   cargar();
 })();
