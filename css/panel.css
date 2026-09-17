@@ -52,12 +52,6 @@ body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; color: #2d3748;
 .sc .num { font-size: 1.75rem; font-weight: 700; }
 .sc .lbl { font-size: 0.76rem; color: #718096; text-transform: uppercase; letter-spacing: 0.5px; }
 
-/* Pestañas */
-.tabs { display: flex; gap: 6px; margin-bottom: 16px; background: white; border-radius: 10px; padding: 5px; box-shadow: 0 1px 5px rgba(0,0,0,0.07); width: fit-content; }
-.tab-btn { border: none; background: none; padding: 8px 18px; border-radius: 7px; font-size: 0.85rem; font-weight: 700; color: #4a5568; cursor: pointer; transition: background 0.15s, color 0.15s; }
-.tab-btn:hover { background: #f0f4f8; }
-.tab-btn.active { background: #1a5276; color: white; }
-
 /* Filtros */
 .filters { background: white; border-radius: 10px; padding: 13px 18px; margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; box-shadow: 0 1px 5px rgba(0,0,0,0.07); }
 .fg { display: flex; align-items: center; gap: 7px; }

@@ -11,7 +11,6 @@
 
   var _sortKey = 'creado_en';
   var _sortDir = 'desc';
-  var _tab = 'actuales';
 
   async function cargar() {
     var [usuariosRes, pqrsRes] = await Promise.all([
@@ -43,10 +42,6 @@
     return u ? (u.nombre || u.email) : '';
   }
 
-  function porPestana() {
-    return _all.filter(function (r) { return _tab === 'historico' ? r.es_historico : !r.es_historico; });
-  }
-
   function filtrar() {
     var fe = document.getElementById('f-empresa').value;
     var ft = document.getElementById('f-tipo').value;
@@ -56,7 +51,7 @@
     var fr = document.getElementById('f-responsable').value;
     var fb = document.getElementById('f-buscar').value.trim().toLowerCase();
 
-    return porPestana().filter(function (r) {
+    return _all.filter(function (r) {
       if (fe && r.empresa_sigla !== fe) return false;
       if (ft && r.tipo_solicitud !== ft) return false;
       if (fa && r.area_relacionada !== fa) return false;
@@ -95,19 +90,18 @@
   }
 
   function render() {
-    var base = porPestana();
     var rows = ordenar(filtrar());
 
     var stats = { Nuevo: 0, 'En proceso': 0, Resuelto: 0, Cerrado: 0 };
-    base.forEach(function (r) { if (stats[r.estado] !== undefined) stats[r.estado]++; });
+    _all.forEach(function (r) { if (stats[r.estado] !== undefined) stats[r.estado]++; });
     document.getElementById('stats').innerHTML =
       '<div class="sc recibido"><div class="num">' + stats.Nuevo + '</div><div class="lbl">Nuevos</div></div>' +
       '<div class="sc parcial"><div class="num">' + stats['En proceso'] + '</div><div class="lbl">En proceso</div></div>' +
       '<div class="sc entregado"><div class="num">' + stats.Resuelto + '</div><div class="lbl">Resueltos</div></div>' +
-      '<div class="sc total"><div class="num">' + base.length + '</div><div class="lbl">Total</div></div>';
+      '<div class="sc total"><div class="num">' + _all.length + '</div><div class="lbl">Total</div></div>';
 
     var tbody = document.getElementById('tbody');
-    document.getElementById('count-tag').textContent = rows.length + ' de ' + base.length;
+    document.getElementById('count-tag').textContent = rows.length + ' de ' + _all.length;
     document.getElementById('empty-msg').style.display = rows.length ? 'none' : '';
 
     tbody.innerHTML = rows.map(function (r) {
@@ -135,16 +129,6 @@
     ['f-empresa', 'f-tipo', 'f-area', 'f-estado', 'f-urgencia', 'f-responsable'].forEach(function (id) { document.getElementById(id).value = ''; });
     document.getElementById('f-buscar').value = '';
     render();
-  });
-
-  document.querySelectorAll('.tab-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      if (btn.classList.contains('active')) return;
-      document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      _tab = btn.getAttribute('data-tab');
-      render();
-    });
   });
 
   document.querySelectorAll('thead th.sortable').forEach(function (th) {

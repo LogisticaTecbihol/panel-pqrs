@@ -184,7 +184,6 @@ async function importarPqrs(rowNorm, fecha) {
       producto_lote: getVal(rowNorm, COL.productoLote) || null,
       ciudad_departamento: getVal(rowNorm, COL.ciudadDepartamento) || null,
       estado: 'Cerrado', // histórico: se asume ya atendido por fuera del sistema
-      es_historico: true,
       creado_en: fecha.toISOString(),
     })
     .select('id, folio')
