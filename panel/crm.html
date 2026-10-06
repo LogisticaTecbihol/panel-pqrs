@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mercadeo — CRM</title>
+<link rel="stylesheet" href="../css/panel.css?v=20261006">
+</head>
+<body data-modulo="mercadeo">
+  <div class="header">
+    <div>
+      <h1>Mercadeo</h1>
+      <div class="sub">CRM — leads, calendario de actividades, presupuesto e indicadores</div>
+    </div>
+    <nav>
+      <a href="inicio.html">Inicio</a>
+      <a href="dashboard.html" data-modulo="pqrs">PQRS</a>
+      <a href="encuestas.html" data-modulo="encuestas">Encuestas</a>
+      <a href="mercadeo.html" data-modulo="mercadeo">Tablero</a>
+      <a href="crm.html" data-modulo="mercadeo" class="active">CRM</a>
+      <a href="usuarios.html" class="auth-admin-only" data-display="inline" style="display:none">Usuarios</a>
+    </nav>
+    <div id="auth-info"></div>
+  </div>
+
+  <div id="main">
+    <div id="estado-carga" class="empty">Cargando…</div>
+
+    <div id="contenido" style="display:none">
+      <div class="mk-tabs" role="tablist">
+        <button class="mk-tab" id="tab-leads" role="tab" data-act="tab" data-tab="leads">🧲 Leads / Embudo</button>
+        <button class="mk-tab" id="tab-actividades" role="tab" data-act="tab" data-tab="actividades">🎯 Actividades / Calendario</button>
+        <button class="mk-tab" id="tab-presupuesto" role="tab" data-act="tab" data-tab="presupuesto">💰 Presupuesto</button>
+        <button class="mk-tab" id="tab-indicadores" role="tab" data-act="tab" data-tab="indicadores">📈 Indicadores</button>
+      </div>
+
+      <!-- ── Leads ── -->
+      <div id="panel-leads">
+        <div class="stats">
+          <div class="sc info"><div class="num" id="s-nuevos">0</div><div class="lbl">Leads nuevos (mes)</div></div>
+          <div class="sc alerta"><div class="num" id="s-vencidos">0</div><div class="lbl">Sin asignar &gt; 48 h</div></div>
+          <div class="sc parcial"><div class="num" id="s-seguimiento">0</div><div class="lbl">En seguimiento</div></div>
+          <div class="sc entregado"><div class="num" id="s-conversion">—</div><div class="lbl">Conversión (90 días)</div><div class="mk-sub" id="s-conversion-det"></div></div>
+        </div>
+
+        <div class="filters">
+          <div class="fg"><label for="f-estado">Estado</label>
+            <select id="f-estado"><option value="">Todos</option>
+              <option value="nuevo">Nuevo</option><option value="calificado">Calificado</option>
+              <option value="asignado">Asignado</option><option value="en_seguimiento">En seguimiento</option>
+              <option value="cerrado">Cerrado</option>
+            </select>
+          </div>
+          <div class="fg"><label for="f-origen">Origen</label>
+            <select id="f-origen"><option value="">Todos</option>
+              <option value="evento">Evento</option><option value="digital">Digital</option><option value="distribuidor">Distribuidor</option>
+            </select>
+          </div>
+          <div class="fg"><label for="f-calif">Calificación</label>
+            <select id="f-calif"><option value="">Todas</option>
+              <option value="caliente">Caliente</option><option value="tibio">Tibio</option><option value="frio">Frío</option>
+            </select>
+          </div>
+          <div class="fg"><label for="f-asig">Asignado a</label>
+            <select id="f-asig"><option value="">Todos</option></select>
+          </div>
+          <div class="fg"><label for="f-txt">Buscar</label>
+            <input type="text" id="f-txt" placeholder="Nombre, empresa, producto, municipio…">
+          </div>
+          <span id="f-act-chip"></span>
+          <button class="btn-clear-filters" data-act="leads-limpiar">Limpiar filtros</button>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>Leads <span id="leads-ct" style="font-weight:400;color:#718096"></span></h3>
+            <div class="mk-actions">
+              <button class="btn-secondary" data-act="com-abrir">👥 Comerciales</button>
+              <button class="btn-primary sm" data-act="lead-nuevo">➕ Nuevo lead</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Contacto</th><th>Producto de interés</th><th>Origen</th><th>Calificación</th><th>Estado</th>
+                <th>Asignado a</th><th>Captura</th><th>Última interacción</th><th></th>
+              </tr></thead>
+              <tbody id="leads-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Actividades = calendario maestro ── -->
+      <div id="panel-actividades" style="display:none">
+        <div class="filters">
+          <div class="fg"><label for="fa-estado">Estado</label>
+            <select id="fa-estado"><option value="">Todos</option>
+              <option value="planificada">Planificada</option><option value="en_ejecucion">En ejecución</option>
+              <option value="cerrada">Cerrada</option><option value="cancelada">Cancelada</option>
+            </select>
+          </div>
+          <div class="fg"><label for="fa-tipo">Tipo</label>
+            <select id="fa-tipo"><option value="">Todos</option>
+              <option value="eventos">Eventos</option><option value="digital">Digital</option><option value="pop">POP</option>
+              <option value="trade">Trade</option><option value="diseno">Diseño</option><option value="otro">Otro</option>
+            </select>
+          </div>
+          <div class="fg"><label for="fa-cal" style="cursor:pointer"><input type="checkbox" id="fa-cal"> Solo aprobadas en calendario</label></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h3>Actividades <span id="actividades-ct" style="font-weight:400;color:#718096"></span></h3>
+            <button class="btn-primary sm" id="btn-nueva-actividad" data-act="act-nueva">➕ Nueva actividad</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Actividad</th><th>Tipo</th><th>Empresas</th><th>Fechas</th><th>Responsable</th><th>Calendario</th><th>Estado</th>
+                <th style="text-align:right">Presupuesto</th><th style="text-align:right">Leads</th><th></th>
+              </tr></thead>
+              <tbody id="actividades-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Presupuesto ── -->
+      <div id="panel-presupuesto" style="display:none">
+        <div class="filters">
+          <div class="fg"><label for="fp-empresa">Empresa</label>
+            <select id="fp-empresa"><option value="">Todas</option></select>
+          </div>
+          <div class="fg"><label for="fp-rubro">Rubro</label>
+            <select id="fp-rubro"><option value="">Todos</option>
+              <option value="eventos">Eventos</option><option value="digital">Digital</option><option value="pop">POP</option>
+              <option value="trade">Trade</option><option value="diseno">Diseño</option><option value="otro">Otro</option>
+            </select>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h3>Presupuesto <span id="presupuesto-ct" style="font-weight:400;color:#718096"></span></h3>
+            <button class="btn-primary sm" data-act="pr-nuevo">➕ Nueva línea</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Empresa</th><th>Rubro</th><th>Periodo</th>
+                <th style="text-align:right">Presupuestado</th><th style="text-align:right">Ejecutado</th><th>% Ejecución</th><th></th>
+              </tr></thead>
+              <tbody id="presupuesto-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Indicadores ── -->
+      <div id="panel-indicadores" style="display:none">
+        <div class="stats" id="ind-stats"></div>
+        <div id="ind-tareas"></div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-head"><h3>Leads por origen (este mes)</h3></div>
+          <div class="table-wrap"><table><thead><tr><th>Origen</th><th style="text-align:right">Leads</th></tr></thead><tbody id="ind-origen-body"></tbody></table></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Cumplimiento de anticipación de eventos (15 días)</h3></div>
+          <div class="table-wrap"><table><thead><tr><th>Evento</th><th>Solicitado</th><th>Inicio</th><th style="text-align:right">Anticipación</th></tr></thead><tbody id="ind-eventos-body"></tbody></table></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: nuevo / editar lead ══ -->
+  <div class="overlay over" id="nuevo-overlay" role="dialog" aria-modal="true" aria-labelledby="nuevo-titulo">
+    <div class="modal-box" style="max-width:680px">
+      <div class="mhdr"><div><h2 id="nuevo-titulo">Nuevo lead</h2></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="nuevo-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <input type="hidden" id="nv-id">
+        <div class="form-grid cols2">
+          <div><label class="ef-label" for="nv-nombre">Nombre del contacto *</label><input class="ef" id="nv-nombre" maxlength="200"></div>
+          <div><label class="ef-label" for="nv-empresa">Empresa / finca</label><input class="ef" id="nv-empresa" maxlength="200"></div>
+          <div><label class="ef-label" for="nv-telefono">Teléfono</label><input class="ef" id="nv-telefono" maxlength="60"></div>
+          <div><label class="ef-label" for="nv-correo">Correo</label><input class="ef" id="nv-correo" type="email" maxlength="200"></div>
+          <div><label class="ef-label" for="nv-municipio">Municipio</label><input class="ef" id="nv-municipio" maxlength="120"></div>
+          <div><label class="ef-label" for="nv-departamento">Departamento</label><input class="ef" id="nv-departamento" maxlength="120"></div>
+          <div><label class="ef-label" for="nv-producto">Producto de interés</label><input class="ef" id="nv-producto" maxlength="200"></div>
+          <div><label class="ef-label" for="nv-origen">Origen</label>
+            <select class="ef" id="nv-origen"><option value="evento">Evento</option><option value="digital">Digital</option><option value="distribuidor">Distribuidor</option></select></div>
+          <div><label class="ef-label" for="nv-actividad">Actividad de origen</label><select class="ef" id="nv-actividad"></select></div>
+          <div id="nv-asignar-wrap"><label class="ef-label" for="nv-asignado">Asignar a (comercial)</label><select class="ef" id="nv-asignado"></select></div>
+        </div>
+        <label class="ef-label" for="nv-obs">Observaciones</label>
+        <textarea class="ef" id="nv-obs" rows="2" maxlength="1000"></textarea>
+        <label style="display:flex;align-items:flex-start;gap:6px;font-size:0.84rem;margin-top:12px">
+          <input type="checkbox" id="nv-autorizacion" style="margin-top:3px">
+          <span>El contacto autorizó el tratamiento de sus datos personales (Ley 1581 de 2012). <strong>Obligatorio.</strong></span>
+        </label>
+      </div>
+      <div class="mftr"><span></span><div class="mftr-btns">
+        <button class="btn-cancel" data-act="cerrar-modal" data-modal="nuevo-overlay">Cancelar</button>
+        <button class="btn-confirm" id="nv-ok" data-act="lead-guardar">Guardar</button></div></div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: detalle del lead ══ -->
+  <div class="overlay" id="ctx-overlay" role="dialog" aria-modal="true" aria-labelledby="ctx-titulo">
+    <div class="modal-box" style="max-width:860px">
+      <div class="mhdr"><div><h2 id="ctx-titulo"></h2><div class="meta" id="ctx-meta"></div></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="ctx-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody" id="ctx-body"></div>
+      <div class="mftr"><div class="mk-actions">
+          <button class="btn-secondary" id="ctx-btn-editar" data-act="lead-editar">✏️ Editar datos</button>
+          <button class="btn-danger" id="ctx-btn-eliminar" data-act="lead-eliminar-ctx">🗑 Eliminar</button></div>
+        <div class="mftr-btns"><button class="btn-cancel" data-act="cerrar-modal" data-modal="ctx-overlay">Cerrar</button></div></div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: cierre de lead ══ -->
+  <div class="overlay over" id="cierre-overlay" role="dialog" aria-modal="true" aria-labelledby="cierre-titulo">
+    <div class="modal-box" style="max-width:460px">
+      <div class="mhdr" id="cierre-hdr"><div><h2 id="cierre-titulo"></h2></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="cierre-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div id="cierre-campo-valor"><label class="ef-label" for="cierre-valor">Valor de la venta ($)</label>
+          <input class="ef" id="cierre-valor" inputmode="numeric" placeholder="Ej. 3.500.000">
+          <div class="ef-help">Opcional. Si lo dejas vacío se registra $0.</div></div>
+        <div id="cierre-campo-motivo"><label class="ef-label" for="cierre-motivo">Motivo de la pérdida *</label>
+          <textarea class="ef" id="cierre-motivo" rows="3" maxlength="500"></textarea></div>
+      </div>
+      <div class="mftr"><span></span><div class="mftr-btns">
+        <button class="btn-cancel" data-act="cerrar-modal" data-modal="cierre-overlay">Cancelar</button>
+        <button class="btn-confirm" id="cierre-ok" data-act="lead-cierre-confirmar">Confirmar</button></div></div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: actividad ══ -->
+  <div class="overlay" id="act-overlay" role="dialog" aria-modal="true" aria-labelledby="act-titulo">
+    <div class="modal-box" style="max-width:700px">
+      <div class="mhdr"><div><h2 id="act-titulo">Nueva actividad</h2></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="act-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div class="form-grid cols2">
+          <div style="grid-column:1/-1"><label class="ef-label" for="ac-nombre">Nombre *</label><input class="ef" id="ac-nombre" maxlength="200"></div>
+          <div><label class="ef-label" for="ac-tipo">Tipo</label>
+            <select class="ef" id="ac-tipo"><option value="eventos">Eventos</option><option value="digital">Digital</option><option value="pop">POP</option>
+              <option value="trade">Trade</option><option value="diseno">Diseño</option><option value="otro">Otro</option></select></div>
+          <div><label class="ef-label" for="ac-estado">Estado</label>
+            <select class="ef" id="ac-estado"><option value="planificada">Planificada</option><option value="en_ejecucion">En ejecución</option>
+              <option value="cerrada">Cerrada</option><option value="cancelada">Cancelada</option></select></div>
+          <div><label class="ef-label" for="ac-responsable">Responsable</label><select class="ef" id="ac-responsable"></select></div>
+          <div><label class="ef-label" for="ac-presupuesto">Presupuesto asignado ($)</label><input class="ef" id="ac-presupuesto" inputmode="numeric" placeholder="Ej. 5.000.000"></div>
+          <div><label class="ef-label" for="ac-fecha-sol">Fecha de solicitud</label><input class="ef" id="ac-fecha-sol" type="date"></div>
+          <div><label class="ef-label" for="ac-fecha-ini">Fecha de inicio</label><input class="ef" id="ac-fecha-ini" type="date"></div>
+          <div><label class="ef-label" for="ac-fecha-fin">Fecha de fin</label><input class="ef" id="ac-fecha-fin" type="date"></div>
+        </div>
+        <div style="margin-bottom:14px"><span class="ef-label">Empresas *</span><div class="mk-checks" id="ac-empresas-checks"></div></div>
+        <label style="display:flex;align-items:flex-start;gap:6px;font-size:0.86rem;margin-bottom:14px;background:#ebf5fb;border:1px solid #aed6f1;border-radius:8px;padding:10px 12px">
+          <input type="checkbox" id="ac-calendario" style="margin-top:3px">
+          <span><strong>Aprobada en el calendario maestro de campañas</strong><br>
+            <span style="color:#5d6d7e;font-size:0.78rem">Las tareas del tablero vinculadas a una actividad aprobada están "dentro del calendario"; el resto son "fuera de calendario" y, si son urgentes, requieren aval.</span></span>
+        </label>
+        <label class="ef-label" for="ac-objetivo">Objetivo</label>
+        <textarea class="ef" id="ac-objetivo" rows="2" maxlength="1000" style="margin-bottom:10px"></textarea>
+        <label style="display:flex;align-items:center;gap:6px;font-size:0.84rem;margin-bottom:8px">
+          <input type="checkbox" id="ac-bd-entregada"> Base de datos de asistentes entregada</label>
+        <div id="ac-bd-fecha-wrap" style="margin-bottom:10px"><label class="ef-label" for="ac-bd-fecha">Fecha de entrega de la base de datos</label>
+          <input class="ef" id="ac-bd-fecha" type="date" style="max-width:220px"></div>
+        <label class="ef-label" for="ac-obs">Observaciones</label>
+        <textarea class="ef" id="ac-obs" rows="2" maxlength="1000"></textarea>
+      </div>
+      <div class="mftr"><span></span><div class="mftr-btns">
+        <button class="btn-cancel" data-act="cerrar-modal" data-modal="act-overlay">Cancelar</button>
+        <button class="btn-confirm" id="ac-ok" data-act="act-guardar">Guardar</button></div></div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: línea de presupuesto ══ -->
+  <div class="overlay" id="pr-overlay" role="dialog" aria-modal="true" aria-labelledby="pr-titulo">
+    <div class="modal-box" style="max-width:520px">
+      <div class="mhdr"><div><h2 id="pr-titulo">Nueva línea de presupuesto</h2></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="pr-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div class="form-grid cols2">
+          <div><label class="ef-label" for="pr-empresa">Empresa</label><select class="ef" id="pr-empresa"></select></div>
+          <div><label class="ef-label" for="pr-rubro">Rubro</label>
+            <select class="ef" id="pr-rubro"><option value="eventos">Eventos</option><option value="digital">Digital</option><option value="pop">POP</option>
+              <option value="trade">Trade</option><option value="diseno">Diseño</option><option value="otro">Otro</option></select></div>
+          <div><label class="ef-label" for="pr-periodo">Periodo (mes)</label><input class="ef" id="pr-periodo" type="month"></div>
+          <div><label class="ef-label" for="pr-valor">Valor presupuestado ($)</label><input class="ef" id="pr-valor" inputmode="numeric" placeholder="Ej. 5.000.000"></div>
+        </div>
+        <label class="ef-label" for="pr-obs">Observaciones</label>
+        <textarea class="ef" id="pr-obs" rows="2" maxlength="1000"></textarea>
+      </div>
+      <div class="mftr"><span></span><div class="mftr-btns">
+        <button class="btn-cancel" data-act="cerrar-modal" data-modal="pr-overlay">Cancelar</button>
+        <button class="btn-confirm" id="pr-ok" data-act="pr-guardar">Guardar</button></div></div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: detalle de presupuesto (gastos) ══ -->
+  <div class="overlay" id="prd-overlay" role="dialog" aria-modal="true" aria-labelledby="prd-titulo">
+    <div class="modal-box" style="max-width:760px">
+      <div class="mhdr"><div><h2 id="prd-titulo"></h2><div class="meta" id="prd-meta"></div></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="prd-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody" id="prd-body"></div>
+      <div class="mftr"><span></span><div class="mftr-btns"><button class="btn-cancel" data-act="cerrar-modal" data-modal="prd-overlay">Cerrar</button></div></div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: carga masiva de asistentes ══ -->
+  <div class="overlay over" id="carga-overlay" role="dialog" aria-modal="true" aria-labelledby="carga-titulo">
+    <div class="modal-box" style="max-width:720px">
+      <div class="mhdr"><div><h2 id="carga-titulo">📋 Cargar asistentes</h2><div class="meta"><span id="carga-sub"></span></div></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="carga-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <input type="hidden" id="carga-actividad-id">
+        <p style="font-size:0.82rem;color:#4a5568;margin-bottom:8px">Pega las filas desde Excel (una por asistente), columnas separadas por tabulación:
+          <strong>Nombre*, Teléfono, Correo, Empresa/Finca, Municipio, Producto de interés</strong>. Máximo 500 filas.</p>
+        <textarea class="ef" id="carga-texto" rows="9" placeholder="Juan Pérez&#9;3001234567&#9;juan@correo.com&#9;Finca La Esperanza&#9;Sogamoso&#9;Fungicida X"></textarea>
+        <div id="carga-preview" class="ef-help" style="margin-bottom:10px"></div>
+        <div style="margin-bottom:10px"><label class="ef-label" for="carga-asignado">Asignar todos a (opcional)</label><select class="ef" id="carga-asignado" style="max-width:300px"></select></div>
+        <label style="display:flex;align-items:flex-start;gap:6px;font-size:0.84rem">
+          <input type="checkbox" id="carga-autorizacion" style="margin-top:3px">
+          <span>Confirmo que estos asistentes autorizaron el tratamiento de sus datos personales (Ley 1581 de 2012). <strong>Obligatorio.</strong></span>
+        </label>
+      </div>
+      <div class="mftr"><span></span><div class="mftr-btns">
+        <button class="btn-cancel" data-act="cerrar-modal" data-modal="carga-overlay">Cancelar</button>
+        <button class="btn-confirm" id="carga-ok" data-act="carga-confirmar">Cargar</button></div></div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: catálogo de comerciales ══ -->
+  <div class="overlay" id="com-overlay" role="dialog" aria-modal="true" aria-labelledby="com-titulo">
+    <div class="modal-box" style="max-width:520px">
+      <div class="mhdr"><div><h2 id="com-titulo">👥 Comerciales</h2><div class="meta"><span>A quienes se asignan los leads (no tienen acceso al panel)</span></div></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="com-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <input class="ef" id="com-nuevo" placeholder="Nombre del comercial" maxlength="120" aria-label="Nombre del nuevo comercial">
+          <button class="btn-primary sm" data-act="com-agregar" style="white-space:nowrap">Agregar</button>
+        </div>
+        <div id="com-lista"></div>
+      </div>
+      <div class="mftr"><span></span><div class="mftr-btns"><button class="btn-cancel" data-act="cerrar-modal" data-modal="com-overlay">Cerrar</button></div></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../js/shared/supabase-client.js?v=20261006"></script>
+  <script src="../js/shared/modal.js?v=20261006"></script>
+  <script src="../js/panel/auth.js?v=20261006"></script>
+  <script src="../js/panel/crm.js?v=20261006"></script>
+</body>
+</html>

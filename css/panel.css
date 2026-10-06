@@ -201,3 +201,45 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, select:focus-vi
 .module-card .icon { font-size: 2.2rem; margin-bottom: 12px; }
 .module-card h3 { font-size: 1rem; font-weight: 700; color: #1a5276; margin-bottom: 6px; }
 .module-card p { font-size: 0.82rem; color: #718096; margin: 0; line-height: 1.4; }
+
+
+/* ── Mercadeo (CRM + Tablero) ─────────────────────────────────
+   Portado del CRM de panel-pedidos, que reutilizaba clases .car-* de Cartera: aquí con prefijo .mk-. */
+.mk-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.mk-tab { background: #718096; color: white; border: none; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 0.86rem; font-weight: 700; }
+.mk-tab:hover { background: #4a5568; }
+.mk-tab.active { background: #1a5276; }
+.sc.pend { border-color: #d97706; }
+.sc.pend .num { color: #92400e; }
+.sc .mk-sub { font-size: 0.74rem; color: #718096; margin-top: 2px; min-height: 1em; }
+.mk-box { border: 1px solid #e2e8f0; border-radius: 9px; padding: 12px 14px; background: #fff; }
+.mk-box h4 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.4px; color: #4a5568; margin-bottom: 8px; }
+.mk-ctx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+@media (max-width: 760px) { .mk-ctx-grid { grid-template-columns: 1fr; } }
+.mk-kv { display: flex; justify-content: space-between; gap: 10px; font-size: 0.82rem; padding: 3px 0; border-bottom: 1px dashed #edf2f7; }
+.mk-kv:last-child { border-bottom: none; }
+.mk-kv > span:first-child { color: #718096; }
+.mk-kv > span:last-child { font-weight: 600; color: #2d3748; text-align: right; }
+.mk-pill { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 0.72rem; font-weight: 700; }
+.mk-pill.ok { background: #dcfce7; color: #166534; } .mk-pill.mid { background: #fef3c7; color: #92400e; }
+.mk-pill.over { background: #fee2e2; color: #991b1b; } .mk-pill.none { background: #e2e8f0; color: #4a5568; }
+.mk-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.74rem; font-weight: 700; color: #fff; }
+.mk-flag { background: #fef3c7; color: #92400e; border-radius: 6px; padding: 6px 10px; font-size: 0.8rem; margin-bottom: 10px; }
+.mk-mini { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.mk-mini th { background: #f7fafc; padding: 6px 8px; text-align: left; font-size: 0.72rem; color: #4a5568; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
+.mk-mini td { padding: 6px 8px; border-bottom: 1px solid #edf2f7; }
+.mk-aud { font-size: 0.72rem; color: #a0aec0; margin-top: 12px; }
+.mk-sin { font-size: 0.72rem; color: #a0aec0; font-style: italic; }
+.mk-warn { color: #c0392b; font-size: 0.72rem; font-weight: 700; margin-top: 2px; }
+.mk-chip { display: inline-flex; align-items: center; gap: 6px; background: #e8f1f8; color: #1a5276; border-radius: 14px; padding: 3px 6px 3px 12px; font-size: 0.78rem; font-weight: 700; }
+.mk-chip button { background: none; border: none; cursor: pointer; color: #1a5276; font-size: 0.9rem; line-height: 1; }
+.mk-checks { display: flex; flex-wrap: wrap; gap: 10px 14px; font-size: 0.84rem; }
+.mk-checks label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.mk-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+.mk-click { cursor: pointer; }
+.btn-primary.sm, .btn-danger.sm { padding: 6px 14px; font-size: 0.8rem; }
+.overlay.over { z-index: 260; }
+.form-grid.cols2 { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 700px) { .form-grid.cols2 { grid-template-columns: 1fr; } }
+.ef-help { font-size: 0.74rem; color: #718096; margin-top: 3px; }
+textarea.ef { resize: vertical; }

@@ -118,6 +118,34 @@ function norm(s) {
     .normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
+// Lee TODAS las filas de una tabla (PostgREST corta en 1000 sin avisar). build(q) añade filtros.
+// Devuelve { data } o { error }.
+async function fetchAll(table, cols, orderCol, build) {
+  var out = [], from = 0, step = 1000;
+  for (;;) {
+    var q = _sb.from(table).select(cols || '*').order(orderCol || 'id', { ascending: true }).range(from, from + step - 1);
+    if (build) q = build(q);
+    var res = await q;
+    if (res.error) return { error: res.error };
+    out = out.concat(res.data);
+    if (res.data.length < step) break;
+    from += step;
+  }
+  return { data: out };
+}
+
+// "Creado por X el … · Modificado por Y el …" a partir de las columnas de auditoría del registro.
+function auditoriaHtml(r) {
+  var partes = [];
+  if (r.creado_por_nombre || r.creado_en) {
+    partes.push('Creado por ' + escHtml(r.creado_por_nombre || '—') + (r.creado_en ? ' el ' + escHtml(fmtDateTime(r.creado_en)) : ''));
+  }
+  if (r.modificado_en && r.modificado_en !== r.creado_en) {
+    partes.push('Modificado por ' + escHtml(r.modificado_por_nombre || '—') + ' el ' + escHtml(fmtDateTime(r.modificado_en)));
+  }
+  return partes.length ? '<div class="mk-aud">' + partes.join(' · ') + '</div>' : '';
+}
+
 // Mensaje legible para un error de Supabase/PostgREST. Los RAISE EXCEPTION de los triggers
 // (reglas de negocio, en español) se muestran tal cual.
 function errMsg(error) {
