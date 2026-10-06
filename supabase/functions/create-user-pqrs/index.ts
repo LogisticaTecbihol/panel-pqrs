@@ -49,10 +49,16 @@ serve(async (req) => {
       throw new Error('Solo los administradores pueden crear usuarios')
     }
 
-    const { email, password, nombre, rol } = await req.json()
+    const { email, password, nombre, rol, modulos } = await req.json()
     if (!email || !password) throw new Error('Email y contraseña son requeridos')
     if (password.length < 8) throw new Error('La contraseña debe tener al menos 8 caracteres')
-    if (!['admin', 'gestor', 'lector'].includes(rol)) throw new Error('Rol inválido')
+    if (!['admin', 'gestor', 'lector', 'mercadeo'].includes(rol)) throw new Error('Rol inválido')
+
+    // Módulos extra habilitados (hoy solo 'mercadeo'). El rol 'mercadeo' siempre lo lleva.
+    const MODULOS_VALIDOS = ['mercadeo']
+    const mods: string[] = Array.isArray(modulos) ? modulos : []
+    if (mods.some((m) => !MODULOS_VALIDOS.includes(m))) throw new Error('Módulo inválido')
+    if (rol === 'mercadeo' && !mods.includes('mercadeo')) mods.push('mercadeo')
 
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -67,8 +73,13 @@ serve(async (req) => {
       email,
       nombre: nombre || null,
       rol,
+      modulos: [...new Set(mods)],
     })
-    if (profileError) throw profileError
+    if (profileError) {
+      // Sin perfil el usuario no podría entrar y el correo quedaría ocupado: se revierte el alta en auth.
+      await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+      throw profileError
+    }
 
     return new Response(JSON.stringify({ user_id: data.user.id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

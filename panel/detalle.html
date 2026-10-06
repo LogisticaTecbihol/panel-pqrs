@@ -4,17 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gestión PQRS — Detalle</title>
-<link rel="stylesheet" href="../css/panel.css">
+<link rel="stylesheet" href="../css/panel.css?v=20261006">
 </head>
-<body>
+<body data-modulo="pqrs">
   <div class="header">
     <div>
       <h1 id="titulo-folio">PQRS</h1>
       <div class="sub"><a href="dashboard.html" style="color:white">&larr; Volver al listado</a></div>
     </div>
     <nav>
-      <a href="dashboard.html">PQRS</a>
-      <a href="encuestas.html">Encuestas</a>
+      <a href="inicio.html">Inicio</a>
+      <a href="dashboard.html" data-modulo="pqrs">PQRS</a>
+      <a href="encuestas.html" data-modulo="encuestas">Encuestas</a>
+      <a href="mercadeo.html" data-modulo="mercadeo">Tablero</a>
+      <a href="crm.html" data-modulo="mercadeo">CRM</a>
       <a href="usuarios.html" class="auth-admin-only" data-display="inline" style="display:none">Usuarios</a>
     </nav>
     <div id="auth-info"></div>
@@ -88,8 +91,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="../js/shared/supabase-client.js"></script>
-  <script src="../js/panel/auth.js"></script>
+  <script src="../js/shared/supabase-client.js?v=20261006"></script>
+  <script src="../js/panel/auth.js?v=20261006"></script>
   <script src="../js/panel/detalle.js"></script>
 </body>
 </html>

@@ -4,14 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gestión PQRS — Usuarios</title>
-<link rel="stylesheet" href="../css/panel.css">
+<link rel="stylesheet" href="../css/panel.css?v=20261006">
 </head>
 <body>
   <div class="header">
     <div><h1>Gestión PQRS</h1><div class="sub">Usuarios internos</div></div>
     <nav>
-      <a href="dashboard.html">PQRS</a>
-      <a href="encuestas.html">Encuestas</a>
+      <a href="inicio.html">Inicio</a>
+      <a href="dashboard.html" data-modulo="pqrs">PQRS</a>
+      <a href="encuestas.html" data-modulo="encuestas">Encuestas</a>
+      <a href="mercadeo.html" data-modulo="mercadeo">Tablero</a>
+      <a href="crm.html" data-modulo="mercadeo">CRM</a>
       <a href="usuarios.html" class="active">Usuarios</a>
     </nav>
     <div id="auth-info"></div>
@@ -28,12 +31,18 @@
             <div><label class="ef-label">Nombre</label><input class="ef" id="n-nombre"></div>
             <div><label class="ef-label">Correo</label><input class="ef" id="n-email" type="email"></div>
             <div><label class="ef-label">Contraseña</label><input class="ef" id="n-password" type="password"></div>
-            <div><label class="ef-label">Rol</label>
+            <div><label class="ef-label" for="n-rol">Rol</label>
               <select class="ef" id="n-rol">
-                <option value="lector">Lector</option>
-                <option value="gestor">Gestor</option>
-                <option value="admin">Admin</option>
+                <option value="lector">Lector (PQRS, solo lectura)</option>
+                <option value="gestor">Gestor (PQRS)</option>
+                <option value="mercadeo">Mercadeo (solo Tablero y CRM)</option>
+                <option value="admin">Admin (todo)</option>
               </select>
+            </div>
+            <div><label class="ef-label">Módulos adicionales</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:0.84rem;padding:6px 0">
+                <input type="checkbox" id="n-mod-mercadeo"> Tablero y CRM de Mercadeo
+              </label>
             </div>
           </div>
           <button class="btn-primary" id="btn-crear">Crear usuario</button>
@@ -44,7 +53,7 @@
         <div class="card-head"><h3>Equipo</h3></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Activo</th><th></th></tr></thead>
+            <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Mercadeo</th><th>Activo</th><th></th></tr></thead>
             <tbody id="tbody"></tbody>
           </table>
         </div>
@@ -53,8 +62,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="../js/shared/supabase-client.js"></script>
-  <script src="../js/panel/auth.js"></script>
-  <script src="../js/panel/usuarios.js"></script>
+  <script src="../js/shared/supabase-client.js?v=20261006"></script>
+  <script src="../js/panel/auth.js?v=20261006"></script>
+  <script src="../js/panel/usuarios.js?v=20261006"></script>
 </body>
 </html>

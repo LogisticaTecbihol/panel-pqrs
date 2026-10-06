@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel interno — Inicio</title>
+<link rel="stylesheet" href="../css/panel.css?v=20261006">
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>Panel interno</h1>
+      <div class="sub">Holding — PQRS y Mercadeo</div>
+    </div>
+    <nav>
+      <a href="inicio.html" class="active">Inicio</a>
+      <a href="dashboard.html" data-modulo="pqrs">PQRS</a>
+      <a href="encuestas.html" data-modulo="encuestas">Encuestas</a>
+      <a href="mercadeo.html" data-modulo="mercadeo">Tablero</a>
+      <a href="crm.html" data-modulo="mercadeo">CRM</a>
+      <a href="usuarios.html" class="auth-admin-only" data-display="inline" style="display:none">Usuarios</a>
+    </nav>
+    <div id="auth-info"></div>
+  </div>
+
+  <div id="main">
+    <div class="landing">
+      <h2 id="saludo">Módulos disponibles</h2>
+      <p class="lead">Selecciona un módulo para comenzar a trabajar</p>
+
+      <div class="modules-grid">
+        <a href="mercadeo.html" data-modulo="mercadeo" class="module-card">
+          <div class="icon">🗂️</div>
+          <h3>Tablero de Mercadeo</h3>
+          <p>Tablero kanban de tareas del área: solicitudes, producción, validación y entrega para las 5 empresas, con prioridades y excepciones fuera de calendario.</p>
+        </a>
+
+        <a href="crm.html" data-modulo="mercadeo" class="module-card">
+          <div class="icon">🧲</div>
+          <h3>CRM de Mercadeo</h3>
+          <p>Leads y embudo, actividades (calendario maestro), presupuesto de mercadeo e indicadores de gestión.</p>
+        </a>
+
+        <a href="dashboard.html" data-modulo="pqrs" class="module-card">
+          <div class="icon">📨</div>
+          <h3>PQRS</h3>
+          <p>Peticiones, quejas, reclamos y sugerencias recibidas por los formularios del holding.</p>
+        </a>
+
+        <a href="encuestas.html" data-modulo="encuestas" class="module-card">
+          <div class="icon">⭐</div>
+          <h3>Encuestas de satisfacción</h3>
+          <p>Resultados de las encuestas de satisfacción por empresa.</p>
+        </a>
+
+        <a href="usuarios.html" class="module-card auth-admin-only" data-display="block" style="display:none">
+          <div class="icon">👥</div>
+          <h3>Usuarios</h3>
+          <p>Alta de usuarios internos, roles y módulos habilitados.</p>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../js/shared/supabase-client.js?v=20261006"></script>
+  <script src="../js/panel/auth.js?v=20261006"></script>
+  <script src="../js/panel/inicio.js?v=20261006"></script>
+</body>
+</html>

@@ -1,7 +1,13 @@
-// Módulo de autenticación del panel PQRS.
-// Mismo patrón que js/auth.js del panel de pedidos, simplificado: solo 3 roles
-// (admin/gestor/lector), sin concepto de módulos ni empresas por usuario (el
-// equipo interno ve todas las empresas).
+// Módulo de autenticación del panel (PQRS + Mercadeo).
+// Mismo patrón que js/auth.js del panel de pedidos, simplificado: roles
+// admin/gestor/lector (PQRS y Encuestas) y 'mercadeo' (solo Tablero y CRM de
+// Mercadeo), más usuarios_pqrs.modulos para habilitar un módulo extra sin
+// cambiar de rol. El equipo interno ve todas las empresas (sin empresas por usuario).
+//
+// Módulos: 'pqrs', 'encuestas' (por rol admin/gestor/lector), 'mercadeo'
+// (admin o 'mercadeo' en modulos). Cada página declara su módulo con
+// <body data-modulo="..."> y los enlaces/tarjetas con data-modulo se ocultan
+// si el usuario no lo tiene. La seguridad real es la RLS; esto es solo UX.
 var AUTH = (function () {
   var _user = null;
   var _profile = null;
@@ -83,7 +89,11 @@ var AUTH = (function () {
 
       _profile = res.data;
 
-      if (isLoginPage) { location.replace('dashboard.html'); return new Promise(function () {}); }
+      if (isLoginPage) { location.replace('inicio.html'); return new Promise(function () {}); }
+
+      // Guard de módulo: si la página exige uno que el usuario no tiene, va al inicio.
+      var modPagina = document.body.getAttribute('data-modulo');
+      if (modPagina && !hasModule(modPagina)) { location.replace('inicio.html'); return new Promise(function () {}); }
 
       _renderAuthUI();
       _setupAuthListener();
@@ -109,6 +119,11 @@ var AUTH = (function () {
     document.querySelectorAll('.auth-admin-only').forEach(function (e) {
       e.style.display = canManageUsers() ? (e.dataset.display || 'inline-block') : 'none';
     });
+    // Enlaces/tarjetas de un módulo que el usuario no tiene (el <body> también lleva data-modulo: se omite).
+    document.querySelectorAll('[data-modulo]').forEach(function (e) {
+      if (e === document.body) return;
+      if (!hasModule(e.getAttribute('data-modulo'))) e.style.display = 'none';
+    });
   }
 
   function _setupAuthListener() {
@@ -121,11 +136,21 @@ var AUTH = (function () {
     _sb.auth.signOut().then(function () { location.replace('login.html'); });
   }
 
+  // canEdit() = escritura sobre PQRS (el rol 'mercadeo' no tiene acceso a PQRS).
   function canEdit() { return !!_profile && (_profile.rol === 'admin' || _profile.rol === 'gestor'); }
   function isAdmin() { return !!_profile && _profile.rol === 'admin'; }
   function canManageUsers() { return isAdmin(); }
   function getProfile() { return _profile; }
   function getUser() { return _user; }
+
+  var ROLES_PQRS = ['admin', 'gestor', 'lector'];
+  // ¿El usuario tiene el módulo? (admin: todos).
+  function hasModule(key) {
+    if (!_profile) return false;
+    if (_profile.rol === 'admin') return true;
+    if (key === 'pqrs' || key === 'encuestas') return ROLES_PQRS.indexOf(_profile.rol) >= 0;
+    return (_profile.modulos || []).indexOf(key) >= 0;
+  }
 
   return {
     init: init,
@@ -134,6 +159,7 @@ var AUTH = (function () {
     canEdit: canEdit,
     isAdmin: isAdmin,
     canManageUsers: canManageUsers,
+    hasModule: hasModule,
     getProfile: getProfile,
     getUser: getUser,
   };
