@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mercadeo — Tablero</title>
+<link rel="stylesheet" href="../css/panel.css?v=20261006">
+</head>
+<body data-modulo="mercadeo">
+  <div class="header">
+    <div>
+      <h1>Mercadeo</h1>
+      <div class="sub">Tablero de tareas — solicitudes, producción, validación y entrega</div>
+    </div>
+    <nav>
+      <a href="inicio.html">Inicio</a>
+      <a href="dashboard.html" data-modulo="pqrs">PQRS</a>
+      <a href="encuestas.html" data-modulo="encuestas">Encuestas</a>
+      <a href="mercadeo.html" data-modulo="mercadeo" class="active">Tablero</a>
+      <a href="crm.html" data-modulo="mercadeo">CRM</a>
+      <a href="usuarios.html" class="auth-admin-only" data-display="inline" style="display:none">Usuarios</a>
+    </nav>
+    <div id="auth-info"></div>
+  </div>
+
+  <div id="main">
+    <div id="estado-carga" class="empty">Cargando…</div>
+
+    <div id="contenido" style="display:none">
+      <div class="stats" id="kb-stats"></div>
+
+      <div class="filters">
+        <div class="fg"><label for="f-empresa">Empresa</label>
+          <select id="f-empresa"><option value="">Todas</option></select></div>
+        <div class="fg"><label for="f-resp">Responsable</label>
+          <select id="f-resp"></select></div>
+        <div class="fg"><label for="f-tipo">Tipo</label>
+          <select id="f-tipo"><option value="">Todos</option></select></div>
+        <div class="fg"><label for="f-clase">Clase</label>
+          <select id="f-clase"><option value="">Todas</option></select></div>
+        <div class="fg"><label for="f-buscar">Buscar</label>
+          <input type="text" id="f-buscar" placeholder="Título o descripción…"></div>
+        <div class="fg"><label for="f-urg" style="cursor:pointer"><input type="checkbox" id="f-urg"> Solo urgentes</label></div>
+        <div class="fg"><label for="f-entregadas">Entregadas</label>
+          <select id="f-entregadas"><option value="30">Últimos 30 días</option><option value="todas">Todas</option></select></div>
+        <div class="fg"><label for="f-canceladas" style="cursor:pointer"><input type="checkbox" id="f-canceladas"> Ver canceladas</label></div>
+        <button class="btn-clear-filters" data-act="limpiar">Limpiar filtros</button>
+        <button class="btn-primary" data-act="tarea-nueva">➕ Nueva tarea</button>
+      </div>
+
+      <div class="kb-board" id="kb-board" aria-label="Tablero de tareas"></div>
+      <div id="kb-canceladas"></div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: tarea ══ -->
+  <div class="overlay" id="tarea-overlay" role="dialog" aria-modal="true" aria-labelledby="tarea-titulo">
+    <div class="modal-box" style="max-width:880px">
+      <div class="mhdr"><div><h2 id="tarea-titulo">Nueva tarea</h2><div class="meta" id="tarea-meta"></div></div>
+        <button class="btn-close" data-act="cerrar-modal" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div id="t-flags"></div>
+        <div class="form-grid cols2">
+          <div style="grid-column:1/-1"><label class="ef-label" for="t-titulo">Título *</label>
+            <input class="ef" id="t-titulo" maxlength="200" autocomplete="off"></div>
+          <div><label class="ef-label" for="t-tipo">Tipo *</label><select class="ef" id="t-tipo"></select></div>
+          <div><label class="ef-label" for="t-estado">Estado</label><select class="ef" id="t-estado"></select></div>
+          <div><label class="ef-label" for="t-actividad">Actividad del calendario</label><select class="ef" id="t-actividad"></select></div>
+          <div><label class="ef-label" for="t-prioridad">Clase de prioridad</label><select class="ef" id="t-prioridad"></select>
+            <div class="ef-help" id="t-prioridad-help"></div></div>
+          <div><label class="ef-label" for="t-fecha">Fecha límite (compromiso)</label><input class="ef" id="t-fecha" type="date"></div>
+          <div><span class="ef-label">Urgente</span>
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.86rem;padding:6px 0"><input type="checkbox" id="t-urgente"> Marcar como urgente</label></div>
+        </div>
+
+        <div id="t-aval-box" style="display:none" class="mk-box">
+          <h4>Aval de excepción — urgente fuera de calendario</h4>
+          <div class="ef-help" style="margin-bottom:8px">Según el manual, una tarea urgente fuera del calendario aprobado solo procede con aval del Comité de Mercadeo o de Gerencia General y se registra como excepción.</div>
+          <div class="form-grid cols2" style="margin-bottom:6px">
+            <div><label class="ef-label" for="t-aval-por">Quién avala *</label>
+              <select class="ef" id="t-aval-por"><option value="">Elegir…</option><option value="comite">Comité de Mercadeo</option><option value="gerencia_general">Gerencia General</option></select></div>
+            <div><label class="ef-label" for="t-aval-ref">Referencia (acta, correo, fecha) *</label><input class="ef" id="t-aval-ref" maxlength="300"></div>
+            <div style="grid-column:1/-1"><label class="ef-label" for="t-aval-motivo">Motivo *</label><textarea class="ef" id="t-aval-motivo" rows="2" maxlength="500"></textarea></div>
+          </div>
+          <div class="ef-help" id="t-aval-reg"></div>
+        </div>
+        <div id="t-urg-ok" class="ef-help" style="display:none;margin-bottom:10px">Urgente dentro del calendario aprobado: no requiere aval.</div>
+
+        <div style="margin:14px 0 10px"><span class="ef-label">Empresas *</span><div class="mk-checks" id="t-empresas"></div></div>
+        <div style="margin-bottom:12px"><span class="ef-label">Responsables</span><div class="mk-checks" id="t-resp"></div></div>
+
+        <label class="ef-label" for="t-desc">Descripción / brief</label>
+        <textarea class="ef" id="t-desc" rows="4" maxlength="4000"></textarea>
+        <div class="ef-help">Para confirmar la tarea (sacarla de “Solicitada”) se requiere la descripción y la fecha límite.</div>
+
+        <div id="t-nuevo-files" style="margin-top:14px">
+          <label class="ef-label" for="t-files-nuevo">Adjuntar archivos (opcional)</label>
+          <input type="file" id="t-files-nuevo" multiple>
+          <div class="ef-help">Máximo 25 MB por archivo. Se suben al guardar la tarea.</div>
+        </div>
+
+        <div id="t-extra" style="display:none">
+          <div class="mk-box" style="margin-top:16px">
+            <h4>Adjuntos</h4>
+            <div id="t-adjuntos"></div>
+            <div style="margin-top:8px"><label class="ef-label" for="t-files">Subir archivos</label>
+              <input type="file" id="t-files" multiple>
+              <div class="ef-help">Máximo 25 MB por archivo.</div></div>
+          </div>
+          <div class="mk-box" style="margin-top:14px">
+            <h4>Comentarios y bitácora</h4>
+            <textarea class="ef" id="t-coment-txt" rows="2" maxlength="2000" placeholder="Escribe un comentario…" aria-label="Nuevo comentario"></textarea>
+            <button class="btn-confirm" style="margin:8px 0 10px" data-act="comentar">💬 Comentar</button>
+            <div id="t-bitacora"></div>
+          </div>
+          <div id="t-audit"></div>
+        </div>
+      </div>
+      <div class="mftr">
+        <div class="mk-actions">
+          <button class="btn-danger" id="t-eliminar" data-act="tarea-eliminar" style="display:none">🗑 Eliminar</button>
+        </div>
+        <div class="mftr-btns">
+          <button class="btn-cancel" data-act="cerrar-modal">Cerrar</button>
+          <button class="btn-confirm" id="t-guardar" data-act="tarea-guardar">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../js/shared/supabase-client.js?v=20261006"></script>
+  <script src="../js/shared/modal.js?v=20261006"></script>
+  <script src="../js/panel/auth.js?v=20261006"></script>
+  <script src="../js/panel/mercadeo.js?v=20261006"></script>
+</body>
+</html>

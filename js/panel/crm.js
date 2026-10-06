@@ -31,10 +31,10 @@
   var MAX_CARGA = 500;
 
   // ── Estado ──
-  var leads = [], seguimientos = [], actividades = [], presupuesto = [], gastos = [], comerciales = [], equipo = [];
+  var leads = [], seguimientos = [], actividades = [], presupuesto = [], gastos = [], comerciales = [], equipo = [], tareas = [];
   var leadById = {}, segPorLead = {}, actById = {}, presById = {}, gastosPorPres = {};
   var ctxId = null, cierreKind = null, tab = 'leads', actEditId = null, presEditId = null, presDetId = null;
-  var filtroActividadId = null;
+  var filtroActividadId = null, indMes = null;
 
   function $(id) { return document.getElementById(id); }
   function esc(v) { return escHtml(v === null || v === undefined ? '' : String(v)); }
@@ -89,10 +89,11 @@
         fetchAll('mercadeo_presupuesto_gastos', '*', 'id'),
         fetchAll('mercadeo_comerciales', '*', 'nombre'),
         _sb.rpc('list_equipo_mercadeo'),
+        fetchAll('mercadeo_tareas', 'id,titulo,estado,empresas,urgente,fuera_calendario,aval_por,aval_referencia,aval_motivo,aval_registrado_por_nombre,aval_registrado_en,fecha_limite,creado_en,confirmada_en,entregada_en', 'id'),
       ]);
       for (var i = 0; i < rs.length; i++) if (rs[i].error) throw rs[i].error;
       leads = rs[0].data; seguimientos = rs[1].data; actividades = rs[2].data;
-      presupuesto = rs[3].data; gastos = rs[4].data; comerciales = rs[5].data; equipo = rs[6].data || [];
+      presupuesto = rs[3].data; gastos = rs[4].data; comerciales = rs[5].data; equipo = rs[6].data || []; tareas = rs[7].data;
     } catch (err) {
       if (primera) {
         $('estado-carga').innerHTML = 'No se pudieron cargar los datos: ' + esc(errMsg(err)) +
@@ -853,6 +854,48 @@
       return '<tr><td>' + esc(a.nombre) + '</td><td>' + esc(fmtDateOnly(a.fecha_solicitud)) + '</td><td>' + esc(fmtDateOnly(a.fecha_inicio)) + '</td>' +
         '<td style="text-align:right;font-weight:700;color:' + (d !== null && d < 15 ? '#c0392b' : '#15803d') + '">' + (d === null ? '—' : d + ' días') + '</td></tr>';
     }).join('') : '<tr><td colspan="4" class="empty" style="padding:16px">Sin eventos con fechas registradas.</td></tr>';
+    renderIndicadoresTareas();
+  }
+
+  // KPI del Tablero: reglas de priorización y SLA (MKT-DOC-00 §B.9). Mes por fecha de creación de la tarea
+  // (entrega: por fecha de entrega).
+  var AVAL_T = { comite: 'Comité de Mercadeo', gerencia_general: 'Gerencia General' };
+  function fechaLocal(ts) {
+    var d = new Date(ts);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function pct(n, d) { return d ? Math.round(n / d * 100) + '%' : '—'; }
+
+  function renderIndicadoresTareas() {
+    var mes = indMes || today().slice(0, 7);
+    var delMes = tareas.filter(function (t) { return String(t.creado_en || '').slice(0, 7) === mes; });
+    var dentro = delMes.filter(function (t) { return !t.fuera_calendario; });
+    var excep = delMes.filter(function (t) { return t.urgente && t.fuera_calendario; });
+    // Oportunidad de confirmación: solo cuentan las ya resueltas (confirmadas, o con más de 24 h sin confirmar); se excluyen las canceladas.
+    var resueltas = delMes.filter(function (t) { return t.estado !== 'cancelada' && (t.confirmada_en || (Date.now() - new Date(t.creado_en).getTime()) / 3600000 > 24); });
+    var aTiempoConf = resueltas.filter(function (t) { return t.confirmada_en && (new Date(t.confirmada_en).getTime() - new Date(t.creado_en).getTime()) / 3600000 <= 24; });
+    // Efectividad de entrega: entregadas en el mes que tenían fecha comprometida.
+    var entregadas = tareas.filter(function (t) { return t.entregada_en && fechaLocal(t.entregada_en).slice(0, 7) === mes && t.fecha_limite; });
+    var aTiempoEnt = entregadas.filter(function (t) { return fechaLocal(t.entregada_en) <= t.fecha_limite; });
+
+    var h = '<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>Tablero de tareas — reglas de priorización</h3>' +
+      '<div class="fg"><label for="ind-mes">Mes</label><input type="month" id="ind-mes" value="' + esc(mes) + '" style="border:1px solid #cbd5e0;border-radius:6px;padding:5px 8px"></div></div>' +
+      '<div class="mbody"><div class="stats" style="margin-bottom:14px">' +
+      '<div class="sc info"><div class="num">' + delMes.length + '</div><div class="lbl">Solicitudes del mes</div></div>' +
+      '<div class="sc entregado"><div class="num">' + pct(dentro.length, delMes.length) + '</div><div class="lbl">Dentro del calendario aprobado</div><div class="mk-sub">' + dentro.length + ' de ' + delMes.length + '</div></div>' +
+      '<div class="sc alerta"><div class="num">' + pct(excep.length, delMes.length) + '</div><div class="lbl">Urgentes fuera de calendario</div><div class="mk-sub">' + excep.length + ' excepción(es) con aval</div></div>' +
+      '<div class="sc pend"><div class="num">' + pct(aTiempoConf.length, resueltas.length) + '</div><div class="lbl">Confirmadas en ≤ 24 h</div><div class="mk-sub">' + aTiempoConf.length + ' de ' + resueltas.length + '</div></div>' +
+      '<div class="sc total"><div class="num">' + pct(aTiempoEnt.length, entregadas.length) + '</div><div class="lbl">Entregadas a tiempo</div><div class="mk-sub">' + aTiempoEnt.length + ' de ' + entregadas.length + '</div></div>' +
+      '</div>' +
+      '<h4 style="font-size:0.8rem;text-transform:uppercase;color:#4a5568;margin-bottom:6px">Excepciones del mes (urgente fuera de calendario)</h4>' +
+      (excep.length ? '<div class="table-wrap"><table class="mk-mini"><thead><tr><th>Tarea</th><th>Empresas</th><th>Avala</th><th>Referencia</th><th>Motivo</th><th>Registró</th><th>Estado</th></tr></thead><tbody>' +
+        excep.map(function (t) {
+          return '<tr><td>' + esc(t.titulo) + '</td><td>' + empresaChips(t.empresas) + '</td><td>' + esc(AVAL_T[t.aval_por] || '— sin aval —') + '</td><td>' + esc(t.aval_referencia) + '</td><td>' + esc(t.aval_motivo) + '</td>' +
+            '<td>' + esc(t.aval_registrado_por_nombre || '—') + (t.aval_registrado_en ? ' · ' + esc(fmtDateTime(t.aval_registrado_en)) : '') + '</td><td>' + esc(t.estado.replace('_', ' ')) + '</td></tr>';
+        }).join('') + '</tbody></table></div>' : '<div class="mk-sin">Sin excepciones en este mes.</div>') +
+      '<div class="ef-help" style="margin-top:10px">Confirmación: solo cuentan las solicitudes ya resueltas (confirmadas o con más de 24 h sin confirmar; se excluyen canceladas). Entrega: tareas entregadas en el mes con fecha límite.</div>' +
+      '</div></div>';
+    $('ind-tareas').innerHTML = h;
   }
 
   // ══════════════ Eventos ══════════════
@@ -912,6 +955,9 @@
   ['fa-estado', 'fa-tipo', 'fa-cal'].forEach(function (id) { $(id).addEventListener('change', renderActividades); });
   ['fp-empresa', 'fp-rubro'].forEach(function (id) { $(id).addEventListener('change', renderPresupuesto); });
   $('carga-texto').addEventListener('input', actualizarPreviewCarga);
+  document.addEventListener('change', function (e) {
+    if (e.target && e.target.id === 'ind-mes') { indMes = /^\d{4}-\d{2}$/.test(e.target.value) ? e.target.value : null; renderIndicadoresTareas(); }
+  });
   $('ac-bd-entregada').addEventListener('change', sincronizarBd);
 
   MODAL.onClose = function (id) {

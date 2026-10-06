@@ -243,3 +243,53 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, select:focus-vi
 @media (max-width: 700px) { .form-grid.cols2 { grid-template-columns: 1fr; } }
 .ef-help { font-size: 0.74rem; color: #718096; margin-top: 3px; }
 textarea.ef { resize: vertical; }
+
+/* ── Tablero kanban de Mercadeo ───────────────────────────── */
+.kb-board { display: flex; gap: 12px; overflow-x: auto; align-items: flex-start; padding-bottom: 12px; }
+.kb-col { flex: 0 0 290px; background: #e4eaf1; border-radius: 10px; display: flex; flex-direction: column; max-height: calc(100vh - 270px); min-height: 200px; border-top: 4px solid #a0aec0; }
+.kb-col[data-estado="solicitada"] { border-top-color: #d97706; }
+.kb-col[data-estado="confirmada"] { border-top-color: #2563eb; }
+.kb-col[data-estado="en_produccion"] { border-top-color: #7c3aed; }
+.kb-col[data-estado="en_validacion"] { border-top-color: #0891b2; }
+.kb-col[data-estado="entregada"] { border-top-color: #15803d; }
+.kb-col-head { padding: 10px 12px 6px; display: flex; justify-content: space-between; align-items: center; font-size: 0.84rem; font-weight: 700; color: #2d3748; }
+.kb-count { background: #fff; border-radius: 10px; padding: 0 8px; font-size: 0.74rem; color: #4a5568; }
+.kb-list { padding: 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 70px; border-radius: 0 0 10px 10px; }
+.kb-list.over { background: #cfe3f3; outline: 2px dashed #2471a3; outline-offset: -4px; }
+.kb-card { background: #fff; border-radius: 8px; padding: 10px 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); cursor: grab; border-left: 4px solid #cbd5e0; font-size: 0.84rem; }
+.kb-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.18); }
+.kb-card.dragging { opacity: 0.4; }
+.kb-card.p-calendario { border-left-color: #15803d; }
+.kb-card.p-soporte_ventas { border-left-color: #2563eb; }
+.kb-card.p-mejora { border-left-color: #a0aec0; }
+.kb-card.p-exploratorio { border-left-color: #d6bcfa; }
+.kb-card.urg { border-left-color: #e74c3c; }
+.kb-card-top { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; align-items: center; }
+.kb-chip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.68rem; font-weight: 700; background: #edf2f7; color: #4a5568; }
+.kb-chip.urg { background: #e74c3c; color: #fff; }
+.kb-chip.warn { background: #fef3c7; color: #92400e; }
+.kb-title { font-weight: 700; color: #2d3748; line-height: 1.3; margin-bottom: 6px; word-break: break-word; }
+.kb-emp { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.kb-act { font-size: 0.72rem; color: #718096; margin-bottom: 6px; }
+.kb-meta { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 0.75rem; color: #718096; }
+.kb-fecha.venc { color: #c0392b; font-weight: 700; }
+.kb-fecha.pronto { color: #b7791f; font-weight: 700; }
+.kb-avatars { display: flex; padding-left: 6px; }
+.kb-av { width: 24px; height: 24px; border-radius: 50%; background: #2471a3; color: #fff; font-size: 0.64rem; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-left: -6px; border: 2px solid #fff; }
+.kb-av.inactivo { background: #a0aec0; }
+.kb-move { display: flex; justify-content: flex-end; gap: 4px; margin-top: 6px; }
+.kb-move button { background: #f0f4f8; border: 1px solid #cbd5e0; border-radius: 5px; width: 30px; height: 24px; cursor: pointer; font-size: 0.72rem; color: #4a5568; }
+.kb-move button:hover:not(:disabled) { background: #e2e8f0; }
+.kb-move button:disabled { opacity: 0.35; cursor: default; }
+.kb-vacio { text-align: center; color: #a0aec0; font-size: 0.78rem; padding: 14px 4px; }
+@media (max-width: 700px) { .kb-col { flex-basis: 84vw; max-height: none; } }
+
+/* Ajustes de usabilidad (móvil y contraste) */
+.header .btn-secondary { color: #fff; border-color: rgba(255,255,255,0.65); }
+.header .btn-secondary:hover { background: rgba(255,255,255,0.15); }
+.filters select, .filters input[type="text"] { max-width: 100%; min-width: 0; }
+@media (max-width: 700px) {
+  .filters .fg { width: 100%; justify-content: space-between; }
+  .filters .fg select, .filters .fg input[type="text"] { flex: 1; }
+  #main { padding: 14px 12px; }
+}
