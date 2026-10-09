@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SST — Sistema de Gestión</title>
-<link rel="stylesheet" href="../css/panel.css?v=20261009">
+<link rel="stylesheet" href="../css/panel.css?v=20261010">
 </head>
 <body data-modulo="sst">
   <div class="header">
@@ -38,6 +38,7 @@
       <div class="mk-tabs" role="tablist">
         <button class="mk-tab" id="tab-empresas" role="tab" data-act="tab" data-tab="empresas">🏢 Empresas</button>
         <button class="mk-tab" id="tab-trabajadores" role="tab" data-act="tab" data-tab="trabajadores">👷 Trabajadores</button>
+        <button class="mk-tab" id="tab-autoevaluacion" role="tab" data-act="tab" data-tab="autoevaluacion">✅ Autoevaluación</button>
         <button class="mk-tab" id="tab-evidencias" role="tab" data-act="tab" data-tab="evidencias">🔗 Evidencias (Drive)</button>
       </div>
 
@@ -87,6 +88,34 @@
                 <th>Nombre</th><th>Documento</th><th>Empresa</th><th>Cargo</th><th>Vinculación</th><th>Ingreso</th><th>Retiro</th><th></th>
               </tr></thead>
               <tbody id="trabajadores-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Autoevaluación ── -->
+      <div id="panel-autoevaluacion" style="display:none">
+        <div class="mk-flag" style="background:#ebf5fb;color:#1a5276">
+          Autoevaluación anual de estándares mínimos (Res. 312 de 2019, arts. 25 a 28): se hace cada año en diciembre, se registra en la aplicación del Ministerio del Trabajo y se envía copia, con el plan de mejoramiento, a la ARL.
+        </div>
+        <div class="filters">
+          <div class="fg"><label for="fa-empresa">Empresa</label><select id="fa-empresa"><option value="">Todas</option></select></div>
+          <div class="fg"><label for="fa-estado">Estado</label>
+            <select id="fa-estado"><option value="">Todos</option><option value="borrador">Borrador</option><option value="cerrada">Cerrada</option></select>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h3>Autoevaluaciones <span id="autoevaluaciones-ct" style="font-weight:400;color:#718096"></span></h3>
+            <button class="btn-primary sm" data-act="ae-nueva">➕ Nueva autoevaluación</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Empresa</th><th>Vigencia</th><th>Fecha</th><th>Estándares</th><th>Estado</th>
+                <th style="text-align:right">Puntaje</th><th>Resultado</th><th>Reporte de avances a la ARL</th><th></th>
+              </tr></thead>
+              <tbody id="autoevaluaciones-body"></tbody>
             </table>
           </div>
         </div>
@@ -181,11 +210,12 @@
   </div>
 
   <!-- ══ Modal: evidencia ══ -->
-  <div class="overlay" id="ev-overlay" role="dialog" aria-modal="true" aria-labelledby="ev-titulo">
+  <div class="overlay over" id="ev-overlay" style="z-index:270" role="dialog" aria-modal="true" aria-labelledby="ev-titulo">
     <div class="modal-box" style="max-width:700px">
       <div class="mhdr"><div><h2 id="ev-titulo">Nueva evidencia</h2></div>
         <button class="btn-close" data-act="cerrar-modal" data-modal="ev-overlay" aria-label="Cerrar">✕</button></div>
       <div class="mbody">
+        <div class="mk-flag" id="v-contexto" style="display:none;background:#ebf5fb;color:#1a5276"></div>
         <div class="form-grid cols2">
           <div style="grid-column:1/-1"><label class="ef-label" for="v-empresa">Empresa *</label><select class="ef" id="v-empresa"></select></div>
           <div style="grid-column:1/-1"><label class="ef-label" for="v-titulo">Título *</label><input class="ef" id="v-titulo" maxlength="200"></div>
@@ -209,10 +239,92 @@
     </div>
   </div>
 
+  <!-- ══ Modal: nueva autoevaluación ══ -->
+  <div class="overlay over" id="ae-nueva-overlay" role="dialog" aria-modal="true" aria-labelledby="ae-nueva-titulo">
+    <div class="modal-box" style="max-width:600px">
+      <div class="mhdr"><div><h2 id="ae-nueva-titulo">Nueva autoevaluación</h2></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="ae-nueva-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div class="form-grid cols2">
+          <div style="grid-column:1/-1"><label class="ef-label" for="an-empresa">Empresa *</label><select class="ef" id="an-empresa"></select></div>
+          <div><label class="ef-label" for="an-vigencia">Vigencia (año evaluado) *</label><input class="ef" id="an-vigencia" type="number" min="2019" max="2100" step="1" inputmode="numeric"></div>
+          <div><label class="ef-label" for="an-fecha">Fecha de la evaluación *</label><input class="ef" id="an-fecha" type="date"></div>
+          <div style="grid-column:1/-1"><label class="ef-label" for="an-empleador">Empleador o representante legal (firma)</label><input class="ef" id="an-empleador" maxlength="200"></div>
+          <div style="grid-column:1/-1"><label class="ef-label" for="an-responsable">Responsable del SG-SST (firma)</label><input class="ef" id="an-responsable" maxlength="200"></div>
+        </div>
+        <div class="mk-flag" id="an-grupo" style="background:#ebf5fb;color:#1a5276"></div>
+        <div class="ef-help">Los estándares a evaluar los crea el sistema según el grupo de la empresa (7, 21 o 60). La autoevaluación es anual: solo puede haber una por empresa y vigencia.</div>
+      </div>
+      <div class="mftr"><span></span><div class="mftr-btns">
+        <button class="btn-cancel" data-act="cerrar-modal" data-modal="ae-nueva-overlay">Cancelar</button>
+        <button class="btn-confirm" id="an-ok" data-act="ae-crear">Crear autoevaluación</button></div></div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: detalle de la autoevaluación ══ -->
+  <div class="overlay" id="ae-overlay" role="dialog" aria-modal="true" aria-labelledby="ae-titulo">
+    <div class="modal-box" style="max-width:1040px">
+      <div class="mhdr"><div><h2 id="ae-titulo"></h2><div class="meta" id="ae-meta"></div></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="ae-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody" id="ae-body"></div>
+      <div class="mftr">
+        <div class="mk-actions">
+          <button class="btn-secondary" id="ae-btn-pdf" data-act="ae-pdf">📄 Generar PDF</button>
+          <button class="btn-secondary" id="ae-btn-reabrir" data-act="ae-reabrir" style="display:none">↩ Reabrir (admin)</button>
+        </div>
+        <div class="mftr-btns">
+          <button class="btn-confirm" id="ae-btn-cerrar" data-act="ae-cerrar">🔒 Cerrar autoevaluación</button>
+          <button class="btn-cancel" data-act="cerrar-modal" data-modal="ae-overlay">Cerrar ventana</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: evidencias de un estándar o de una actividad ══ -->
+  <div class="overlay over" id="evl-overlay" role="dialog" aria-modal="true" aria-labelledby="evl-titulo">
+    <div class="modal-box" style="max-width:720px">
+      <div class="mhdr"><div><h2 id="evl-titulo"></h2><div class="meta"><span>Enlaces a Google Drive que respaldan este registro</span></div></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="evl-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody" id="evl-body"></div>
+      <div class="mftr"><span></span><div class="mftr-btns">
+        <button class="btn-cancel" data-act="cerrar-modal" data-modal="evl-overlay">Cerrar</button>
+        <button class="btn-confirm" data-act="evl-agregar">➕ Agregar enlace</button></div></div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: actividad del plan de mejoramiento ══ -->
+  <div class="overlay over" id="pm-overlay" role="dialog" aria-modal="true" aria-labelledby="pm-titulo">
+    <div class="modal-box" style="max-width:680px">
+      <div class="mhdr"><div><h2 id="pm-titulo">Nueva actividad del plan</h2></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="pm-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div class="form-grid cols2">
+          <div style="grid-column:1/-1"><label class="ef-label" for="pm-actividad">Actividad *</label><textarea class="ef" id="pm-actividad" rows="2" maxlength="500"></textarea></div>
+          <div style="grid-column:1/-1"><label class="ef-label" for="pm-item">Estándar que atiende</label><select class="ef" id="pm-item"></select></div>
+          <div><label class="ef-label" for="pm-responsable">Responsable</label><input class="ef" id="pm-responsable" maxlength="200"></div>
+          <div><label class="ef-label" for="pm-plazo">Plazo</label><input class="ef" id="pm-plazo" type="date"></div>
+          <div style="grid-column:1/-1"><label class="ef-label" for="pm-recursos">Recursos administrativos y financieros</label><input class="ef" id="pm-recursos" maxlength="500"></div>
+          <div><label class="ef-label" for="pm-estado">Estado</label><select class="ef" id="pm-estado"></select></div>
+          <div><label class="ef-label" for="pm-cumplimiento">Fecha de cumplimiento</label><input class="ef readonly" id="pm-cumplimiento" type="date" disabled>
+            <div class="ef-help">La registra el sistema al marcarla «Cumplida».</div></div>
+        </div>
+        <label class="ef-label" for="pm-obs">Observaciones</label>
+        <textarea class="ef" id="pm-obs" rows="2" maxlength="1000"></textarea>
+        <div id="pm-aud"></div>
+      </div>
+      <div class="mftr"><span></span><div class="mftr-btns">
+        <button class="btn-cancel" data-act="cerrar-modal" data-modal="pm-overlay">Cancelar</button>
+        <button class="btn-confirm" id="pm-ok" data-act="pm-guardar">Guardar</button></div></div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="../js/shared/supabase-client.js?v=20261009"></script>
-  <script src="../js/shared/modal.js?v=20261009"></script>
-  <script src="../js/panel/auth.js?v=20261009"></script>
-  <script src="../js/panel/sst.js?v=20261009"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+  <script src="../js/shared/supabase-client.js?v=20261010"></script>
+  <script src="../js/shared/modal.js?v=20261010"></script>
+  <script src="../js/panel/auth.js?v=20261010"></script>
+  <script src="../js/panel/sst-pdf.js?v=20261010"></script>
+  <script src="../js/panel/sst.js?v=20261010"></script>
 </body>
 </html>
