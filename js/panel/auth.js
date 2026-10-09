@@ -1,11 +1,12 @@
-// Módulo de autenticación del panel (PQRS + Mercadeo).
+// Módulo de autenticación del panel (PQRS + Mercadeo + SST).
 // Mismo patrón que js/auth.js del panel de pedidos, simplificado: roles
-// admin/gestor/lector (PQRS y Encuestas) y 'mercadeo' (solo Tablero y CRM de
-// Mercadeo), más usuarios_pqrs.modulos para habilitar un módulo extra sin
-// cambiar de rol. El equipo interno ve todas las empresas (sin empresas por usuario).
+// admin/gestor/lector (PQRS y Encuestas), 'mercadeo' (solo Tablero y CRM de
+// Mercadeo) y 'sst' (solo el módulo SST), más usuarios_pqrs.modulos para habilitar
+// un módulo extra sin cambiar de rol. El equipo interno ve todas las empresas
+// (sin empresas por usuario).
 //
-// Módulos: 'pqrs', 'encuestas' (por rol admin/gestor/lector), 'mercadeo'
-// (admin o 'mercadeo' en modulos). Cada página declara su módulo con
+// Módulos: 'pqrs', 'encuestas' (por rol admin/gestor/lector), 'mercadeo' y 'sst'
+// (admin o la clave en modulos). Cada página declara su módulo con
 // <body data-modulo="..."> y los enlaces/tarjetas con data-modulo se ocultan
 // si el usuario no lo tiene. La seguridad real es la RLS; esto es solo UX.
 var AUTH = (function () {
@@ -106,7 +107,7 @@ var AUTH = (function () {
     var el = document.getElementById('auth-info');
     if (!el) return;
     var name = _profile ? escHtml(_profile.nombre || _profile.email) : '';
-    var rolLabel = _profile ? _profile.rol.charAt(0).toUpperCase() + _profile.rol.slice(1) : '';
+    var rolLabel = _profile ? (_profile.rol === 'sst' ? 'SST' : _profile.rol.charAt(0).toUpperCase() + _profile.rol.slice(1)) : '';
     el.innerHTML =
       '<span class="auth-user">' + name + '</span>' +
       '<span class="auth-role-badge">' + escHtml(rolLabel) + '</span>' +

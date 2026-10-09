@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SST — Sistema de Gestión</title>
+<link rel="stylesheet" href="../css/panel.css?v=20261009">
+</head>
+<body data-modulo="sst">
+  <div class="header">
+    <div>
+      <h1>SST</h1>
+      <div class="sub">Sistema de Gestión de Seguridad y Salud en el Trabajo — Res. 312 de 2019</div>
+    </div>
+    <nav>
+      <a href="inicio.html">Inicio</a>
+      <a href="dashboard.html" data-modulo="pqrs">PQRS</a>
+      <a href="encuestas.html" data-modulo="encuestas">Encuestas</a>
+      <a href="mercadeo.html" data-modulo="mercadeo">Tablero</a>
+      <a href="crm.html" data-modulo="mercadeo">CRM</a>
+      <a href="sst.html" data-modulo="sst" class="active">SST</a>
+      <a href="usuarios.html" class="auth-admin-only" data-display="inline" style="display:none">Usuarios</a>
+    </nav>
+    <div id="auth-info"></div>
+  </div>
+
+  <div id="main">
+    <div id="estado-carga" class="empty">Cargando…</div>
+
+    <div id="contenido" style="display:none">
+      <div class="stats">
+        <div class="sc info"><div class="num" id="s-empresas">0</div><div class="lbl">Empresas activas</div></div>
+        <div class="sc parcial"><div class="num" id="s-trabajadores">0</div><div class="lbl">Trabajadores activos</div></div>
+        <div class="sc entregado"><div class="num" id="s-evidencias">0</div><div class="lbl">Evidencias (enlaces a Drive)</div></div>
+        <div class="sc alerta"><div class="num" id="s-vencen">0</div><div class="lbl">Vencidas o por vencer (30 días)</div></div>
+      </div>
+
+      <div class="mk-tabs" role="tablist">
+        <button class="mk-tab" id="tab-empresas" role="tab" data-act="tab" data-tab="empresas">🏢 Empresas</button>
+        <button class="mk-tab" id="tab-trabajadores" role="tab" data-act="tab" data-tab="trabajadores">👷 Trabajadores</button>
+        <button class="mk-tab" id="tab-evidencias" role="tab" data-act="tab" data-tab="evidencias">🔗 Evidencias (Drive)</button>
+      </div>
+
+      <!-- ── Empresas ── -->
+      <div id="panel-empresas">
+        <div class="mk-flag" style="background:#ebf5fb;color:#1a5276">
+          El grupo de estándares mínimos (7, 21 o 60) lo calcula el sistema con el número de trabajadores y la clase de riesgo (Res. 312 de 2019, art. 3).
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h3>Empresas <span id="empresas-ct" style="font-weight:400;color:#718096"></span></h3>
+            <button class="btn-primary sm" data-act="emp-nueva">➕ Nueva empresa</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Empresa</th><th>NIT</th><th>ARL</th><th>Clase de riesgo</th>
+                <th style="text-align:right">Trabajadores</th><th>Estándares aplicables</th><th>Estado</th><th></th>
+              </tr></thead>
+              <tbody id="empresas-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Trabajadores ── -->
+      <div id="panel-trabajadores" style="display:none">
+        <div class="mk-flag">
+          Datos personales (Ley 1581 de 2012): se registran solo los datos mínimos para identificar al trabajador. <strong>No se guardan datos de salud.</strong>
+        </div>
+        <div class="filters">
+          <div class="fg"><label for="ft-empresa">Empresa</label><select id="ft-empresa"><option value="">Todas</option></select></div>
+          <div class="fg"><label for="ft-estado">Estado</label>
+            <select id="ft-estado"><option value="activos">Activos</option><option value="retirados">Retirados</option><option value="">Todos</option></select>
+          </div>
+          <div class="fg"><label for="ft-txt">Buscar</label><input type="text" id="ft-txt" placeholder="Nombre, documento o cargo…"></div>
+          <button class="btn-clear-filters" data-act="tr-limpiar">Limpiar filtros</button>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h3>Trabajadores <span id="trabajadores-ct" style="font-weight:400;color:#718096"></span></h3>
+            <button class="btn-primary sm" data-act="tr-nuevo">➕ Nuevo trabajador</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Nombre</th><th>Documento</th><th>Empresa</th><th>Cargo</th><th>Vinculación</th><th>Ingreso</th><th>Retiro</th><th></th>
+              </tr></thead>
+              <tbody id="trabajadores-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Evidencias ── -->
+      <div id="panel-evidencias" style="display:none">
+        <div class="mk-flag" style="background:#ebf5fb;color:#1a5276">
+          Las evidencias permanecen en Google Drive: aquí se guarda el enlace y qué es. Quien abra un enlace necesita acceso a esa carpeta de Drive.
+        </div>
+        <div class="filters">
+          <div class="fg"><label for="fv-empresa">Empresa</label><select id="fv-empresa"><option value="">Todas</option></select></div>
+          <div class="fg"><label for="fv-tipo">Tipo</label><select id="fv-tipo"><option value="">Todos</option></select></div>
+          <div class="fg"><label for="fv-estado">Enlace</label>
+            <select id="fv-estado"><option value="activas">Activas</option><option value="por_revisar">Por revisar</option><option value="retirada">Retiradas</option><option value="">Todas</option></select>
+          </div>
+          <div class="fg"><label for="fv-vigencia">Vigencia</label>
+            <select id="fv-vigencia"><option value="">Todas</option><option value="vencen">Vencidas o por vencer</option></select>
+          </div>
+          <div class="fg"><label for="fv-txt">Buscar</label><input type="text" id="fv-txt" placeholder="Título, código o versión…"></div>
+          <button class="btn-clear-filters" data-act="ev-limpiar">Limpiar filtros</button>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h3>Evidencias <span id="evidencias-ct" style="font-weight:400;color:#718096"></span></h3>
+            <button class="btn-primary sm" data-act="ev-nueva">➕ Nueva evidencia</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Título</th><th>Empresa</th><th>Tipo</th><th>Código</th><th>Versión</th><th>Fecha</th><th>Vigente hasta</th><th>Enlace</th><th></th>
+              </tr></thead>
+              <tbody id="evidencias-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: empresa ══ -->
+  <div class="overlay" id="emp-overlay" role="dialog" aria-modal="true" aria-labelledby="emp-titulo">
+    <div class="modal-box" style="max-width:680px">
+      <div class="mhdr"><div><h2 id="emp-titulo">Nueva empresa</h2></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="emp-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div class="form-grid cols2">
+          <div style="grid-column:1/-1"><label class="ef-label" for="e-nombre">Razón social *</label><input class="ef" id="e-nombre" maxlength="200"></div>
+          <div><label class="ef-label" for="e-nit">NIT</label><input class="ef" id="e-nit" maxlength="30" placeholder="Ej. 901860911-2"></div>
+          <div><label class="ef-label" for="e-arl">ARL</label><input class="ef" id="e-arl" maxlength="120"></div>
+          <div><label class="ef-label" for="e-num">Número de trabajadores *</label><input class="ef" id="e-num" type="number" min="0" step="1" inputmode="numeric"></div>
+          <div><label class="ef-label" for="e-estado">Estado</label>
+            <select class="ef" id="e-estado"><option value="1">Activa</option><option value="0">Inactiva</option></select></div>
+        </div>
+        <div style="margin-bottom:12px"><span class="ef-label">Clases de riesgo reportadas *</span>
+          <div class="mk-checks" id="e-clases"></div></div>
+        <div class="mk-flag" id="e-grupo" style="background:#ebf5fb;color:#1a5276"></div>
+        <label class="ef-label" for="e-actividades">Actividades económicas (CIIU)</label>
+        <textarea class="ef" id="e-actividades" rows="2" maxlength="1000" style="margin-bottom:10px"></textarea>
+        <label class="ef-label" for="e-obs">Observaciones</label>
+        <textarea class="ef" id="e-obs" rows="2" maxlength="1000"></textarea>
+        <div id="e-aud"></div>
+      </div>
+      <div class="mftr"><span></span><div class="mftr-btns">
+        <button class="btn-cancel" data-act="cerrar-modal" data-modal="emp-overlay">Cancelar</button>
+        <button class="btn-confirm" id="e-ok" data-act="emp-guardar">Guardar</button></div></div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: trabajador ══ -->
+  <div class="overlay" id="tr-overlay" role="dialog" aria-modal="true" aria-labelledby="tr-titulo">
+    <div class="modal-box" style="max-width:680px">
+      <div class="mhdr"><div><h2 id="tr-titulo">Nuevo trabajador</h2></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="tr-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div class="form-grid cols2">
+          <div style="grid-column:1/-1"><label class="ef-label" for="t-empresa">Empresa *</label><select class="ef" id="t-empresa"></select></div>
+          <div style="grid-column:1/-1"><label class="ef-label" for="t-nombre">Nombre completo *</label><input class="ef" id="t-nombre" maxlength="200"></div>
+          <div><label class="ef-label" for="t-tipodoc">Tipo de documento</label><select class="ef" id="t-tipodoc"></select></div>
+          <div><label class="ef-label" for="t-numdoc">Número de documento *</label><input class="ef" id="t-numdoc" maxlength="30" inputmode="numeric"></div>
+          <div><label class="ef-label" for="t-cargo">Cargo</label><input class="ef" id="t-cargo" maxlength="120"></div>
+          <div><label class="ef-label" for="t-vinc">Vinculación</label><select class="ef" id="t-vinc"></select></div>
+          <div><label class="ef-label" for="t-ingreso">Fecha de ingreso</label><input class="ef" id="t-ingreso" type="date"></div>
+          <div><label class="ef-label" for="t-retiro">Fecha de retiro</label><input class="ef" id="t-retiro" type="date"></div>
+        </div>
+        <div id="t-aud"></div>
+      </div>
+      <div class="mftr"><span></span><div class="mftr-btns">
+        <button class="btn-cancel" data-act="cerrar-modal" data-modal="tr-overlay">Cancelar</button>
+        <button class="btn-confirm" id="t-ok" data-act="tr-guardar">Guardar</button></div></div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: evidencia ══ -->
+  <div class="overlay" id="ev-overlay" role="dialog" aria-modal="true" aria-labelledby="ev-titulo">
+    <div class="modal-box" style="max-width:700px">
+      <div class="mhdr"><div><h2 id="ev-titulo">Nueva evidencia</h2></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="ev-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div class="form-grid cols2">
+          <div style="grid-column:1/-1"><label class="ef-label" for="v-empresa">Empresa *</label><select class="ef" id="v-empresa"></select></div>
+          <div style="grid-column:1/-1"><label class="ef-label" for="v-titulo">Título *</label><input class="ef" id="v-titulo" maxlength="200"></div>
+          <div style="grid-column:1/-1"><label class="ef-label" for="v-url">Enlace de Google Drive *</label>
+            <input class="ef" id="v-url" maxlength="2000" placeholder="https://drive.google.com/…  o  https://docs.google.com/…">
+            <div class="ef-help">Pega el enlace del archivo o carpeta (Compartir → Copiar enlace). Solo se aceptan enlaces de drive.google.com y docs.google.com.</div></div>
+          <div><label class="ef-label" for="v-tipo">Tipo</label><select class="ef" id="v-tipo"></select></div>
+          <div><label class="ef-label" for="v-codigo">Código documental</label><input class="ef" id="v-codigo" maxlength="60" placeholder="Ej. SST-TEC-FO07"></div>
+          <div><label class="ef-label" for="v-version">Versión</label><input class="ef" id="v-version" maxlength="30"></div>
+          <div><label class="ef-label" for="v-estado">Estado del enlace</label><select class="ef" id="v-estado"></select></div>
+          <div><label class="ef-label" for="v-fecha">Fecha del documento</label><input class="ef" id="v-fecha" type="date"></div>
+          <div><label class="ef-label" for="v-vigente">Vigente hasta</label><input class="ef" id="v-vigente" type="date"></div>
+        </div>
+        <label class="ef-label" for="v-obs">Observaciones</label>
+        <textarea class="ef" id="v-obs" rows="2" maxlength="1000"></textarea>
+        <div id="v-aud"></div>
+      </div>
+      <div class="mftr"><span></span><div class="mftr-btns">
+        <button class="btn-cancel" data-act="cerrar-modal" data-modal="ev-overlay">Cancelar</button>
+        <button class="btn-confirm" id="v-ok" data-act="ev-guardar">Guardar</button></div></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../js/shared/supabase-client.js?v=20261009"></script>
+  <script src="../js/shared/modal.js?v=20261009"></script>
+  <script src="../js/panel/auth.js?v=20261009"></script>
+  <script src="../js/panel/sst.js?v=20261009"></script>
+</body>
+</html>

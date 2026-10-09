@@ -3,6 +3,9 @@
 // Clon adaptado de supabase/functions/create-user/index.ts del panel de pedidos.
 // Exige JWT de un 'admin' ya autenticado en usuarios_pqrs; usa service_role para
 // auth.admin.createUser y para insertar el perfil en usuarios_pqrs.
+//
+// v5 (SST): acepta el rol 'sst' y el módulo 'sst' (migración 0015). Hasta la v4 este
+// archivo no estaba versionado en el repo; el código de la v4 vivía solo en Supabase.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -52,13 +55,14 @@ serve(async (req) => {
     const { email, password, nombre, rol, modulos } = await req.json()
     if (!email || !password) throw new Error('Email y contraseña son requeridos')
     if (password.length < 8) throw new Error('La contraseña debe tener al menos 8 caracteres')
-    if (!['admin', 'gestor', 'lector', 'mercadeo'].includes(rol)) throw new Error('Rol inválido')
+    if (!['admin', 'gestor', 'lector', 'mercadeo', 'sst'].includes(rol)) throw new Error('Rol inválido')
 
-    // Módulos extra habilitados (hoy solo 'mercadeo'). El rol 'mercadeo' siempre lo lleva.
-    const MODULOS_VALIDOS = ['mercadeo']
+    // Módulos extra habilitados ('mercadeo', 'sst'). Un rol que lleva su módulo (mercadeo, sst) siempre lo tiene.
+    const MODULOS_VALIDOS = ['mercadeo', 'sst']
     const mods: string[] = Array.isArray(modulos) ? modulos : []
     if (mods.some((m) => !MODULOS_VALIDOS.includes(m))) throw new Error('Módulo inválido')
     if (rol === 'mercadeo' && !mods.includes('mercadeo')) mods.push('mercadeo')
+    if (rol === 'sst' && !mods.includes('sst')) mods.push('sst')
 
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
