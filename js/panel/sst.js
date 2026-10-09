@@ -1,6 +1,8 @@
 // ══════════════════════════════════════════════════════════════
 // SST — Sistema de Gestión de Seguridad y Salud en el Trabajo (Res. 312 de 2019)
 // FASE 0: base del módulo = Empresas + Trabajadores + Evidencias (enlaces a Drive).
+// FASE 1: autoevaluación de estándares mínimos + plan de mejoramiento.
+// FASE 2: plan anual de trabajo (cronograma mensual programado/ejecutado) + programa de capacitación.
 // ══════════════════════════════════════════════════════════════
 // Mismo patrón que crm.js/mercadeo.js: cliente Supabase directo, la seguridad real es la RLS
 // (user_has_module_pqrs('sst'), migración 0015) y las reglas de negocio las sella el servidor:
@@ -33,6 +35,16 @@
   var evlCtx = null;     // { tipo, id, titulo } del registro cuyas evidencias se listan
   var evEntidad = null;  // { tipo, id, empresa_id, titulo } al crear una evidencia desde un estándar o una actividad
   var pmEditId = null, pmAutoId = null;
+  // Fase 2: plan anual de trabajo y capacitaciones
+  var planesAnual = [], planActs = [], planGrupos = [], caps = [], sesiones = [], asistentes = [], indMes = [];
+  var planAnualById = {}, actById = {}, actsPorPlan = {}, capById = {}, sesById = {}, sesPorCap = {}, asisPorSes = {};
+  var plSel = null;                 // plan anual abierto en la pestaña
+  var plDatosKey = null, plDatosAbierto = null;
+  var paEditId = null, paPlanId = null;
+  var cpEditId = null, cpCtx = null; // tema: id en edición y { empresa_id, vigencia } al crear
+  var cslCapId = null;              // tema cuyas sesiones se listan
+  var csEditId = null, csCapId = null;
+  var capInit = false;
 
   function $(id) { return document.getElementById(id); }
   function esc(v) { return escHtml(v === null || v === undefined ? '' : String(v)); }
@@ -81,10 +93,19 @@
         fetchAll('sst_autoevaluaciones_resumen', '*', 'id'),
         fetchAll('sst_autoeval_items', '*', 'id'),
         fetchAll('sst_plan_mejora', '*', 'id'),
+        fetchAll('sst_planes_resumen', '*', 'id'),
+        fetchAll('sst_plan_actividades_calc', '*', 'orden'),
+        fetchAll('sst_plan_grupo_resumen', '*', 'plan_id'),
+        fetchAll('sst_capacitaciones_resumen', '*', 'id'),
+        fetchAll('sst_cap_sesiones', '*', 'fecha'),
+        fetchAll('sst_cap_asistentes', '*', 'id'),
+        fetchAll('sst_cap_indicadores_mes', '*', 'mes'),
       ]);
       for (var i = 0; i < rs.length; i++) if (rs[i].error) throw rs[i].error;
       empresas = rs[0].data; trabajadores = rs[1].data; evidencias = rs[2].data;
       estandares = rs[3].data; autoevals = rs[4].data; aeItems = rs[5].data; planes = rs[6].data;
+      planesAnual = rs[7].data; planActs = rs[8].data; planGrupos = rs[9].data; caps = rs[10].data;
+      sesiones = rs[11].data; asistentes = rs[12].data; indMes = rs[13].data;
     } catch (err) {
       if (primera) {
         $('estado-carga').innerHTML = 'No se pudieron cargar los datos: ' + esc(errMsg(err)) +
@@ -104,6 +125,15 @@
     });
     planById = {}; planPorAuto = {};
     planes.forEach(function (p) { planById[p.id] = p; (planPorAuto[p.autoeval_id] = planPorAuto[p.autoeval_id] || []).push(p); });
+    planAnualById = {}; planesAnual.forEach(function (p) { planAnualById[p.id] = p; });
+    actById = {}; actsPorPlan = {};
+    planActs.forEach(function (a) { actById[a.id] = a; (actsPorPlan[a.plan_id] = actsPorPlan[a.plan_id] || []).push(a); });
+    Object.keys(actsPorPlan).forEach(function (k) { actsPorPlan[k].sort(function (a, b) { return a.orden - b.orden || a.id - b.id; }); });
+    capById = {}; caps.forEach(function (c) { capById[c.id] = c; });
+    sesById = {}; sesPorCap = {}; asisPorSes = {};
+    sesiones.forEach(function (s) { sesById[s.id] = s; (sesPorCap[s.capacitacion_id] = sesPorCap[s.capacitacion_id] || []).push(s); });
+    Object.keys(sesPorCap).forEach(function (k) { sesPorCap[k].sort(function (a, b) { return a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : b.id - a.id; }); });
+    asistentes.forEach(function (a) { (asisPorSes[a.sesion_id] = asisPorSes[a.sesion_id] || []).push(a); });
     $('estado-carga').style.display = 'none';
     $('contenido').style.display = '';
     rellenarFiltros();
@@ -117,20 +147,24 @@
       var el = $(id), actual = el.value;
       el.innerHTML = optsHtml(op, 'Todas', actual);
     });
+    var cfe = $('cf-empresa'), cfActual = cfe.value;
+    cfe.innerHTML = optsHtml(op, null, cfActual);
+    if (!capInit) { iniciarFiltroCap(); capInit = true; }
     var ftipo = $('fv-tipo'), actualTipo = ftipo.value;
     ftipo.innerHTML = optsHtml(mapOpts(TIPO_EVID), 'Todos', actualTipo);
   }
 
   function renderTodo() {
-    renderStats(); renderEmpresas(); renderTrabajadores(); renderAutoevals(); renderEvidencias();
+    renderStats(); renderEmpresas(); renderTrabajadores(); renderAutoevals(); renderPlan(); renderCapacitaciones(); renderEvidencias();
     cambiarTab(tab);
     if (aeId) { if (autoById[aeId]) renderAutoDetalle(); else MODAL.close('ae-overlay'); }
+    if (cslCapId) { if (capById[cslCapId]) renderSesionesLista(); else MODAL.close('cs-lista-overlay'); }
     if (evlCtx) renderEvl();
   }
 
   function cambiarTab(t) {
     tab = t;
-    ['empresas', 'trabajadores', 'autoevaluacion', 'evidencias'].forEach(function (k) {
+    ['empresas', 'trabajadores', 'autoevaluacion', 'plan', 'capacitaciones', 'evidencias'].forEach(function (k) {
       $('tab-' + k).classList.toggle('active', k === t);
       $('tab-' + k).setAttribute('aria-selected', k === t ? 'true' : 'false');
       $('panel-' + k).style.display = k === t ? '' : 'none';
@@ -143,6 +177,11 @@
     var vivas = evidencias.filter(function (e) { return e.estado_enlace !== 'retirada'; });
     $('s-evidencias').textContent = vivas.length;
     $('s-vencen').textContent = vivas.filter(function (e) { var v = vigencia(e); return v && v.vence; }).length;
+    // Plan anual y capacitaciones de la vigencia en curso: actividades vencidas o del mes.
+    var y = parseInt(today().slice(0, 4), 10), n = 0;
+    planesAnual.forEach(function (p) { if (p.vigencia === y) n += (p.n_vencidas || 0) + (p.n_este_mes || 0); });
+    caps.forEach(function (c) { if (c.vigencia === y && (c.semaforo === 'vencida' || c.semaforo === 'este_mes')) n++; });
+    $('s-plan').textContent = n;
   }
 
   // ══════════════ Empresas ══════════════
@@ -340,6 +379,18 @@
     if (e.entidad_tipo === 'plan_mejora') {
       var p = planById[e.entidad_id], pa = p && autoById[p.autoeval_id];
       return pa ? 'Plan de mejoramiento ' + pa.vigencia + ' · ' + p.actividad.slice(0, 60) : '(actividad eliminada)';
+    }
+    if (e.entidad_tipo === 'plan') {
+      var pl = planAnualById[e.entidad_id];
+      return pl ? 'Plan anual ' + pl.vigencia + ' (documento firmado)' : '(plan eliminado)';
+    }
+    if (e.entidad_tipo === 'plan_actividad') {
+      var ac = actById[e.entidad_id];
+      return ac ? 'Plan anual ' + ac.vigencia + ' · ' + (ac.item_codigo ? ac.item_codigo + ' ' : '') + ac.actividad.slice(0, 60) : '(actividad eliminada)';
+    }
+    if (e.entidad_tipo === 'cap_sesion') {
+      var se = sesById[e.entidad_id], cp = se && capById[se.capacitacion_id];
+      return se && cp ? 'Capacitación ' + fmtDateOnly(se.fecha) + ' · ' + cp.tema.slice(0, 60) : '(sesión eliminada)';
     }
     return '';
   }
@@ -712,6 +763,18 @@
       var it = itemById[id], a = it && autoById[it.autoeval_id], est = it && estandarById[it.estandar_id];
       if (!a || !est) return;
       titulo = 'Autoevaluación ' + a.vigencia + ' · ' + est.codigo + ' ' + est.nombre; empresaId = a.empresa_id;
+    } else if (tipo === 'plan') {
+      var pln = planAnualById[id];
+      if (!pln) return;
+      titulo = 'Plan anual ' + pln.vigencia + ' · documento firmado'; empresaId = pln.empresa_id;
+    } else if (tipo === 'plan_actividad') {
+      var ac = actById[id], pac = ac && planAnualById[ac.plan_id];
+      if (!pac) return;
+      titulo = 'Plan anual ' + pac.vigencia + ' · ' + (ac.item_codigo ? ac.item_codigo + ' ' : '') + ac.actividad.slice(0, 60); empresaId = pac.empresa_id;
+    } else if (tipo === 'cap_sesion') {
+      var se = sesById[id], cp = se && capById[se.capacitacion_id];
+      if (!cp) return;
+      titulo = 'Capacitación ' + fmtDateOnly(se.fecha) + ' · ' + cp.tema.slice(0, 60); empresaId = cp.empresa_id;
     } else {
       var p = planById[id], pa = p && autoById[p.autoeval_id];
       if (!pa) return;
@@ -780,17 +843,686 @@
     await cargar(false);
   }
 
+  // ══════════════ Fase 2: Plan anual de trabajo ══════════════
+  // El avance, lo esperado a la fecha y el semáforo los calculan las vistas sst_plan_actividades_calc /
+  // sst_planes_resumen / sst_plan_grupo_resumen (servidor); aquí solo se muestran. Las alertas son solo en pantalla.
+  var MES3 = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  var MES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  var CICLOS = { planear: 'Planear', hacer: 'Hacer', verificar: 'Verificar', actuar: 'Actuar' };
+  var SEMAFORO = {
+    ejecutada: ['Ejecutada', '#15803d'], vencida: ['Vencida', '#c0392b'], este_mes: ['Del mes', '#d97706'], al_dia: ['Al día', '#2563eb'],
+    sin_programar: ['Sin programar', '#718096'], no_aplica: ['No aplica', '#a0aec0'], inactiva: ['Inactivo', '#a0aec0'],
+  };
+  var ESTADO_SESION = { programada: 'Programada', realizada: 'Realizada', cancelada: 'Cancelada' };
+  var COLOR_SESION = { programada: '#2563eb', realizada: '#15803d', cancelada: '#a0aec0' };
+  var MODALIDADES = { presencial: 'Presencial', virtual: 'Virtual', mixta: 'Mixta' };
+
+  function semBadge(s) { var x = SEMAFORO[s] || [s, '#718096']; return badge(x[0], x[1]); }
+  function fmtPct1(v) { return v === null || v === undefined ? '—' : Number(v).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + ' %'; }
+  function fmtNum(v) { return v === null || v === undefined ? '—' : Number(v).toLocaleString('es-CO', { maximumFractionDigits: 3 }); }
+  function nums(arr) { return (arr || []).map(Number); }
+  // Mes de referencia de una vigencia: 13 = ya pasó, 0 = futura, 1-12 = mes en curso (igual que sst_mes_ref en el servidor).
+  function mesRef(vig) {
+    var y = parseInt(today().slice(0, 4), 10), m = parseInt(today().slice(5, 7), 10);
+    return vig < y ? 13 : vig > y ? 0 : m;
+  }
+  function mesesHead() { return '<span class="sst-mes-head">' + MES3.map(function (m) { return '<span>' + m + '</span>'; }).join('') + '</span>'; }
+  // Cuadrícula de 12 meses: P programado, E ejecutado, rojo = programado vencido. Con `accion`, los meses P/E son clicables.
+  function mesesHtml(prog, ejec, vig, semaforo, accion, id) {
+    var P = nums(prog), E = nums(ejec), ref = mesRef(vig), out = '<span class="sst-meses">';
+    for (var m = 1; m <= 12; m++) {
+      var p = P.indexOf(m) >= 0, e = E.indexOf(m) >= 0;
+      var cls = e ? 'e' : p ? (semaforo === 'vencida' && m < ref ? 'v' : 'p') : '';
+      var click = accion && (p || e);
+      out += '<span class="sst-m ' + cls + (click ? ' click' : '') + (m === ref ? ' ahora' : '') + '"' +
+        (click ? ' data-act="' + accion + '" data-id="' + esc(id) + '" data-mes="' + m + '" role="button" title="' + (e ? 'Quitar la ejecución de ' : 'Marcar como ejecutado en ') + MES_LARGO[m - 1] + '"'
+               : ' title="' + MES_LARGO[m - 1] + (p ? ' (programado)' : '') + (e ? ' (ejecutado)' : '') + '"') + '>' + (e ? 'E' : p ? 'P' : '·') + '</span>';
+    }
+    return out + '</span>';
+  }
+  function barraHtml(pct, esp) {
+    if (pct === null || pct === undefined) return '<span class="mk-sin">—</span>';
+    return '<div class="sst-bar" title="Ejecutado ' + esc(fmtPct1(pct)) + (esp !== null && esp !== undefined ? ' · esperado a la fecha ' + esc(fmtPct1(esp)) : '') + '">' +
+      '<i style="width:' + Math.max(0, Math.min(100, pct)) + '%"></i>' +
+      (esp !== null && esp !== undefined ? '<b style="left:' + Math.max(0, Math.min(100, esp)) + '%"></b>' : '') + '</div>';
+  }
+
+  function planesOrdenados() {
+    return planesAnual.slice().sort(function (a, b) {
+      return b.vigencia - a.vigencia || String(nombreEmpresa(a.empresa_id)).localeCompare(String(nombreEmpresa(b.empresa_id)));
+    });
+  }
+  function planPorDefecto(lista) {
+    var y = parseInt(today().slice(0, 4), 10);
+    return lista.filter(function (p) { return p.vigencia === y; })[0] || lista[0];
+  }
+
+  function renderPlan() {
+    var lista = planesOrdenados(), sel = $('pl-plan');
+    if (!lista.length) {
+      plSel = null; sel.innerHTML = '';
+      $('pl-vacio').style.display = ''; $('pl-contenido').style.display = 'none';
+      return;
+    }
+    if (!plSel || !planAnualById[plSel]) plSel = planPorDefecto(lista).id;
+    sel.innerHTML = optsHtml(lista.map(function (p) { return { v: p.id, t: nombreEmpresa(p.empresa_id) + ' — ' + p.vigencia }; }), null, plSel);
+    $('pl-vacio').style.display = 'none'; $('pl-contenido').style.display = '';
+    $('pa-th-meses').innerHTML = mesesHead();
+    renderPlanResumen(); renderPlanDatos(); renderPlanFiltros(); renderActividades();
+  }
+
+  function sumaCiclo(planId, ciclo) {
+    var t = 0, e = 0, x = 0, nv = 0, nm = 0;
+    planGrupos.forEach(function (g) {
+      if (g.plan_id !== planId || g.ciclo !== ciclo) return;
+      t += Number(g.peso_total); e += Number(g.peso_ejecutado); x += Number(g.peso_esperado); nv += g.n_vencidas; nm += g.n_este_mes;
+    });
+    return { total: t, pct: t > 0 ? 100 * e / t : null, esp: t > 0 ? 100 * x / t : null, nv: nv, nm: nm };
+  }
+
+  function planFaltantes(p) {
+    var f = [];
+    if (!p.objetivo) f.push('objetivos');
+    if (!p.metas) f.push('metas');
+    if (!p.recursos) f.push('recursos');
+    if (!p.firmado_en) f.push('firma del empleador');
+    if (!evidenciasDe('plan', p.id).length) f.push('enlace al plan firmado en Drive');
+    return f;
+  }
+
+  function renderPlanResumen() {
+    var p = planAnualById[plSel];
+    var h = '';
+    var falt = planFaltantes(p);
+    if (falt.length) {
+      h += '<div class="mk-flag">Para cumplir el estándar «Plan Anual de Trabajo» (firmado por el empleador, con objetivos, metas, responsabilidades, recursos y cronograma) todavía falta: <strong>' + esc(falt.join(', ')) + '</strong>. Las responsabilidades y el cronograma salen de las actividades.</div>';
+    }
+    h += '<div class="mk-ctx-grid">' +
+      '<div class="mk-box"><h4>Cumplimiento del plan ' + esc(p.vigencia) + ' — ' + esc(nombreEmpresa(p.empresa_id)) + '</h4>' +
+        '<div style="font-size:2rem;font-weight:700">' + esc(fmtPct1(p.cumplimiento)) + '</div>' +
+        '<div style="margin:4px 0 8px">' + barraHtml(p.cumplimiento === null ? null : Number(p.cumplimiento), p.esperado === null ? null : Number(p.esperado)) +
+          '<div class="mk-sub" style="font-size:0.74rem;color:#718096;margin-top:3px">Esperado a la fecha según el cronograma: <strong>' + esc(fmtPct1(p.esperado)) + '</strong> (la marca naranja de la barra)</div></div>' +
+        '<div class="mk-kv"><span>Actividades que aplican</span><span>' + esc(p.n_aplica) + '</span></div>' +
+        '<div class="mk-kv"><span>Ejecutadas</span><span>' + esc(p.n_ejecutadas) + '</span></div>' +
+        '<div class="mk-kv"><span>Vencidas</span><span style="color:' + (p.n_vencidas ? '#c0392b' : 'inherit') + '">' + esc(p.n_vencidas) + '</span></div>' +
+        '<div class="mk-kv"><span>Del mes en curso</span><span>' + esc(p.n_este_mes) + '</span></div>' +
+        '<div class="mk-kv"><span>Sin programar</span><span>' + esc(p.n_sin_programar) + '</span></div>' +
+        '<div class="mk-kv"><span>No aplican</span><span>' + esc(p.n_no_aplica) + '</span></div></div>' +
+      '<div class="mk-box"><h4>Avance por ciclo PHVA</h4>' +
+        Object.keys(CICLOS).map(function (c) {
+          var s = sumaCiclo(p.id, c);
+          return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:0.84rem"><strong>' + esc(CICLOS[c]) + '</strong>' +
+            '<span>' + esc(fmtPct1(s.pct)) + (s.nv ? ' · <span style="color:#c0392b">' + s.nv + ' vencidas</span>' : '') + (s.nm ? ' · ' + s.nm + ' del mes' : '') + '</span></div>' +
+            barraHtml(s.pct, s.esp) + '</div>';
+        }).join('') + '</div></div>';
+    $('pl-resumen').innerHTML = h;
+  }
+
+  function renderPlanDatos() {
+    var p = planAnualById[plSel];
+    var key = p.id + '|' + p.modificado_en + '|' + evidenciasDe('plan', p.id).length;
+    if (key === plDatosKey) return;           // no pisar lo que la persona está escribiendo
+    plDatosKey = key;
+    var falt = planFaltantes(p);
+    var abierto = plDatosAbierto === null ? falt.length > 0 : plDatosAbierto;
+    $('pl-datos').innerHTML = '<div class="mk-box" style="margin:14px 0"><details id="pl-det"' + (abierto ? ' open' : '') + '>' +
+      '<summary style="cursor:pointer;font-weight:700">Datos del plan, firma y soporte' + (falt.length ? ' ' + badge('Falta: ' + falt.length, '#d97706') : ' ' + badge('Completo', '#15803d')) + '</summary>' +
+      '<div class="form-grid cols2" style="margin:10px 0">' +
+        '<div><label class="ef-label" for="pd-codigo">Código del documento</label><input class="ef" id="pd-codigo" maxlength="60" placeholder="Ej. SST-TEC-MT0001" value="' + esc(p.codigo_documento) + '"></div>' +
+        '<div><label class="ef-label" for="pd-version">Versión</label><input class="ef" id="pd-version" maxlength="30" value="' + esc(p.version) + '"></div>' +
+        '<div><label class="ef-label" for="pd-fecha">Fecha del documento</label><input class="ef" id="pd-fecha" type="date" value="' + esc(p.fecha_documento || '') + '"></div>' +
+        '<div><label class="ef-label" for="pd-firmado">Firmado por el empleador el</label><input class="ef" id="pd-firmado" type="date" value="' + esc(p.firmado_en || '') + '"></div>' +
+        '<div style="grid-column:1/-1"><label class="ef-label" for="pd-objetivo">Objetivos</label><textarea class="ef" id="pd-objetivo" rows="2" maxlength="2000">' + esc(p.objetivo) + '</textarea></div>' +
+        '<div style="grid-column:1/-1"><label class="ef-label" for="pd-metas">Metas</label><textarea class="ef" id="pd-metas" rows="2" maxlength="2000">' + esc(p.metas) + '</textarea></div>' +
+        '<div style="grid-column:1/-1"><label class="ef-label" for="pd-recursos">Recursos (humanos, técnicos, financieros)</label><textarea class="ef" id="pd-recursos" rows="2" maxlength="2000">' + esc(p.recursos) + '</textarea></div>' +
+        '<div><label class="ef-label" for="pd-empleador">Empleador o representante legal (firma)</label><input class="ef" id="pd-empleador" maxlength="200" value="' + esc(p.empleador_nombre) + '"></div>' +
+        '<div><label class="ef-label" for="pd-responsable">Responsable del SG-SST (firma)</label><input class="ef" id="pd-responsable" maxlength="200" value="' + esc(p.responsable_nombre) + '"></div>' +
+        '<div style="grid-column:1/-1"><label class="ef-label" for="pd-obs">Observaciones</label><input class="ef" id="pd-obs" maxlength="1000" value="' + esc(p.observaciones) + '"></div></div>' +
+      '<div class="mk-actions"><button class="btn-secondary" data-act="pd-guardar">Guardar datos del plan</button>' +
+        '<button class="btn-secondary" data-act="evl-abrir" data-tipo="plan" data-id="' + esc(p.id) + '">🔗 Plan firmado en Drive (' + evidenciasDe('plan', p.id).length + ')</button></div>' +
+      auditoriaHtml(p) + '</details></div>';
+    var det = $('pl-det');
+    if (det) det.addEventListener('toggle', function () { plDatosAbierto = det.open; });
+  }
+
+  function renderPlanFiltros() {
+    var acts = actsPorPlan[plSel] || [], gSel = $('pf-grupo'), actual = gSel.value, vistos = {}, op = [];
+    acts.forEach(function (a) { if (a.grupo && !vistos[a.grupo]) { vistos[a.grupo] = 1; op.push({ v: a.grupo, t: a.grupo }); } });
+    gSel.innerHTML = optsHtml(op, 'Todos', vistos[actual] ? actual : '');
+  }
+
+  function filtrarActs() {
+    var ciclo = $('pf-ciclo').value, grupo = $('pf-grupo').value, est = $('pf-estado').value, mes = Number($('pf-mes').value), q = norm($('pf-txt').value);
+    return (actsPorPlan[plSel] || []).filter(function (a) {
+      if (ciclo && a.ciclo !== ciclo) return false;
+      if (grupo && a.grupo !== grupo) return false;
+      if (est === 'no_aplica') { if (a.aplica) return false; }
+      else {
+        if (!a.aplica) return false;
+        if (est === 'atencion') { if (a.semaforo !== 'vencida' && a.semaforo !== 'este_mes') return false; }
+        else if (est === 'sin_soporte') { if (!(a.n_ejec > 0 && !evidenciasDe('plan_actividad', a.id).length)) return false; }
+        else if (est && a.semaforo !== est) return false;
+      }
+      if (mes && nums(a.meses_programados).indexOf(mes) < 0) return false;
+      if (q && norm([a.actividad, a.item_codigo, a.item_nombre, a.responsable].join(' ')).indexOf(q) < 0) return false;
+      return true;
+    });
+  }
+
+  function renderActividades() {
+    if (!plSel) return;
+    var todas = actsPorPlan[plSel] || [], lista = filtrarActs();
+    $('pa-ct').textContent = '(' + lista.length + (lista.length !== todas.length ? ' de ' + todas.length : '') + ')';
+    if (!lista.length) {
+      $('pa-body').innerHTML = '<tr><td colspan="9"><div class="empty">' + (todas.length ? 'Ninguna actividad coincide con los filtros.' : 'Este plan aún no tiene actividades. Agrega la primera con «Actividad».') + '</div></td></tr>';
+      return;
+    }
+    var p = planAnualById[plSel], itemPrevio = null;
+    $('pa-body').innerHTML = lista.map(function (a) {
+      var nEv = evidenciasDe('plan_actividad', a.id).length;
+      var sinSoporte = a.aplica && a.n_ejec > 0 && !nEv;
+      var itemKey = a.item_codigo + '|' + a.item_nombre, titItem = itemKey !== itemPrevio && a.item_nombre;
+      itemPrevio = itemKey;
+      return '<tr' + (a.aplica ? '' : ' style="opacity:0.6"') + '>' +
+        '<td><strong>' + esc(a.item_codigo) + '</strong></td>' +
+        '<td>' + (titItem ? '<div class="mk-sin" style="font-style:normal;font-weight:700;color:#1a5276;margin-bottom:2px">' + esc(a.item_nombre) + '</div>' : '') +
+          '<div class="sst-clamp" title="' + esc(a.actividad) + '">' + esc(a.actividad) + '</div>' +
+          (a.aplica ? '' : '<div class="mk-sin">No aplica: ' + esc(a.motivo_no_aplica) + '</div>') + '</td>' +
+        '<td>' + esc(a.responsable) + '</td>' +
+        '<td style="text-align:right">' + esc(fmtNum(a.peso)) + '</td>' +
+        '<td>' + (a.aplica ? mesesHtml(a.meses_programados, a.meses_ejecutados, p.vigencia, a.semaforo, 'pa-mes', a.id) : '<span class="mk-sin">—</span>') + '</td>' +
+        '<td style="text-align:right">' + (a.avance === null || a.avance === undefined ? '—' : Math.round(Number(a.avance) * 100) + ' %') + '</td>' +
+        '<td>' + semBadge(a.semaforo) + '</td>' +
+        '<td><button class="btn-secondary" data-act="evl-abrir" data-tipo="plan_actividad" data-id="' + esc(a.id) + '">🔗 ' + nEv + '</button>' +
+          (sinSoporte ? '<div style="font-size:0.7rem;color:#92400e">sin soporte</div>' : '') + '</td>' +
+        '<td><button class="btn-edit" data-act="pa-editar" data-id="' + esc(a.id) + '">Editar</button></td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  async function alternarMes(id, mes) {
+    var a = actById[id];
+    if (!a) return;
+    var E = nums(a.meses_ejecutados), i = E.indexOf(mes);
+    if (i >= 0) E.splice(i, 1); else E.push(mes);
+    var res = await _sb.from('sst_plan_actividades').update({ meses_ejecutados: E }).eq('id', id);
+    if (res.error) fail('marcar el mes', res.error);
+    await cargar(false);
+  }
+
+  // ── Datos del plan ──
+  async function guardarDatosPlan() {
+    var p = planAnualById[plSel];
+    if (!p) return;
+    var res = await _sb.from('sst_planes').update({
+      codigo_documento: $('pd-codigo').value.trim(), version: $('pd-version').value.trim(), fecha_documento: valOrNull('pd-fecha'),
+      firmado_en: valOrNull('pd-firmado'), objetivo: $('pd-objetivo').value.trim(), metas: $('pd-metas').value.trim(),
+      recursos: $('pd-recursos').value.trim(), empleador_nombre: $('pd-empleador').value.trim(),
+      responsable_nombre: $('pd-responsable').value.trim(), observaciones: $('pd-obs').value.trim(),
+    }).eq('id', p.id);
+    if (res.error) { fail('guardar los datos del plan', res.error); return; }
+    showToast('Datos del plan guardados');
+    plDatosKey = null;
+    await cargar(false);
+  }
+
+  // ── Nuevo plan (vacío o copiado de otra vigencia) ──
+  function actualizarNuevoPlan() {
+    var empId = Number($('pn-empresa').value), vig = parseInt($('pn-vigencia').value, 10), aviso = '', bloquea = false;
+    var previos = planesAnual.filter(function (p) { return p.empresa_id === empId; }).sort(function (a, b) { return b.vigencia - a.vigencia; });
+    var yaLleno = $('pn-origen').options.length > 0, actual = $('pn-origen').value;
+    var conservar = yaLleno && (actual === '' || (planAnualById[actual] && planAnualById[actual].empresa_id === empId));
+    $('pn-origen').innerHTML = optsHtml(previos.map(function (p) { return { v: p.id, t: 'Copiar el plan ' + p.vigencia + ' (' + p.n_actividades + ' actividades)' }; }), 'Empezar vacío', conservar ? actual : (previos[0] ? previos[0].id : ''));
+    if (isNaN(vig) || vig < 2019 || vig > 2100) { aviso = 'La vigencia debe ser un año entre 2019 y 2100.'; bloquea = true; }
+    else if (previos.some(function (p) { return p.vigencia === vig; })) { aviso = 'Ya existe el plan ' + vig + ' de esta empresa.'; bloquea = true; }
+    else if ($('pn-origen').value) {
+      var o = planAnualById[$('pn-origen').value];
+      if (o && o.vigencia === vig) { aviso = 'La vigencia nueva debe ser distinta de la del plan de origen.'; bloquea = true; }
+      else aviso = 'Se copiará el plan ' + (o ? o.vigencia : '') + ' a la vigencia ' + vig + ' con los meses programados y sin lo ejecutado.';
+    } else aviso = 'Se creará un plan vacío; después agregas las actividades.';
+    $('pn-aviso').textContent = aviso;
+    $('pn-ok').disabled = bloquea;
+  }
+  function abrirNuevoPlan() {
+    var activas = empresas.filter(function (e) { return e.activa; });
+    if (!activas.length) { showToast('Primero crea una empresa activa', '#e74c3c'); return; }
+    var emp0 = plSel && planAnualById[plSel] ? planAnualById[plSel].empresa_id : activas[0].id;
+    $('pn-empresa').innerHTML = optsHtml(activas.map(function (e) { return { v: e.id, t: e.nombre }; }), null, emp0);
+    var previos = planesAnual.filter(function (p) { return p.empresa_id === emp0; });
+    var max = previos.reduce(function (m, p) { return Math.max(m, p.vigencia); }, 0);
+    $('pn-vigencia').value = max ? max + 1 : new Date().getFullYear();
+    $('pn-origen').innerHTML = '';
+    actualizarNuevoPlan();
+    MODAL.open('pl-nuevo-overlay', 'pn-empresa');
+  }
+  async function crearPlan() {
+    var empId = Number($('pn-empresa').value), vig = parseInt($('pn-vigencia').value, 10), origen = $('pn-origen').value;
+    if (!empId) { showToast('Elige la empresa', '#e74c3c'); return; }
+    if (isNaN(vig) || vig < 2019 || vig > 2100) { showToast('La vigencia debe ser un año entre 2019 y 2100', '#e74c3c'); return; }
+    var btn = $('pn-ok'); btnBusy(btn, true);
+    var res = origen ? await _sb.rpc('sst_plan_copiar', { p_plan_origen: Number(origen), p_vigencia: vig })
+                     : await _sb.from('sst_planes').insert({ empresa_id: empId, vigencia: vig });
+    btnBusy(btn, false);
+    if (res.error) { fail('crear el plan', res.error); return; }
+    MODAL.close('pl-nuevo-overlay');
+    showToast(origen ? 'Plan copiado' : 'Plan creado');
+    await cargar(false);
+    var nuevo = planesAnual.filter(function (p) { return p.empresa_id === empId && p.vigencia === vig; })[0];
+    if (nuevo) { plSel = nuevo.id; plDatosKey = null; plDatosAbierto = null; renderPlan(); }
+    cambiarTab('plan');
+  }
+
+  // ── Actividad del plan ──
+  function responsablesConocidos() {
+    var vistos = {}, op = [];
+    planActs.forEach(function (a) { var r = String(a.responsable || '').trim(); if (r && !vistos[r]) { vistos[r] = 1; op.push(r); } });
+    return op.sort();
+  }
+  function filaMesesEdicion(P, E) {
+    return MES_LARGO.map(function (nombre, i) {
+      var m = i + 1;
+      return '<div><strong>' + esc(nombre) + '</strong>' +
+        '<label><input type="checkbox" id="pa-p-' + m + '"' + (P.indexOf(m) >= 0 ? ' checked' : '') + '> Programada</label>' +
+        '<label><input type="checkbox" id="pa-e-' + m + '"' + (E.indexOf(m) >= 0 ? ' checked' : '') + '> Ejecutada</label></div>';
+    }).join('');
+  }
+  function abrirActividad(id) {
+    var a = id ? actById[id] : null;
+    var plan = planAnualById[a ? a.plan_id : plSel];
+    if (!plan) return;
+    paEditId = id || null; paPlanId = plan.id;
+    $('pa-titulo').textContent = a ? 'Editar actividad' : 'Nueva actividad';
+    $('pa-meta').innerHTML = '<span>' + esc(nombreEmpresa(plan.empresa_id)) + '</span><span>Plan ' + esc(plan.vigencia) + '</span>';
+    $('pa-ciclo').value = a ? a.ciclo : ($('pf-ciclo').value || 'hacer');
+    $('pa-grupo').value = a ? a.grupo : '';
+    $('pa-item-codigo').value = a ? a.item_codigo : '';
+    $('pa-item-nombre').value = a ? a.item_nombre : '';
+    $('pa-actividad').value = a ? a.actividad : '';
+    $('pa-responsable').value = a ? a.responsable : '';
+    $('pa-peso').value = a ? a.peso : '0.5';
+    $('pa-aplica').value = !a || a.aplica ? '1' : '0';
+    $('pa-motivo').value = a ? a.motivo_no_aplica : '';
+    $('pa-motivo-box').style.display = $('pa-aplica').value === '1' ? 'none' : '';
+    $('pa-obs').value = a ? a.observaciones : '';
+    $('pa-meses').innerHTML = filaMesesEdicion(a ? nums(a.meses_programados) : [], a ? nums(a.meses_ejecutados) : []);
+    var grupos = {}, dl = [];
+    (actsPorPlan[plan.id] || []).forEach(function (x) { if (x.grupo && !grupos[x.grupo]) { grupos[x.grupo] = 1; dl.push(x.grupo); } });
+    $('pa-grupos').innerHTML = dl.map(function (g) { return '<option value="' + esc(g) + '">'; }).join('');
+    $('pa-responsables').innerHTML = responsablesConocidos().map(function (r) { return '<option value="' + esc(r) + '">'; }).join('');
+    $('pa-aud').innerHTML = a ? auditoriaHtml(a) : '';
+    var be = $('pa-btn-evid');
+    be.style.display = a ? '' : 'none';
+    if (a) be.textContent = '🔗 Soportes (' + evidenciasDe('plan_actividad', a.id).length + ')';
+    MODAL.open('pa-overlay', 'pa-actividad');
+  }
+  async function guardarActividad() {
+    var actividad = $('pa-actividad').value.trim();
+    if (actividad.length < 3) { showToast('Describe la actividad', '#e74c3c'); return; }
+    var peso = Number($('pa-peso').value);
+    if ($('pa-peso').value.trim() === '' || !isFinite(peso) || peso < 0 || peso > 100) { showToast('El peso debe estar entre 0 y 100', '#e74c3c'); return; }
+    var aplica = $('pa-aplica').value === '1', motivo = $('pa-motivo').value.trim();
+    if (!aplica && motivo.length < 3) { showToast('Indica el motivo por el que la actividad no aplica', '#e74c3c'); return; }
+    var P = [], E = [];
+    for (var m = 1; m <= 12; m++) { if ($('pa-p-' + m).checked) P.push(m); if ($('pa-e-' + m).checked) E.push(m); }
+    var fila = {
+      ciclo: $('pa-ciclo').value, grupo: $('pa-grupo').value.trim(), item_codigo: $('pa-item-codigo').value.trim(), item_nombre: $('pa-item-nombre').value.trim(),
+      actividad: actividad, responsable: $('pa-responsable').value.trim(), peso: peso, aplica: aplica, motivo_no_aplica: aplica ? '' : motivo,
+      meses_programados: P, meses_ejecutados: E, observaciones: $('pa-obs').value.trim(),
+    };
+    if (!paEditId) fila.plan_id = paPlanId;
+    var btn = $('pa-ok'); btnBusy(btn, true);
+    var res = paEditId ? await _sb.from('sst_plan_actividades').update(fila).eq('id', paEditId) : await _sb.from('sst_plan_actividades').insert(fila);
+    btnBusy(btn, false);
+    if (res.error) { fail('guardar la actividad', res.error); return; }
+    MODAL.close('pa-overlay');
+    showToast(paEditId ? 'Actividad actualizada' : 'Actividad agregada al plan');
+    await cargar(false);
+  }
+
+  function generarPdfPlan() {
+    var p = planAnualById[plSel];
+    if (!p) return;
+    try {
+      var emp = empresaById[p.empresa_id] || {};
+      var doc = SST_PDF.planAnual({
+        empresa: emp, plan: p, actividades: actsPorPlan[p.id] || [],
+        capacitaciones: caps.filter(function (c) { return c.empresa_id === p.empresa_id && c.vigencia === p.vigencia; }), ahora: new Date(),
+      });
+      doc.save(SST_PDF.nombrePlan(emp, p));
+    } catch (err) {
+      showToast('No se pudo generar el PDF: ' + (err && err.message ? err.message : err), '#e74c3c');
+    }
+  }
+
+  // ══════════════ Fase 2: Capacitaciones ══════════════
+  function iniciarFiltroCap() {
+    var y = parseInt(today().slice(0, 4), 10);
+    var emp = caps.length ? caps[0].empresa_id : ((empresas.filter(function (e) { return e.activa; })[0] || empresas[0] || {}).id);
+    if (emp !== undefined && emp !== null) $('cf-empresa').value = emp;
+    var vigs = caps.filter(function (c) { return c.empresa_id === emp; }).map(function (c) { return c.vigencia; });
+    $('cf-vigencia').value = vigs.indexOf(y) >= 0 || !vigs.length ? y : Math.max.apply(null, vigs);
+  }
+  function capContexto() { return { emp: Number($('cf-empresa').value), vig: parseInt($('cf-vigencia').value, 10) }; }
+
+  function capsFiltradas() {
+    var c = capContexto(), est = $('cf-estado').value;
+    return caps.filter(function (x) {
+      if (x.empresa_id !== c.emp || x.vigencia !== c.vig) return false;
+      if (est === 'inactiva') return !x.activa;
+      if (!x.activa) return false;
+      if (est === 'atencion') return x.semaforo === 'vencida' || x.semaforo === 'este_mes';
+      return !est || x.semaforo === est;
+    });
+  }
+
+  function renderCapacitaciones() {
+    var c = capContexto();
+    $('cp-th-meses').innerHTML = mesesHead();
+    var ind = indMes.filter(function (i) { return i.empresa_id === c.emp && i.vigencia === c.vig; }).sort(function (a, b) { return a.mes - b.mes; });
+    var h = '';
+    if (ind.length) {
+      var ref = mesRef(c.vig), tp = 0, te = 0, tpA = 0, teA = 0, tc = 0, ta = 0;
+      ind.forEach(function (i) {
+        tp += i.programadas; te += i.ejecutadas_programadas; tc += i.convocados; ta += i.asistentes;
+        if (i.mes <= ref) { tpA += i.programadas; teA += i.ejecutadas_programadas; }
+      });
+      var pc = function (n, d) { return d > 0 ? 100 * n / d : null; };
+      h += '<div class="mk-ctx-grid"><div class="mk-box"><h4>Cumplimiento del programa ' + esc(c.vig) + '</h4>' +
+        '<div style="font-size:2rem;font-weight:700">' + esc(fmtPct1(pc(teA, tpA))) + '</div>' +
+        '<div class="mk-sub" style="font-size:0.78rem;color:#718096;margin:2px 0 8px">a la fecha: ' + teA + ' de ' + tpA + ' temas programados hasta ahora (por mes)</div>' +
+        '<div class="mk-kv"><span>Todo el año</span><span>' + te + ' de ' + tp + ' (' + esc(fmtPct1(pc(te, tp))) + ')</span></div></div>' +
+        '<div class="mk-box"><h4>Cobertura</h4>' +
+        '<div style="font-size:2rem;font-weight:700">' + esc(fmtPct1(pc(ta, tc))) + '</div>' +
+        '<div class="mk-sub" style="font-size:0.78rem;color:#718096;margin:2px 0 8px">asistentes / convocados en las sesiones realizadas</div>' +
+        '<div class="mk-kv"><span>Convocados</span><span>' + tc + '</span></div><div class="mk-kv"><span>Asistentes</span><span>' + ta + '</span></div></div></div>';
+      h += '<div class="mk-box" style="margin-bottom:14px"><h4>Indicadores por mes</h4><div class="table-wrap"><table class="mk-mini sst-ind"><thead><tr><th>Indicador</th>' +
+        MES3.map(function (m, i) { return '<th' + (i + 1 === ref ? ' style="background:#fffbeb"' : '') + '>' + m + '</th>'; }).join('') + '<th>Año</th></tr></thead><tbody>' +
+        filaInd('Temas programados', ind, function (i) { return i.programadas; }, tp, ref) +
+        filaInd('Temas ejecutados', ind, function (i) { return i.ejecutadas_programadas; }, te, ref) +
+        filaInd('Cumplimiento', ind, function (i) { return i.programadas > 0 ? Math.round(100 * i.ejecutadas_programadas / i.programadas) + ' %' : '—'; }, pc(te, tp) === null ? '—' : Math.round(pc(te, tp)) + ' %', ref) +
+        filaInd('Convocados', ind, function (i) { return i.convocados; }, tc, ref) +
+        filaInd('Asistentes', ind, function (i) { return i.asistentes; }, ta, ref) +
+        filaInd('Cobertura', ind, function (i) { return i.convocados > 0 ? Math.round(100 * i.asistentes / i.convocados) + ' %' : '—'; }, pc(ta, tc) === null ? '—' : Math.round(pc(ta, tc)) + ' %', ref) +
+        '</tbody></table></div></div>';
+    }
+    $('cp-resumen').innerHTML = h;
+
+    var lista = capsFiltradas();
+    $('cp-ct').textContent = '(' + lista.length + ')';
+    if (!lista.length) {
+      $('cp-body').innerHTML = '<tr><td colspan="7"><div class="empty">' + (isNaN(c.vig) ? 'Indica la vigencia.' : caps.some(function (x) { return x.empresa_id === c.emp && x.vigencia === c.vig; })
+        ? 'Ningún tema coincide con el filtro.' : 'Aún no hay temas para esta empresa y vigencia. Crea el primero con «Nuevo tema» o copia un plan anual de otra vigencia.') + '</div></td></tr>';
+      return;
+    }
+    $('cp-body').innerHTML = lista.map(function (x) {
+      return '<tr' + (x.activa ? '' : ' style="opacity:0.6"') + '>' +
+        '<td><strong>' + esc(x.tema) + '</strong>' + (x.dirigido_a || x.entregable ? '<div class="mk-sin" style="font-style:normal">' + esc([x.dirigido_a, x.entregable].filter(Boolean).join(' · ')) + '</div>' : '') + '</td>' +
+        '<td>' + esc(x.responsable) + '</td>' +
+        '<td>' + mesesHtml(x.meses_programados, x.meses_ejecutados, x.vigencia, x.semaforo, null, x.id) + '</td>' +
+        '<td>' + esc(x.sesiones_realizadas) + ' realizada(s)' + (x.sesiones_programadas ? '<div class="mk-sin">' + esc(x.sesiones_programadas) + ' programada(s)</div>' : '') + '</td>' +
+        '<td style="text-align:right">' + esc(fmtPct1(x.cobertura)) + (x.convocados ? '<div class="mk-sub" style="font-size:0.72rem;color:#718096">' + x.asistentes + ' de ' + x.convocados + '</div>' : '') + '</td>' +
+        '<td>' + semBadge(x.semaforo) + '</td>' +
+        '<td><div class="mk-actions"><button class="btn-secondary" data-act="cs-lista" data-id="' + esc(x.id) + '">📋 Sesiones</button>' +
+          '<button class="btn-edit" data-act="cp-editar" data-id="' + esc(x.id) + '">Editar</button></div></td>' +
+        '</tr>';
+    }).join('');
+  }
+  function filaInd(nombre, ind, fn, total, ref) {
+    return '<tr><td>' + esc(nombre) + '</td>' + ind.map(function (i) {
+      return '<td' + (i.mes === ref ? ' style="background:#fffbeb"' : '') + '>' + esc(fn(i)) + '</td>';
+    }).join('') + '<td><strong>' + esc(total) + '</strong></td></tr>';
+  }
+
+  // ── Tema de capacitación ──
+  function abrirTema(id) {
+    var c = capContexto();
+    var x = id ? capById[id] : null;
+    if (!x && (!c.emp || isNaN(c.vig))) { showToast('Elige la empresa y la vigencia', '#e74c3c'); return; }
+    cpEditId = id || null;
+    cpCtx = x ? { empresa_id: x.empresa_id, vigencia: x.vigencia } : { empresa_id: c.emp, vigencia: c.vig };
+    $('cp-titulo').textContent = x ? 'Editar tema de capacitación' : 'Nuevo tema de capacitación';
+    $('cp-meta').innerHTML = '<span>' + esc(nombreEmpresa(cpCtx.empresa_id)) + '</span><span>Vigencia ' + esc(cpCtx.vigencia) + '</span>';
+    $('cp-tema').value = x ? x.tema : '';
+    $('cp-dirigido').value = x ? x.dirigido_a : '';
+    $('cp-responsable').value = x ? x.responsable : '';
+    $('cp-entregable').value = x ? x.entregable : 'Registro de formación';
+    $('cp-horas').value = x && x.horas_previstas ? x.horas_previstas : '';
+    $('cp-activa').value = x && !x.activa ? '0' : '1';
+    $('cp-obs').value = x ? x.observaciones : '';
+    var P = x ? nums(x.meses_programados) : [];
+    $('cp-meses').innerHTML = MES3.map(function (m, i) {
+      return '<label><input type="checkbox" id="cp-m-' + (i + 1) + '"' + (P.indexOf(i + 1) >= 0 ? ' checked' : '') + '> ' + m + '</label>';
+    }).join('');
+    $('cp-aud').innerHTML = x ? auditoriaHtml(x) : '';
+    MODAL.open('cp-overlay', 'cp-tema');
+  }
+  async function guardarTema() {
+    var tema = $('cp-tema').value.trim();
+    if (tema.length < 3) { showToast('Escribe el tema de la capacitación', '#e74c3c'); return; }
+    var horasTxt = $('cp-horas').value.trim(), horas = horasTxt === '' ? null : Number(horasTxt);
+    if (horas !== null && (!isFinite(horas) || horas <= 0 || horas > 99)) { showToast('Las horas previstas deben estar entre 0 y 99', '#e74c3c'); return; }
+    var P = [];
+    for (var m = 1; m <= 12; m++) if ($('cp-m-' + m).checked) P.push(m);
+    var fila = {
+      tema: tema, dirigido_a: $('cp-dirigido').value.trim(), responsable: $('cp-responsable').value.trim(), entregable: $('cp-entregable').value.trim(),
+      horas_previstas: horas, meses_programados: P, activa: $('cp-activa').value === '1', observaciones: $('cp-obs').value.trim(),
+    };
+    if (!cpEditId) { fila.empresa_id = cpCtx.empresa_id; fila.vigencia = cpCtx.vigencia; }
+    var btn = $('cp-ok'); btnBusy(btn, true);
+    var res = cpEditId ? await _sb.from('sst_capacitaciones').update(fila).eq('id', cpEditId) : await _sb.from('sst_capacitaciones').insert(fila);
+    btnBusy(btn, false);
+    if (res.error) { fail('guardar el tema', res.error); return; }
+    MODAL.close('cp-overlay');
+    showToast(cpEditId ? 'Tema actualizado' : 'Tema agregado al programa');
+    await cargar(false);
+  }
+
+  // ── Sesiones de un tema ──
+  function abrirSesionesLista(capId) {
+    cslCapId = capId;
+    renderSesionesLista();
+    MODAL.open('cs-lista-overlay');
+  }
+  function asistenciaDe(sesId) {
+    var rows = asisPorSes[sesId] || [], asi = rows.filter(function (r) { return r.asistio; }).length;
+    return { conv: rows.length, asi: asi, pct: rows.length ? Math.round(100 * asi / rows.length) : null };
+  }
+  function renderSesionesLista() {
+    var cap = capById[cslCapId];
+    if (!cap) return;
+    $('cs-lista-titulo').textContent = cap.tema.length > 110 ? cap.tema.slice(0, 107) + '…' : cap.tema;
+    $('cs-lista-meta').innerHTML = '<span>' + esc(nombreEmpresa(cap.empresa_id)) + '</span><span>Vigencia ' + esc(cap.vigencia) + '</span>' +
+      '<span>Programado: ' + esc(nums(cap.meses_programados).map(function (m) { return MES3[m - 1]; }).join(', ') || 'sin meses') + '</span>';
+    var lista = sesPorCap[cap.id] || [];
+    $('cs-lista-body').innerHTML = !lista.length
+      ? '<div class="empty" style="padding:24px">Aún no hay sesiones. Programa la primera con «Nueva sesión».</div>'
+      : '<div class="table-wrap"><table class="mk-mini" style="min-width:700px"><thead><tr><th>Fecha</th><th>Estado</th><th>Horas</th><th>Instructor</th><th>Asistencia</th><th>Planilla firmada</th><th></th></tr></thead><tbody>' +
+        lista.map(function (s) {
+          var a = asistenciaDe(s.id);
+          return '<tr><td><strong>' + esc(fmtDateOnly(s.fecha)) + '</strong></td>' +
+            '<td>' + badge(ESTADO_SESION[s.estado] || s.estado, COLOR_SESION[s.estado] || '#718096') + '</td>' +
+            '<td>' + esc(s.horas || '') + '</td><td>' + esc(s.instructor) + '</td>' +
+            '<td>' + (a.conv ? esc(a.asi) + ' de ' + esc(a.conv) + ' (' + a.pct + ' %)' : '<span class="mk-sin">sin convocados</span>') + '</td>' +
+            '<td><button class="btn-secondary" data-act="evl-abrir" data-tipo="cap_sesion" data-id="' + esc(s.id) + '">🔗 ' + evidenciasDe('cap_sesion', s.id).length + '</button>' +
+              (s.estado === 'realizada' && !evidenciasDe('cap_sesion', s.id).length ? '<div style="font-size:0.7rem;color:#92400e">sin planilla firmada</div>' : '') + '</td>' +
+            '<td><div class="mk-actions"><button class="btn-edit" data-act="cs-editar" data-id="' + esc(s.id) + '">Editar</button>' +
+              '<button class="btn-secondary" data-act="cs-planilla-id" data-id="' + esc(s.id) + '">📄 Planilla</button></div></td></tr>';
+        }).join('') + '</tbody></table></div>';
+  }
+
+  // ── Sesión: datos + convocados y asistencia ──
+  function trabajadoresDeSesion(cap, sesId) {
+    var existentes = {};
+    (asisPorSes[sesId] || []).forEach(function (a) { existentes[a.trabajador_id] = a; });
+    return trabajadores.filter(function (t) { return t.empresa_id === cap.empresa_id && (esActivo(t) || existentes[t.id]); })
+      .sort(function (a, b) { return String(a.nombre).localeCompare(String(b.nombre)); });
+  }
+  function abrirSesion(id, capId) {
+    var s = id ? sesById[id] : null;
+    csEditId = id || null; csCapId = s ? s.capacitacion_id : capId;
+    var cap = capById[csCapId];
+    if (!cap) return;
+    var hoy = today(), y = parseInt(hoy.slice(0, 4), 10);
+    $('cs-titulo').textContent = s ? 'Editar sesión' : 'Nueva sesión';
+    $('cs-meta').innerHTML = '<span>' + esc(cap.tema.length > 90 ? cap.tema.slice(0, 87) + '…' : cap.tema) + '</span><span>' + esc(nombreEmpresa(cap.empresa_id)) + '</span>';
+    $('cs-fecha').min = cap.vigencia + '-01-01'; $('cs-fecha').max = cap.vigencia + '-12-31';
+    $('cs-fecha').value = s ? s.fecha : (cap.vigencia === y ? hoy : cap.vigencia + '-01-15');
+    $('cs-estado').value = s ? s.estado : 'programada';
+    $('cs-horas').value = s && s.horas ? s.horas : (cap.horas_previstas || '');
+    $('cs-modalidad').value = s ? s.modalidad : 'presencial';
+    $('cs-instructor').value = s ? s.instructor : (cap.responsable || '');
+    $('cs-lugar').value = s ? s.lugar : '';
+    $('cs-obs').value = s ? s.observaciones : '';
+    $('cs-aud').innerHTML = s ? auditoriaHtml(s) : '';
+    var existentes = {};
+    (s ? asisPorSes[s.id] || [] : []).forEach(function (a) { existentes[a.trabajador_id] = a; });
+    var lista = trabajadoresDeSesion(cap, s ? s.id : null);
+    var bloqueaQuitar = s && s.estado !== 'programada' && !AUTH.isAdmin();
+    $('cs-asis').innerHTML = !lista.length
+      ? '<tr><td colspan="4"><div class="empty" style="padding:14px">La empresa no tiene trabajadores activos registrados.</div></td></tr>'
+      : lista.map(function (t) {
+        var ex = existentes[t.id], conv = s ? !!ex : true, asi = ex ? !!ex.asistio : false;
+        return '<tr><td><strong>' + esc(t.nombre) + '</strong>' + (esActivo(t) ? '' : ' <span class="mk-sin">(retirado)</span>') + '</td><td>' + esc(t.cargo) + '</td>' +
+          '<td style="text-align:center"><input type="checkbox" id="cs-c-' + t.id + '" data-chg="cs-conv" data-id="' + t.id + '"' + (conv ? ' checked' : '') + (ex && bloqueaQuitar ? ' disabled' : '') + ' aria-label="Convocado: ' + esc(t.nombre) + '"></td>' +
+          '<td style="text-align:center"><input type="checkbox" id="cs-a-' + t.id + '" data-chg="cs-asi" data-id="' + t.id + '"' + (asi ? ' checked' : '') + ' aria-label="Asistió: ' + esc(t.nombre) + '"></td></tr>';
+      }).join('');
+    $('cs-btn-planilla').style.display = s ? '' : 'none';
+    var be = $('cs-btn-evid');
+    be.style.display = s ? '' : 'none';
+    if (s) be.textContent = '🔗 Planilla firmada (' + evidenciasDe('cap_sesion', s.id).length + ')';
+    aplicarEstadoSesion();
+    MODAL.open('cs-overlay', 'cs-fecha');
+  }
+  // Ayudas según el estado elegido (el servidor valida lo mismo).
+  function aplicarEstadoSesion() {
+    var est = $('cs-estado').value, aviso = $('cs-aviso'), ayuda = $('cs-asis-ayuda');
+    var cancelada = est === 'cancelada';
+    var cajas = $('cs-asis').querySelectorAll('input[type=checkbox]');
+    Array.prototype.forEach.call(cajas, function (c) {
+      if (cancelada) { c.dataset.eraDisabled = c.disabled ? '1' : ''; c.disabled = true; }
+      else if (c.dataset.eraDisabled !== undefined) { c.disabled = c.dataset.eraDisabled === '1'; delete c.dataset.eraDisabled; }
+    });
+    var hayAsi = Array.prototype.some.call($('cs-asis').querySelectorAll('input[id^="cs-a-"]'), function (c) { return c.checked; });
+    var msg = '';
+    if (est === 'realizada' && $('cs-fecha').value > today()) msg = 'La fecha es futura: una sesión solo se puede marcar como realizada cuando ya ocurrió.';
+    else if (est === 'realizada' && !hayAsi) msg = 'Marca quiénes asistieron: se necesita al menos un asistente para dar la sesión por realizada.';
+    else if (cancelada) msg = 'Una sesión cancelada congela la lista de asistencia y no cuenta como realizada.';
+    aviso.style.display = msg ? '' : 'none'; aviso.textContent = msg;
+    ayuda.innerHTML = 'Imprime la planilla antes de la sesión para recoger las firmas. <a href="#" data-act="cs-todos">Marcar a todos los convocados como asistentes</a>.';
+  }
+  function cambiarConvocado(el) {
+    if (!el.checked) { var a = $('cs-a-' + el.getAttribute('data-id')); if (a && !a.disabled) a.checked = false; }
+    aplicarEstadoSesion();
+  }
+  function cambiarAsistio(el) {
+    if (el.checked) { var c = $('cs-c-' + el.getAttribute('data-id')); if (c && !c.disabled) c.checked = true; }
+    aplicarEstadoSesion();
+  }
+  function marcarTodosAsistentes() {
+    Array.prototype.forEach.call($('cs-asis').querySelectorAll('input[id^="cs-c-"]'), function (c) {
+      if (!c.checked) return;
+      var a = $('cs-a-' + c.getAttribute('data-id'));
+      if (a && !a.disabled) a.checked = true;
+    });
+    aplicarEstadoSesion();
+  }
+
+  async function guardarSesion() {
+    var cap = capById[csCapId];
+    if (!cap) return;
+    var s = csEditId ? sesById[csEditId] : null;
+    var fecha = $('cs-fecha').value, estado = $('cs-estado').value;
+    if (!fecha) { showToast('Indica la fecha de la sesión', '#e74c3c'); return; }
+    if (fecha.slice(0, 4) !== String(cap.vigencia)) { showToast('La fecha debe estar dentro de la vigencia ' + cap.vigencia, '#e74c3c'); return; }
+    var horasTxt = $('cs-horas').value.trim(), horas = horasTxt === '' ? null : Number(horasTxt);
+    if (horas !== null && (!isFinite(horas) || horas <= 0 || horas > 99)) { showToast('La duración debe estar entre 0 y 99 horas', '#e74c3c'); return; }
+    var trabs = trabajadoresDeSesion(cap, s ? s.id : null), conv = [], asi = 0;
+    trabs.forEach(function (t) {
+      var c = $('cs-c-' + t.id), a = $('cs-a-' + t.id);
+      conv.push({ id: t.id, conv: !!(c && c.checked), asi: !!(a && a.checked && c && c.checked) });
+      if (a && a.checked && c && c.checked) asi++;
+    });
+    if (estado === 'realizada') {
+      if (fecha > today()) { showToast('No se puede marcar como realizada una sesión con fecha futura', '#e74c3c'); return; }
+      if (!asi) { showToast('Para dar la sesión por realizada marca al menos un asistente', '#e74c3c'); return; }
+    }
+    var campos = { fecha: fecha, horas: horas, instructor: $('cs-instructor').value.trim(), modalidad: $('cs-modalidad').value, lugar: $('cs-lugar').value.trim(), observaciones: $('cs-obs').value.trim() };
+    var btn = $('cs-ok'); btnBusy(btn, true);
+    try {
+      var id = csEditId;
+      if (!id) {
+        // La sesión nace «programada» (o «cancelada»): pasa a «realizada» al final, cuando ya tiene asistentes.
+        var ins = await _sb.from('sst_cap_sesiones').insert(Object.assign({ capacitacion_id: csCapId, estado: estado === 'cancelada' ? 'cancelada' : 'programada' }, campos)).select('id').single();
+        if (ins.error) throw ins.error;
+        id = ins.data.id;
+      } else if (s.estado === 'cancelada' && estado !== 'cancelada') {
+        var re = await _sb.from('sst_cap_sesiones').update({ estado: 'programada' }).eq('id', id);   // descongela la lista
+        if (re.error) throw re.error;
+      }
+      if (estado !== 'cancelada') {
+        var actuales = {};
+        (asisPorSes[id] || []).forEach(function (a) { actuales[a.trabajador_id] = a; });
+        var nuevos = [], cambios = [], quitar = [];
+        conv.forEach(function (c) {
+          var ex = actuales[c.id];
+          if (c.conv && !ex) nuevos.push({ sesion_id: id, trabajador_id: c.id, asistio: c.asi });
+          else if (c.conv && ex && !!ex.asistio !== c.asi) cambios.push({ id: ex.id, asistio: c.asi });
+          else if (!c.conv && ex) quitar.push(ex.id);
+        });
+        if (quitar.length) { var rd = await _sb.from('sst_cap_asistentes').delete().in('id', quitar); if (rd.error) throw rd.error; }
+        if (nuevos.length) { var ri = await _sb.from('sst_cap_asistentes').insert(nuevos); if (ri.error) throw ri.error; }
+        for (var i = 0; i < cambios.length; i++) {
+          var ru = await _sb.from('sst_cap_asistentes').update({ asistio: cambios[i].asistio }).eq('id', cambios[i].id);
+          if (ru.error) throw ru.error;
+        }
+      }
+      var rs = await _sb.from('sst_cap_sesiones').update(Object.assign({ estado: estado }, campos)).eq('id', id);
+      if (rs.error) throw rs.error;
+    } catch (err) {
+      btnBusy(btn, false);
+      fail('guardar la sesión', err);
+      await cargar(false);
+      return;
+    }
+    btnBusy(btn, false);
+    MODAL.close('cs-overlay');
+    showToast(s ? 'Sesión actualizada' : 'Sesión registrada');
+    await cargar(false);
+  }
+
+  function generarPlanilla(sesId) {
+    var s = sesById[sesId], cap = s && capById[s.capacitacion_id];
+    if (!cap) return;
+    try {
+      var emp = empresaById[cap.empresa_id] || {}, rows = asisPorSes[s.id] || [], tById = {};
+      trabajadores.forEach(function (t) { tById[t.id] = t; });
+      var convocados = rows.map(function (r) { return { trabajador: tById[r.trabajador_id], asistio: r.asistio }; }).filter(function (c) { return c.trabajador; });
+      if (!convocados.length) convocados = trabajadores.filter(function (t) { return t.empresa_id === cap.empresa_id && esActivo(t); }).map(function (t) { return { trabajador: t, asistio: false }; });
+      convocados.sort(function (a, b) { return String(a.trabajador.nombre).localeCompare(String(b.trabajador.nombre)); });
+      var doc = SST_PDF.planilla({ empresa: emp, capacitacion: cap, sesion: s, convocados: convocados, ahora: new Date() });
+      doc.save(SST_PDF.nombrePlanilla(emp, s));
+    } catch (err) {
+      showToast('No se pudo generar el PDF: ' + (err && err.message ? err.message : err), '#e74c3c');
+    }
+  }
+
   MODAL.onClose = function (id) {
     if (id === 'ae-overlay') aeId = null;
     if (id === 'evl-overlay') evlCtx = null;
     if (id === 'ev-overlay') evEntidad = null;
     if (id === 'pm-overlay') { pmEditId = null; pmAutoId = null; }
+    if (id === 'pa-overlay') { paEditId = null; paPlanId = null; }
+    if (id === 'cp-overlay') { cpEditId = null; cpCtx = null; }
+    if (id === 'cs-lista-overlay') cslCapId = null;
+    if (id === 'cs-overlay') { csEditId = null; csCapId = null; }
   };
 
   // ══════════════ Eventos ══════════════
   var CAMBIOS = {
     'ae-item-resultado': cambiarResultadoItem,
     'ae-item-obs': cambiarObsItem,
+    'cs-conv': cambiarConvocado,
+    'cs-asi': cambiarAsistio,
   };
   var ACCIONES = {
     'ae-nueva': abrirNuevaAuto,
@@ -807,6 +1539,27 @@
     'pm-nuevo-item': function (el) { abrirPlan(null, aeId, Number(el.getAttribute('data-id'))); },
     'pm-editar': function (el) { abrirPlan(Number(el.getAttribute('data-id')), null, null); },
     'pm-guardar': guardarPlan,
+    'pl-nuevo': abrirNuevoPlan,
+    'pl-crear': crearPlan,
+    'pl-pdf': generarPdfPlan,
+    'pd-guardar': guardarDatosPlan,
+    'pf-limpiar': function () { $('pf-ciclo').value = ''; $('pf-grupo').value = ''; $('pf-estado').value = ''; $('pf-mes').value = ''; $('pf-txt').value = ''; renderActividades(); },
+    'pa-nueva': function () { abrirActividad(null); },
+    'pa-editar': function (el) { abrirActividad(Number(el.getAttribute('data-id'))); },
+    'pa-guardar': guardarActividad,
+    'pa-mes': function (el) { alternarMes(Number(el.getAttribute('data-id')), Number(el.getAttribute('data-mes'))); },
+    'pa-evid': function () { if (paEditId) abrirEvl('plan_actividad', paEditId); },
+    'cp-nuevo': function () { abrirTema(null); },
+    'cp-editar': function (el) { abrirTema(Number(el.getAttribute('data-id'))); },
+    'cp-guardar': guardarTema,
+    'cs-lista': function (el) { abrirSesionesLista(Number(el.getAttribute('data-id'))); },
+    'cs-nueva': function () { if (cslCapId) abrirSesion(null, cslCapId); },
+    'cs-editar': function (el) { abrirSesion(Number(el.getAttribute('data-id')), null); },
+    'cs-guardar': guardarSesion,
+    'cs-todos': marcarTodosAsistentes,
+    'cs-planilla': function () { if (csEditId) generarPlanilla(csEditId); },
+    'cs-planilla-id': function (el) { generarPlanilla(Number(el.getAttribute('data-id'))); },
+    'cs-evid': function () { if (csEditId) abrirEvl('cap_sesion', csEditId); },
     'reintentar': function () { cargar(true); },
     'tab': function (el) { cambiarTab(el.getAttribute('data-tab')); },
     'cerrar-modal': function (el) { MODAL.close(el.getAttribute('data-modal')); },
@@ -839,6 +1592,13 @@
   $('e-num').addEventListener('input', previsualizarGrupo);
   $('e-clases').addEventListener('change', previsualizarGrupo);
   ['fa-empresa', 'fa-estado'].forEach(function (id) { $(id).addEventListener('change', renderAutoevals); });
+  $('pl-plan').addEventListener('change', function () { plSel = Number(this.value); plDatosKey = null; plDatosAbierto = null; renderPlan(); });
+  $('pf-mes').innerHTML = '<option value="">Cualquier mes</option>' + MES_LARGO.map(function (m, i) { return '<option value="' + (i + 1) + '">' + m + '</option>'; }).join('');
+  ['pf-ciclo', 'pf-grupo', 'pf-estado', 'pf-mes', 'pf-txt'].forEach(function (id) { $(id).addEventListener('input', renderActividades); $(id).addEventListener('change', renderActividades); });
+  ['cf-empresa', 'cf-vigencia', 'cf-estado'].forEach(function (id) { $(id).addEventListener('input', renderCapacitaciones); $(id).addEventListener('change', renderCapacitaciones); });
+  ['pn-empresa', 'pn-vigencia', 'pn-origen'].forEach(function (id) { $(id).addEventListener('input', actualizarNuevoPlan); $(id).addEventListener('change', actualizarNuevoPlan); });
+  $('pa-aplica').addEventListener('change', function () { $('pa-motivo-box').style.display = this.value === '1' ? 'none' : ''; });
+  ['cs-estado', 'cs-fecha'].forEach(function (id) { $(id).addEventListener('change', aplicarEstadoSesion); });
   ['an-empresa', 'an-vigencia'].forEach(function (id) { $(id).addEventListener('input', actualizarNuevaAuto); $(id).addEventListener('change', actualizarNuevaAuto); });
   ['an-empleador', 'an-responsable'].forEach(function (id) { $(id).addEventListener('input', function () { this.dataset.tocado = '1'; }); });
   // Selectores y campos que guardan al cambiar (calificación y observación de cada estándar).

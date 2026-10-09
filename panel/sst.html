@@ -5,6 +5,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SST — Sistema de Gestión</title>
 <link rel="stylesheet" href="../css/panel.css?v=20261010">
+<style>
+  /* Fase 2: cuadrícula de meses del plan anual y del programa de capacitación */
+  .sst-meses { display: inline-flex; gap: 2px; white-space: nowrap; }
+  .sst-m { display: inline-block; width: 20px; height: 20px; line-height: 18px; text-align: center; font-size: 0.64rem; border-radius: 3px;
+    border: 1px solid transparent; color: #a0aec0; user-select: none; }
+  .sst-m.p { border-color: #2563eb; color: #1a5276; background: #eef4fc; font-weight: 700; }
+  .sst-m.e { border-color: #15803d; color: #fff; background: #16a34a; font-weight: 700; }
+  .sst-m.v { border-color: #c0392b; color: #c0392b; background: #fdecea; font-weight: 700; }
+  .sst-m.click { cursor: pointer; }
+  .sst-m.click:hover { box-shadow: 0 0 0 2px #cbd5e0; }
+  .sst-m.ahora { box-shadow: 0 -2px 0 #d97706 inset; }
+  .sst-mes-head { display: inline-flex; gap: 2px; }
+  .sst-mes-head span { display: inline-block; width: 20px; text-align: center; font-size: 0.56rem; color: #718096; letter-spacing: 0; text-transform: none; font-weight: 600; overflow: hidden; }
+  .sst-bar { height: 10px; border-radius: 5px; background: #e2e8f0; position: relative; overflow: hidden; min-width: 90px; }
+  .sst-bar > i { display: block; height: 100%; background: #16a34a; }
+  .sst-bar > b { position: absolute; top: 0; bottom: 0; width: 2px; background: #d97706; }
+  .sst-clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; max-width: 520px; }
+  .sst-ind td, .sst-ind th { text-align: center; padding: 4px 6px; font-size: 0.78rem; white-space: nowrap; }
+  .sst-ind td:first-child, .sst-ind th:first-child { text-align: left; font-weight: 600; }
+  .sst-asis td { vertical-align: middle; }
+  .sst-grid-meses { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; }
+  .sst-grid-meses > div { border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px 8px; font-size: 0.8rem; }
+  .sst-grid-meses label { display: block; font-size: 0.78rem; cursor: pointer; }
+</style>
 </head>
 <body data-modulo="sst">
   <div class="header">
@@ -33,12 +57,15 @@
         <div class="sc parcial"><div class="num" id="s-trabajadores">0</div><div class="lbl">Trabajadores activos</div></div>
         <div class="sc entregado"><div class="num" id="s-evidencias">0</div><div class="lbl">Evidencias (enlaces a Drive)</div></div>
         <div class="sc alerta"><div class="num" id="s-vencen">0</div><div class="lbl">Vencidas o por vencer (30 días)</div></div>
+        <div class="sc alerta"><div class="num" id="s-plan">0</div><div class="lbl">Plan y capacitación: vencidas o del mes</div></div>
       </div>
 
       <div class="mk-tabs" role="tablist">
         <button class="mk-tab" id="tab-empresas" role="tab" data-act="tab" data-tab="empresas">🏢 Empresas</button>
         <button class="mk-tab" id="tab-trabajadores" role="tab" data-act="tab" data-tab="trabajadores">👷 Trabajadores</button>
         <button class="mk-tab" id="tab-autoevaluacion" role="tab" data-act="tab" data-tab="autoevaluacion">✅ Autoevaluación</button>
+        <button class="mk-tab" id="tab-plan" role="tab" data-act="tab" data-tab="plan">📅 Plan anual</button>
+        <button class="mk-tab" id="tab-capacitaciones" role="tab" data-act="tab" data-tab="capacitaciones">🎓 Capacitaciones</button>
         <button class="mk-tab" id="tab-evidencias" role="tab" data-act="tab" data-tab="evidencias">🔗 Evidencias (Drive)</button>
       </div>
 
@@ -116,6 +143,85 @@
                 <th style="text-align:right">Puntaje</th><th>Resultado</th><th>Reporte de avances a la ARL</th><th></th>
               </tr></thead>
               <tbody id="autoevaluaciones-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Plan anual de trabajo ── -->
+      <div id="panel-plan" style="display:none">
+        <div class="mk-flag" style="background:#ebf5fb;color:#1a5276">
+          Plan Anual de Trabajo (Res. 312 de 2019): debe estar firmado por el empleador e identificar objetivos, metas, responsabilidades, recursos y cronograma.
+          Marca mes a mes lo programado y lo ejecutado; las alertas (vencidas y del mes) se calculan al abrir la página, no se envían correos.
+        </div>
+        <div class="filters">
+          <div class="fg"><label for="pl-plan">Plan</label><select id="pl-plan"></select></div>
+          <button class="btn-primary sm" data-act="pl-nuevo">➕ Nuevo plan</button>
+        </div>
+        <div id="pl-vacio" class="empty" style="display:none">Aún no hay planes. Crea el primero con «Nuevo plan».</div>
+        <div id="pl-contenido" style="display:none">
+          <div id="pl-resumen"></div>
+          <div id="pl-datos"></div>
+          <div class="filters">
+            <div class="fg"><label for="pf-ciclo">Ciclo</label>
+              <select id="pf-ciclo"><option value="">Todos</option><option value="planear">Planear</option><option value="hacer">Hacer</option><option value="verificar">Verificar</option><option value="actuar">Actuar</option></select></div>
+            <div class="fg"><label for="pf-grupo">Grupo</label><select id="pf-grupo"><option value="">Todos</option></select></div>
+            <div class="fg"><label for="pf-estado">Estado</label>
+              <select id="pf-estado">
+                <option value="">Todas las que aplican</option><option value="atencion">Requieren atención (vencidas y del mes)</option>
+                <option value="vencida">Vencidas</option><option value="este_mes">Del mes en curso</option><option value="ejecutada">Ejecutadas</option>
+                <option value="al_dia">Al día</option><option value="sin_programar">Sin programar</option><option value="sin_soporte">Ejecutadas sin soporte</option><option value="no_aplica">No aplican</option>
+              </select></div>
+            <div class="fg"><label for="pf-mes">Programadas en</label>
+              <select id="pf-mes"><option value="">Cualquier mes</option></select></div>
+            <div class="fg"><label for="pf-txt">Buscar</label><input type="text" id="pf-txt" placeholder="Actividad, ítem o responsable…"></div>
+            <button class="btn-clear-filters" data-act="pf-limpiar">Limpiar filtros</button>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h3>Actividades <span id="pa-ct" style="font-weight:400;color:#718096"></span></h3>
+              <div class="mk-actions">
+                <button class="btn-secondary" data-act="pl-pdf">📄 PDF del plan</button>
+                <button class="btn-primary sm" data-act="pa-nueva">➕ Actividad</button>
+              </div>
+            </div>
+            <div class="ef-help" style="padding:0 14px 8px">Haz clic en un mes programado (<span class="sst-m p" style="width:16px;height:16px;line-height:14px">P</span>) para marcarlo como ejecutado (<span class="sst-m e" style="width:16px;height:16px;line-height:14px">E</span>); una ejecución tardía cubre la programación más antigua pendiente. El peso es relativo: el cumplimiento se calcula sobre la suma de pesos de lo que aplica.</div>
+            <div class="table-wrap">
+              <table style="min-width:980px">
+                <thead><tr>
+                  <th>Ítem</th><th style="min-width:300px">Actividad</th><th>Responsable</th><th style="text-align:right">Peso</th>
+                  <th id="pa-th-meses"></th><th style="text-align:right">Avance</th><th>Estado</th><th>Soportes</th><th></th>
+                </tr></thead>
+                <tbody id="pa-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Capacitaciones ── -->
+      <div id="panel-capacitaciones" style="display:none">
+        <div class="mk-flag" style="background:#ebf5fb;color:#1a5276">
+          Programa de capacitación (Res. 312 de 2019): cada tema se programa por meses; los meses ejecutados salen de las sesiones realizadas. Imprime la planilla de asistencia para la firma de los trabajadores,
+          escanéala a Drive y registra el enlace como evidencia de la sesión.
+        </div>
+        <div class="filters">
+          <div class="fg"><label for="cf-empresa">Empresa</label><select id="cf-empresa"></select></div>
+          <div class="fg"><label for="cf-vigencia">Vigencia</label><input type="number" id="cf-vigencia" min="2019" max="2100" step="1" inputmode="numeric" style="width:100px"></div>
+          <div class="fg"><label for="cf-estado">Estado</label>
+            <select id="cf-estado"><option value="">Todos los activos</option><option value="atencion">Requieren atención</option><option value="vencida">Vencidos</option><option value="este_mes">Del mes en curso</option>
+              <option value="ejecutada">Ejecutados</option><option value="inactiva">Inactivos</option></select></div>
+        </div>
+        <div id="cp-resumen"></div>
+        <div class="card">
+          <div class="card-head"><h3>Programa de capacitación <span id="cp-ct" style="font-weight:400;color:#718096"></span></h3>
+            <button class="btn-primary sm" data-act="cp-nuevo">➕ Nuevo tema</button></div>
+          <div class="table-wrap">
+            <table style="min-width:980px">
+              <thead><tr>
+                <th style="min-width:280px">Tema</th><th>Responsable</th><th id="cp-th-meses"></th><th>Sesiones</th><th style="text-align:right">Cobertura</th><th>Estado</th><th></th>
+              </tr></thead>
+              <tbody id="cp-body"></tbody>
             </table>
           </div>
         </div>
@@ -281,7 +387,7 @@
   </div>
 
   <!-- ══ Modal: evidencias de un estándar o de una actividad ══ -->
-  <div class="overlay over" id="evl-overlay" role="dialog" aria-modal="true" aria-labelledby="evl-titulo">
+  <div class="overlay over" id="evl-overlay" style="z-index:265" role="dialog" aria-modal="true" aria-labelledby="evl-titulo">
     <div class="modal-box" style="max-width:720px">
       <div class="mhdr"><div><h2 id="evl-titulo"></h2><div class="meta"><span>Enlaces a Google Drive que respaldan este registro</span></div></div>
         <button class="btn-close" data-act="cerrar-modal" data-modal="evl-overlay" aria-label="Cerrar">✕</button></div>
@@ -318,13 +424,143 @@
     </div>
   </div>
 
+  <!-- ══ Modal: nuevo plan anual ══ -->
+  <div class="overlay over" id="pl-nuevo-overlay" role="dialog" aria-modal="true" aria-labelledby="pl-nuevo-titulo">
+    <div class="modal-box" style="max-width:600px">
+      <div class="mhdr"><div><h2 id="pl-nuevo-titulo">Nuevo plan anual</h2></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="pl-nuevo-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div class="form-grid cols2">
+          <div style="grid-column:1/-1"><label class="ef-label" for="pn-empresa">Empresa *</label><select class="ef" id="pn-empresa"></select></div>
+          <div><label class="ef-label" for="pn-vigencia">Vigencia (año) *</label><input class="ef" id="pn-vigencia" type="number" min="2019" max="2100" step="1" inputmode="numeric"></div>
+          <div><label class="ef-label" for="pn-origen">Punto de partida</label><select class="ef" id="pn-origen"></select></div>
+        </div>
+        <div class="mk-flag" id="pn-aviso" style="background:#ebf5fb;color:#1a5276"></div>
+        <div class="ef-help">Al copiar un plan se llevan las actividades (con pesos, responsables y meses programados), los datos del plan y los temas de capacitación activos. No se copian lo ejecutado, la firma, las sesiones ni las evidencias.</div>
+      </div>
+      <div class="mftr"><span></span><div class="mftr-btns">
+        <button class="btn-cancel" data-act="cerrar-modal" data-modal="pl-nuevo-overlay">Cancelar</button>
+        <button class="btn-confirm" id="pn-ok" data-act="pl-crear">Crear plan</button></div></div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: actividad del plan anual ══ -->
+  <div class="overlay over" id="pa-overlay" role="dialog" aria-modal="true" aria-labelledby="pa-titulo">
+    <div class="modal-box" style="max-width:820px">
+      <div class="mhdr"><div><h2 id="pa-titulo">Nueva actividad</h2><div class="meta" id="pa-meta"></div></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="pa-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div class="form-grid cols2">
+          <div><label class="ef-label" for="pa-ciclo">Ciclo *</label>
+            <select class="ef" id="pa-ciclo"><option value="planear">Planear</option><option value="hacer">Hacer</option><option value="verificar">Verificar</option><option value="actuar">Actuar</option></select></div>
+          <div><label class="ef-label" for="pa-grupo">Grupo</label><input class="ef" id="pa-grupo" maxlength="120" list="pa-grupos"><datalist id="pa-grupos"></datalist></div>
+          <div><label class="ef-label" for="pa-item-codigo">Código del ítem</label><input class="ef" id="pa-item-codigo" maxlength="20" placeholder="Ej. 1.1.4"></div>
+          <div><label class="ef-label" for="pa-item-nombre">Nombre del ítem</label><input class="ef" id="pa-item-nombre" maxlength="200"></div>
+          <div style="grid-column:1/-1"><label class="ef-label" for="pa-actividad">Actividad y entregable *</label><textarea class="ef" id="pa-actividad" rows="4" maxlength="3000"></textarea></div>
+          <div><label class="ef-label" for="pa-responsable">Responsable</label><input class="ef" id="pa-responsable" maxlength="200" list="pa-responsables"><datalist id="pa-responsables"></datalist></div>
+          <div><label class="ef-label" for="pa-peso">Peso (relativo)</label><input class="ef" id="pa-peso" type="number" min="0" max="100" step="0.01" inputmode="decimal"></div>
+          <div><label class="ef-label" for="pa-aplica">¿Aplica a la empresa?</label>
+            <select class="ef" id="pa-aplica"><option value="1">Sí, aplica</option><option value="0">No aplica</option></select></div>
+          <div id="pa-motivo-box" style="display:none"><label class="ef-label" for="pa-motivo">Motivo por el que no aplica *</label><input class="ef" id="pa-motivo" maxlength="300"></div>
+        </div>
+        <div style="margin:4px 0 10px"><span class="ef-label">Cronograma: programada (P) y ejecutada (E) por mes</span>
+          <div class="sst-grid-meses" id="pa-meses"></div></div>
+        <label class="ef-label" for="pa-obs">Observaciones</label>
+        <textarea class="ef" id="pa-obs" rows="2" maxlength="1000"></textarea>
+        <div id="pa-aud"></div>
+      </div>
+      <div class="mftr">
+        <div class="mk-actions"><button class="btn-secondary" id="pa-btn-evid" data-act="pa-evid" style="display:none">🔗 Soportes</button></div>
+        <div class="mftr-btns">
+          <button class="btn-cancel" data-act="cerrar-modal" data-modal="pa-overlay">Cancelar</button>
+          <button class="btn-confirm" id="pa-ok" data-act="pa-guardar">Guardar</button></div></div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: tema de capacitación ══ -->
+  <div class="overlay over" id="cp-overlay" role="dialog" aria-modal="true" aria-labelledby="cp-titulo">
+    <div class="modal-box" style="max-width:720px">
+      <div class="mhdr"><div><h2 id="cp-titulo">Nuevo tema de capacitación</h2><div class="meta" id="cp-meta"></div></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="cp-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div class="form-grid cols2">
+          <div style="grid-column:1/-1"><label class="ef-label" for="cp-tema">Tema *</label><textarea class="ef" id="cp-tema" rows="2" maxlength="500"></textarea></div>
+          <div><label class="ef-label" for="cp-dirigido">Dirigido a</label><input class="ef" id="cp-dirigido" maxlength="200" placeholder="Ej. todos los trabajadores, brigadistas"></div>
+          <div><label class="ef-label" for="cp-responsable">Responsable</label><input class="ef" id="cp-responsable" maxlength="200"></div>
+          <div><label class="ef-label" for="cp-entregable">Entregable</label><input class="ef" id="cp-entregable" maxlength="200" placeholder="Ej. Registro de formación"></div>
+          <div><label class="ef-label" for="cp-horas">Horas previstas</label><input class="ef" id="cp-horas" type="number" min="0.25" max="99" step="0.25" inputmode="decimal"></div>
+          <div><label class="ef-label" for="cp-activa">Estado</label>
+            <select class="ef" id="cp-activa"><option value="1">Activo</option><option value="0">Inactivo (fuera del programa)</option></select></div>
+        </div>
+        <div style="margin:4px 0 10px"><span class="ef-label">Meses programados</span>
+          <div class="mk-checks" id="cp-meses"></div>
+          <div class="ef-help">Los meses ejecutados no se digitan: salen de las sesiones realizadas.</div></div>
+        <label class="ef-label" for="cp-obs">Observaciones</label>
+        <textarea class="ef" id="cp-obs" rows="2" maxlength="1000"></textarea>
+        <div id="cp-aud"></div>
+      </div>
+      <div class="mftr"><span></span><div class="mftr-btns">
+        <button class="btn-cancel" data-act="cerrar-modal" data-modal="cp-overlay">Cancelar</button>
+        <button class="btn-confirm" id="cp-ok" data-act="cp-guardar">Guardar</button></div></div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: sesiones de un tema ══ -->
+  <div class="overlay" id="cs-lista-overlay" role="dialog" aria-modal="true" aria-labelledby="cs-lista-titulo">
+    <div class="modal-box" style="max-width:900px">
+      <div class="mhdr"><div><h2 id="cs-lista-titulo"></h2><div class="meta" id="cs-lista-meta"></div></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="cs-lista-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody" id="cs-lista-body"></div>
+      <div class="mftr"><span></span><div class="mftr-btns">
+        <button class="btn-cancel" data-act="cerrar-modal" data-modal="cs-lista-overlay">Cerrar</button>
+        <button class="btn-confirm" data-act="cs-nueva">➕ Nueva sesión</button></div></div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: sesión de capacitación ══ -->
+  <div class="overlay over" id="cs-overlay" role="dialog" aria-modal="true" aria-labelledby="cs-titulo">
+    <div class="modal-box" style="max-width:820px">
+      <div class="mhdr"><div><h2 id="cs-titulo">Nueva sesión</h2><div class="meta" id="cs-meta"></div></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="cs-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div class="form-grid cols2">
+          <div><label class="ef-label" for="cs-fecha">Fecha *</label><input class="ef" id="cs-fecha" type="date"></div>
+          <div><label class="ef-label" for="cs-estado">Estado</label>
+            <select class="ef" id="cs-estado"><option value="programada">Programada</option><option value="realizada">Realizada</option><option value="cancelada">Cancelada</option></select></div>
+          <div><label class="ef-label" for="cs-horas">Duración (horas)</label><input class="ef" id="cs-horas" type="number" min="0.25" max="99" step="0.25" inputmode="decimal"></div>
+          <div><label class="ef-label" for="cs-modalidad">Modalidad</label>
+            <select class="ef" id="cs-modalidad"><option value="presencial">Presencial</option><option value="virtual">Virtual</option><option value="mixta">Mixta</option></select></div>
+          <div><label class="ef-label" for="cs-instructor">Instructor o proveedor</label><input class="ef" id="cs-instructor" maxlength="200"></div>
+          <div><label class="ef-label" for="cs-lugar">Lugar o enlace</label><input class="ef" id="cs-lugar" maxlength="200"></div>
+        </div>
+        <div class="mk-flag" id="cs-aviso" style="display:none"></div>
+        <div style="margin:6px 0 4px"><span class="ef-label">Convocados y asistencia</span></div>
+        <div class="table-wrap"><table class="mk-mini sst-asis" style="min-width:560px"><thead><tr>
+          <th>Trabajador</th><th>Cargo</th><th style="text-align:center">Convocado</th><th style="text-align:center">Asistió</th></tr></thead>
+          <tbody id="cs-asis"></tbody></table></div>
+        <div class="ef-help" id="cs-asis-ayuda"></div>
+        <label class="ef-label" for="cs-obs" style="margin-top:8px">Observaciones</label>
+        <textarea class="ef" id="cs-obs" rows="2" maxlength="1000"></textarea>
+        <div id="cs-aud"></div>
+      </div>
+      <div class="mftr">
+        <div class="mk-actions">
+          <button class="btn-secondary" id="cs-btn-planilla" data-act="cs-planilla" style="display:none">📄 Planilla de asistencia</button>
+          <button class="btn-secondary" id="cs-btn-evid" data-act="cs-evid" style="display:none">🔗 Planilla firmada (Drive)</button>
+        </div>
+        <div class="mftr-btns">
+          <button class="btn-cancel" data-act="cerrar-modal" data-modal="cs-overlay">Cancelar</button>
+          <button class="btn-confirm" id="cs-ok" data-act="cs-guardar">Guardar</button></div></div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="../js/shared/supabase-client.js?v=20261010"></script>
   <script src="../js/shared/modal.js?v=20261010"></script>
   <script src="../js/panel/auth.js?v=20261010"></script>
-  <script src="../js/panel/sst-pdf.js?v=20261010"></script>
-  <script src="../js/panel/sst.js?v=20261010"></script>
+  <script src="../js/panel/sst-pdf.js?v=20261011"></script>
+  <script src="../js/panel/sst.js?v=20261011"></script>
 </body>
 </html>
