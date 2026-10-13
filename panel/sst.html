@@ -28,6 +28,14 @@
   .sst-grid-meses { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; }
   .sst-grid-meses > div { border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px 8px; font-size: 0.8rem; }
   .sst-grid-meses label { display: block; font-size: 0.78rem; cursor: pointer; }
+  /* Fase 3: tablero de acciones */
+  .sst-kanban { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; align-items: start; }
+  .sst-col { background: #f4f7fa; border-radius: 10px; padding: 10px; min-height: 90px; }
+  .sst-col h4 { margin: 0 0 8px; font-size: 0.82rem; display: flex; justify-content: space-between; color: #2d3748; }
+  .sst-card { background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #cbd5e0; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; font-size: 0.82rem; }
+  .sst-card.vencida { border-left-color: #c0392b; } .sst-card.por_vencer { border-left-color: #d97706; } .sst-card.al_dia { border-left-color: #2563eb; } .sst-card.cerrada { border-left-color: #15803d; }
+  .sst-card .sst-card-meta { color: #718096; font-size: 0.74rem; margin-top: 4px; }
+  .sst-card-btns { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 </style>
 </head>
 <body data-modulo="sst">
@@ -58,6 +66,7 @@
         <div class="sc entregado"><div class="num" id="s-evidencias">0</div><div class="lbl">Evidencias (enlaces a Drive)</div></div>
         <div class="sc alerta"><div class="num" id="s-vencen">0</div><div class="lbl">Vencidas o por vencer (30 días)</div></div>
         <div class="sc alerta"><div class="num" id="s-plan">0</div><div class="lbl">Plan y capacitación: vencidas o del mes</div></div>
+        <div class="sc alerta"><div class="num" id="s-eventos">0</div><div class="lbl">Eventos y acciones con plazo vencido</div></div>
       </div>
 
       <div class="mk-tabs" role="tablist">
@@ -66,6 +75,9 @@
         <button class="mk-tab" id="tab-autoevaluacion" role="tab" data-act="tab" data-tab="autoevaluacion">✅ Autoevaluación</button>
         <button class="mk-tab" id="tab-plan" role="tab" data-act="tab" data-tab="plan">📅 Plan anual</button>
         <button class="mk-tab" id="tab-capacitaciones" role="tab" data-act="tab" data-tab="capacitaciones">🎓 Capacitaciones</button>
+        <button class="mk-tab" id="tab-eventos" role="tab" data-act="tab" data-tab="eventos">⚠️ Eventos</button>
+        <button class="mk-tab" id="tab-acciones" role="tab" data-act="tab" data-tab="acciones">🛠 Acciones</button>
+        <button class="mk-tab" id="tab-indicadores" role="tab" data-act="tab" data-tab="indicadores">📈 Indicadores</button>
         <button class="mk-tab" id="tab-evidencias" role="tab" data-act="tab" data-tab="evidencias">🔗 Evidencias (Drive)</button>
       </div>
 
@@ -225,6 +237,78 @@
             </table>
           </div>
         </div>
+      </div>
+
+      <!-- ── Eventos ── -->
+      <div id="panel-eventos" style="display:none">
+        <div class="mk-flag" style="background:#ebf5fb;color:#1a5276">
+          Accidentes de trabajo, incidentes, condiciones o actos inseguros y casos de enfermedad laboral. <strong>Aquí no se guardan diagnósticos ni datos médicos</strong>: el FURAT,
+          la investigación firmada y la lección aprendida permanecen en Drive y se enlazan como evidencia. Los plazos legales se calculan solos (el FURAT, sin descontar festivos).
+        </div>
+        <div class="filters">
+          <div class="fg"><label for="fe-empresa">Empresa</label><select id="fe-empresa"><option value="">Todas</option></select></div>
+          <div class="fg"><label for="fe-tipo">Tipo</label>
+            <select id="fe-tipo"><option value="">Todos</option><option value="accidente">Accidente de trabajo</option><option value="incidente">Incidente</option>
+              <option value="condicion_insegura">Condición o acto inseguro</option><option value="enfermedad_laboral">Enfermedad laboral</option></select></div>
+          <div class="fg"><label for="fe-estado">Estado</label>
+            <select id="fe-estado"><option value="activos">En curso</option><option value="vencidos">Con plazo vencido</option><option value="cerrado">Cerrados</option>
+              <option value="anulado">Anulados</option><option value="">Todos</option></select></div>
+          <div class="fg"><label for="fe-anio">Año</label><select id="fe-anio"><option value="">Todos</option></select></div>
+          <div class="fg"><label for="fe-txt">Buscar</label><input type="text" id="fe-txt" placeholder="Descripción, trabajador o lugar…"></div>
+          <button class="btn-clear-filters" data-act="fe-limpiar">Limpiar filtros</button>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h3>Eventos <span id="eventos-ct" style="font-weight:400;color:#718096"></span></h3>
+            <button class="btn-primary sm" data-act="evt-nuevo">➕ Registrar evento</button>
+          </div>
+          <div class="table-wrap">
+            <table style="min-width:980px">
+              <thead><tr>
+                <th>Fecha</th><th>Tipo</th><th>Trabajador</th><th style="min-width:240px">Descripción</th><th>Plazos legales</th><th>Estado</th><th style="text-align:center">Acciones</th><th></th>
+              </tr></thead>
+              <tbody id="eventos-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Acciones correctivas, preventivas y de mejora ── -->
+      <div id="panel-acciones" style="display:none">
+        <div class="mk-flag" style="background:#ebf5fb;color:#1a5276">
+          Matriz de acciones correctivas, preventivas y de mejora (ítems 5.1 a 5.4 del plan anual). Cada acción lleva responsable y fecha límite; se cierra solo después de ejecutarla y verificar que fue eficaz (Res. 1401/2007, art. 12).
+        </div>
+        <div class="filters">
+          <div class="fg"><label for="fc-empresa">Empresa</label><select id="fc-empresa"><option value="">Todas</option></select></div>
+          <div class="fg"><label for="fc-origen">Origen</label>
+            <select id="fc-origen"><option value="">Todos</option><option value="evento">Evento</option><option value="resultado_sgsst">Resultado del SG-SST</option>
+              <option value="revision_direccion">Revisión por la dirección</option><option value="auditoria">Auditoría</option><option value="inspeccion">Inspección</option><option value="otro">Otro</option></select></div>
+          <div class="fg"><label for="fc-alerta">Alerta</label>
+            <select id="fc-alerta"><option value="">Todas</option><option value="vencida">Vencidas</option><option value="por_vencer">Vencen en 7 días</option></select></div>
+          <div class="fg"><label for="fc-txt">Buscar</label><input type="text" id="fc-txt" placeholder="Descripción o responsable…"></div>
+          <div class="fg"><label for="fc-cerradas">Cerradas y canceladas</label>
+            <select id="fc-cerradas"><option value="0">Ocultar</option><option value="1">Mostrar</option></select></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h3>Tablero de acciones <span id="acciones-ct" style="font-weight:400;color:#718096"></span></h3>
+            <button class="btn-primary sm" data-act="acc-nueva">➕ Nueva acción</button>
+          </div>
+          <div id="acciones-tablero" style="padding:0 14px 14px"></div>
+        </div>
+      </div>
+
+      <!-- ── Indicadores de accidentalidad ── -->
+      <div id="panel-indicadores" style="display:none">
+        <div class="mk-flag" style="background:#ebf5fb;color:#1a5276">
+          Indicadores mínimos de accidentalidad y enfermedad laboral (Res. 312 de 2019, art. 30), calculados con los eventos registrados y los trabajadores activos de cada mes.
+          El ausentismo por causa médica queda pendiente: requiere los días de incapacidad de cada trabajador y se agregará como módulo aparte.
+        </div>
+        <div class="filters">
+          <div class="fg"><label for="fi-empresa">Empresa</label><select id="fi-empresa"></select></div>
+          <div class="fg"><label for="fi-anio">Año</label><select id="fi-anio"></select></div>
+        </div>
+        <div id="indicadores-contenido"></div>
       </div>
 
       <!-- ── Evidencias ── -->
@@ -554,13 +638,153 @@
     </div>
   </div>
 
+  <!-- ══ Modal: evento ══ -->
+  <div class="overlay" id="evt-overlay" role="dialog" aria-modal="true" aria-labelledby="evt-titulo">
+    <div class="modal-box" style="max-width:940px">
+      <div class="mhdr"><div><h2 id="evt-titulo">Registrar evento</h2><div class="meta" id="evt-meta"></div></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="evt-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div class="mk-flag" id="evt-aviso" style="display:none"></div>
+        <div class="mk-box" style="margin-bottom:12px"><h4>1. Qué pasó</h4>
+          <div class="form-grid cols2">
+            <div><label class="ef-label" for="evt-empresa">Empresa *</label><select class="ef" id="evt-empresa"></select></div>
+            <div><label class="ef-label" for="evt-tipo">Tipo de evento *</label>
+              <select class="ef" id="evt-tipo"><option value="accidente">Accidente de trabajo</option><option value="incidente">Incidente</option>
+                <option value="condicion_insegura">Condición o acto inseguro</option><option value="enfermedad_laboral">Enfermedad laboral</option></select></div>
+            <div><label class="ef-label" for="evt-fecha">Fecha del evento *</label><input class="ef" id="evt-fecha" type="date"></div>
+            <div data-tipos="accidente,incidente,condicion_insegura"><label class="ef-label" for="evt-hora">Hora</label><input class="ef" id="evt-hora" type="time"></div>
+            <div style="grid-column:1/-1"><label class="ef-label" for="evt-trabajador" id="evt-trabajador-lbl">Trabajador</label><select class="ef" id="evt-trabajador"></select></div>
+            <div data-tipos="accidente"><label class="ef-label" for="evt-gravedad">Gravedad *</label>
+              <select class="ef" id="evt-gravedad"><option value="">Selecciona…</option><option value="leve">Leve</option><option value="grave">Grave</option><option value="mortal">Mortal</option></select>
+              <div class="ef-help">Grave: amputación, fractura de huesos largos, quemadura de 2.º o 3.er grado o lesión ocular que comprometa la visión (Res. 1401, art. 3).</div></div>
+            <div data-tipos="accidente"><label class="ef-label" for="evt-tipo-acc">Tipo de accidente</label>
+              <select class="ef" id="evt-tipo-acc"><option value="">—</option><option value="propios_del_trabajo">Propios del trabajo</option><option value="transito">Tránsito</option>
+                <option value="violencia">Violencia</option><option value="deportivo">Deportivo</option><option value="recreativo">Recreativo o cultural</option></select></div>
+            <div data-tipos="accidente,incidente"><label class="ef-label" for="evt-mecanismo">Mecanismo o forma</label>
+              <select class="ef" id="evt-mecanismo"><option value="">—</option><option value="caida_personas">Caída de personas</option><option value="caida_objetos">Caída de objetos</option>
+                <option value="pisadas_choques_golpes">Pisadas, choques o golpes</option><option value="atrapamientos">Atrapamientos</option><option value="sobreesfuerzo">Sobreesfuerzo o falso movimiento</option>
+                <option value="temperatura_extrema">Temperatura extrema</option><option value="electricidad">Electricidad</option><option value="sustancias_nocivas">Sustancias nocivas, radiaciones o salpicaduras</option><option value="otro">Otro</option></select></div>
+            <div data-tipos="accidente,incidente"><label class="ef-label" for="evt-agente">Agente</label>
+              <select class="ef" id="evt-agente"><option value="">—</option><option value="maquinas_equipos">Máquinas y equipos</option><option value="medios_transporte">Medios de transporte</option>
+                <option value="aparatos">Aparatos</option><option value="herramientas">Herramientas, implementos o utensilios</option><option value="materiales_sustancias">Materiales o sustancias</option>
+                <option value="ambiente_trabajo">Ambiente de trabajo</option><option value="otros">Otros agentes</option><option value="sin_clasificar">Sin clasificar</option></select></div>
+            <div data-tipos="accidente,incidente"><label class="ef-label" for="evt-dentro">¿Dentro de la empresa?</label>
+              <select class="ef" id="evt-dentro"><option value="">—</option><option value="1">Dentro de la empresa</option><option value="0">Fuera de la empresa</option></select></div>
+            <div><label class="ef-label" for="evt-lugar">Lugar o área</label><input class="ef" id="evt-lugar" maxlength="200"></div>
+            <div style="grid-column:1/-1"><label class="ef-label" for="evt-descripcion">Descripción *</label>
+              <textarea class="ef" id="evt-descripcion" rows="3" maxlength="3000" placeholder="Qué pasó, cuándo, dónde y cómo."></textarea>
+              <div class="ef-help">No escribas diagnósticos ni datos médicos: van en el FURAT, que se enlaza desde Drive.</div></div>
+            <div data-tipos="accidente"><label class="ef-label" for="evt-dias-inc">Días de incapacidad por el accidente</label><input class="ef" id="evt-dias-inc" type="number" min="0" step="1" inputmode="numeric"></div>
+            <div data-tipos="accidente"><label class="ef-label" for="evt-dias-carg">Días cargados (muerte, invalidez o incapacidad permanente parcial)</label><input class="ef" id="evt-dias-carg" type="number" min="0" step="1" inputmode="numeric"></div>
+            <div data-tipos="enfermedad_laboral"><label class="ef-label" for="evt-caso-hasta">El caso deja de estar activo el</label><input class="ef" id="evt-caso-hasta" type="date">
+              <div class="ef-help">Déjalo vacío mientras el caso siga activo (cuenta en la prevalencia).</div></div>
+          </div></div>
+
+        <div class="mk-box" style="margin-bottom:12px" data-tipos="accidente,enfermedad_laboral"><h4>2. Reporte</h4>
+          <div id="evt-plazos-rep" style="margin-bottom:8px"></div>
+          <div class="form-grid cols2">
+            <div style="grid-column:1/-1"><label class="ef-label" for="evt-ref">Referencia del reporte (número del FURAT o del FUREL)</label><input class="ef" id="evt-ref" maxlength="120"></div>
+            <div><label class="ef-label" for="evt-rep-arl">Reportado a la ARL el</label><input class="ef" id="evt-rep-arl" type="date"></div>
+            <div data-tipos="accidente"><label class="ef-label" for="evt-rep-eps">Reportado a la EPS el</label><input class="ef" id="evt-rep-eps" type="date"></div>
+            <div data-tipos="accidente" id="evt-terr-box"><label class="ef-label" for="evt-rep-terr">Reportado a la Dirección Territorial el (graves y mortales)</label><input class="ef" id="evt-rep-terr" type="date"></div>
+          </div></div>
+
+        <div class="mk-box" style="margin-bottom:12px" data-tipos="accidente,incidente"><h4>3. Investigación (Res. 1401 de 2007)</h4>
+          <div id="evt-plazos-inv" style="margin-bottom:8px"></div>
+          <div class="form-grid cols2">
+            <div><label class="ef-label" for="evt-fecha-inv">Fecha de la investigación</label><input class="ef" id="evt-fecha-inv" type="date"></div>
+            <div id="evt-informe-box" data-tipos="accidente"><label class="ef-label" for="evt-informe-arl">Informe enviado a la ARL el (graves y mortales)</label><input class="ef" id="evt-informe-arl" type="date"></div>
+            <div style="grid-column:1/-1"><label class="ef-label" for="evt-equipo">Equipo investigador *</label>
+              <input class="ef" id="evt-equipo" maxlength="500" placeholder="Jefe inmediato, representante del COPASST o Vigía y responsable del SG-SST">
+              <div class="ef-help">Mínimo: jefe inmediato, representante del COPASST o Vigía y encargado del SG-SST.</div></div>
+            <div style="grid-column:1/-1" id="evt-prof-box"><label class="ef-label" for="evt-prof">Profesional con licencia en SST (obligatorio en accidentes graves y mortales)</label><input class="ef" id="evt-prof" maxlength="300" placeholder="Nombre y número de licencia"></div>
+            <div style="grid-column:1/-1"><label class="ef-label" for="evt-causas-inm">Causas inmediatas *</label><textarea class="ef" id="evt-causas-inm" rows="2" maxlength="2000"></textarea>
+              <div class="mk-checks" style="margin-top:4px"><label><input type="checkbox" id="evt-ti-acto"> Actos subestándar</label><label><input type="checkbox" id="evt-ti-cond"> Condiciones subestándar</label></div></div>
+            <div style="grid-column:1/-1"><label class="ef-label" for="evt-causas-bas">Causas básicas *</label><textarea class="ef" id="evt-causas-bas" rows="2" maxlength="2000"></textarea>
+              <div class="mk-checks" style="margin-top:4px"><label><input type="checkbox" id="evt-tb-pers"> Factores personales</label><label><input type="checkbox" id="evt-tb-trab"> Factores del trabajo</label></div></div>
+          </div></div>
+
+        <div class="mk-box" style="margin-bottom:12px" data-tipos="accidente,incidente"><h4>4. Lección aprendida</h4>
+          <div class="form-grid cols2">
+            <div style="grid-column:1/-1"><label class="ef-label" for="evt-leccion">Lección aprendida</label><textarea class="ef" id="evt-leccion" rows="2" maxlength="2000"></textarea></div>
+            <div><label class="ef-label" for="evt-leccion-soc">Socializada el</label><input class="ef" id="evt-leccion-soc" type="date"></div>
+          </div></div>
+
+        <div class="mk-box" style="margin-bottom:12px" id="evt-acciones-box"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <h4 style="margin:0">Acciones y medidas de intervención</h4><button class="btn-primary sm" id="evt-btn-accion" data-act="evt-accion">➕ Acción</button></div>
+          <div id="evt-acciones"></div></div>
+
+        <label class="ef-label" for="evt-obs">Observaciones</label>
+        <textarea class="ef" id="evt-obs" rows="2" maxlength="1000"></textarea>
+        <div id="evt-aud"></div>
+      </div>
+      <div class="mftr">
+        <div class="mk-actions">
+          <button class="btn-secondary" id="evt-btn-evid" data-act="evt-evid" style="display:none">🔗 FURAT e investigación (Drive)</button>
+          <button class="btn-secondary" id="evt-btn-reabrir" data-act="evt-estado" data-estado="abierto" style="display:none">↩ Reabrir (admin)</button>
+          <button class="btn-secondary" id="evt-btn-anular" data-act="evt-anular" style="display:none">🚫 Anular</button>
+        </div>
+        <div class="mftr-btns">
+          <button class="btn-secondary" id="evt-btn-iniciar" data-act="evt-estado" data-estado="en_investigacion" style="display:none">▶ Iniciar investigación</button>
+          <button class="btn-secondary" id="evt-btn-investigado" data-act="evt-estado" data-estado="investigado" style="display:none">✔ Dar por investigado</button>
+          <button class="btn-secondary" id="evt-btn-cerrar" data-act="evt-estado" data-estado="cerrado" style="display:none">🔒 Cerrar evento</button>
+          <button class="btn-cancel" data-act="cerrar-modal" data-modal="evt-overlay">Cancelar</button>
+          <button class="btn-confirm" id="evt-ok" data-act="evt-guardar">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Modal: acción ══ -->
+  <div class="overlay over" id="acc-overlay" role="dialog" aria-modal="true" aria-labelledby="acc-titulo">
+    <div class="modal-box" style="max-width:760px">
+      <div class="mhdr"><div><h2 id="acc-titulo">Nueva acción</h2><div class="meta" id="acc-meta"></div></div>
+        <button class="btn-close" data-act="cerrar-modal" data-modal="acc-overlay" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div class="form-grid cols2">
+          <div><label class="ef-label" for="acc-empresa">Empresa *</label><select class="ef" id="acc-empresa"></select></div>
+          <div><label class="ef-label" for="acc-origen">Origen *</label>
+            <select class="ef" id="acc-origen"><option value="evento">Evento (accidente, incidente, condición insegura)</option><option value="resultado_sgsst">Resultado del SG-SST (indicadores)</option>
+              <option value="revision_direccion">Revisión por la dirección</option><option value="auditoria">Auditoría</option><option value="inspeccion">Inspección</option><option value="otro">Otro</option></select></div>
+          <div style="grid-column:1/-1" id="acc-evento-box"><label class="ef-label" for="acc-evento">Evento *</label><select class="ef" id="acc-evento"></select></div>
+          <div><label class="ef-label" for="acc-tipo">Tipo de acción</label>
+            <select class="ef" id="acc-tipo"><option value="correctiva">Correctiva</option><option value="preventiva">Preventiva</option><option value="mejora">De mejora</option></select></div>
+          <div><label class="ef-label" for="acc-nivel">Nivel de intervención</label>
+            <select class="ef" id="acc-nivel"><option value="">—</option><option value="fuente">En la fuente</option><option value="medio">En el medio</option><option value="trabajador">En el trabajador</option><option value="proceso">En el proceso</option></select></div>
+          <div style="grid-column:1/-1"><label class="ef-label" for="acc-hallazgo">Causa o hallazgo que la origina</label><input class="ef" id="acc-hallazgo" maxlength="500"></div>
+          <div style="grid-column:1/-1"><label class="ef-label" for="acc-descripcion">Acción a ejecutar *</label><textarea class="ef" id="acc-descripcion" rows="2" maxlength="1000"></textarea></div>
+          <div><label class="ef-label" for="acc-responsable">Responsable *</label><input class="ef" id="acc-responsable" maxlength="200" list="acc-responsables"><datalist id="acc-responsables"></datalist></div>
+          <div><label class="ef-label" for="acc-limite">Fecha límite *</label><input class="ef" id="acc-limite" type="date"></div>
+          <div><label class="ef-label" for="acc-estado">Estado</label>
+            <select class="ef" id="acc-estado"><option value="abierta">Abierta</option><option value="en_curso">En curso</option><option value="en_verificacion">En verificación</option>
+              <option value="cerrada">Cerrada</option><option value="cancelada">Cancelada</option></select></div>
+          <div><label class="ef-label" for="acc-ejecucion">Fecha de ejecución</label><input class="ef" id="acc-ejecucion" type="date"></div>
+          <div><label class="ef-label" for="acc-verificacion">Fecha de verificación</label><input class="ef" id="acc-verificacion" type="date"></div>
+          <div><label class="ef-label" for="acc-eficaz">¿Fue eficaz?</label>
+            <select class="ef" id="acc-eficaz"><option value="">Sin verificar</option><option value="1">Sí, fue eficaz</option><option value="0">No fue eficaz</option></select></div>
+          <div style="grid-column:1/-1"><label class="ef-label" for="acc-resultado">Resultado de la verificación</label><input class="ef" id="acc-resultado" maxlength="500"></div>
+          <div><label class="ef-label" for="acc-verificado-por">Verificado por</label><input class="ef" id="acc-verificado-por" maxlength="200"></div>
+          <div id="acc-cancel-box" style="display:none"><label class="ef-label" for="acc-motivo">Motivo de la cancelación *</label><input class="ef" id="acc-motivo" maxlength="300"></div>
+        </div>
+        <label class="ef-label" for="acc-obs">Observaciones</label>
+        <textarea class="ef" id="acc-obs" rows="2" maxlength="1000"></textarea>
+        <div id="acc-aud"></div>
+      </div>
+      <div class="mftr">
+        <div class="mk-actions"><button class="btn-secondary" id="acc-btn-evid" data-act="acc-evid" style="display:none">🔗 Soportes</button></div>
+        <div class="mftr-btns">
+          <button class="btn-cancel" data-act="cerrar-modal" data-modal="acc-overlay">Cancelar</button>
+          <button class="btn-confirm" id="acc-ok" data-act="acc-guardar">Guardar</button></div></div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="../js/shared/supabase-client.js?v=20261010"></script>
   <script src="../js/shared/modal.js?v=20261010"></script>
   <script src="../js/panel/auth.js?v=20261010"></script>
-  <script src="../js/panel/sst-pdf.js?v=20261011"></script>
-  <script src="../js/panel/sst.js?v=20261011"></script>
+  <script src="../js/panel/sst-pdf.js?v=20261013"></script>
+  <script src="../js/panel/sst.js?v=20261013"></script>
 </body>
 </html>

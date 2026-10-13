@@ -3,6 +3,7 @@
 // FASE 0: base del módulo = Empresas + Trabajadores + Evidencias (enlaces a Drive).
 // FASE 1: autoevaluación de estándares mínimos + plan de mejoramiento.
 // FASE 2: plan anual de trabajo (cronograma mensual programado/ejecutado) + programa de capacitación.
+// FASE 3: eventos (accidentes, incidentes, condiciones inseguras, enfermedad laboral), acciones e indicadores.
 // ══════════════════════════════════════════════════════════════
 // Mismo patrón que crm.js/mercadeo.js: cliente Supabase directo, la seguridad real es la RLS
 // (user_has_module_pqrs('sst'), migración 0015) y las reglas de negocio las sella el servidor:
@@ -100,12 +101,17 @@
         fetchAll('sst_cap_sesiones', '*', 'fecha'),
         fetchAll('sst_cap_asistentes', '*', 'id'),
         fetchAll('sst_cap_indicadores_mes', '*', 'mes'),
+        fetchAll('sst_eventos_resumen', '*', 'fecha_evento'),
+        fetchAll('sst_acciones_calc', '*', 'fecha_limite'),
+        fetchAll('sst_indicadores_mes', '*', 'mes'),
+        fetchAll('sst_indicadores_anio', '*', 'vigencia'),
       ]);
       for (var i = 0; i < rs.length; i++) if (rs[i].error) throw rs[i].error;
       empresas = rs[0].data; trabajadores = rs[1].data; evidencias = rs[2].data;
       estandares = rs[3].data; autoevals = rs[4].data; aeItems = rs[5].data; planes = rs[6].data;
       planesAnual = rs[7].data; planActs = rs[8].data; planGrupos = rs[9].data; caps = rs[10].data;
       sesiones = rs[11].data; asistentes = rs[12].data; indMes = rs[13].data;
+      eventosR = rs[14].data; accionesC = rs[15].data; indAt = rs[16].data; indAnio = rs[17].data;
     } catch (err) {
       if (primera) {
         $('estado-carga').innerHTML = 'No se pudieron cargar los datos: ' + esc(errMsg(err)) +
@@ -134,6 +140,12 @@
     sesiones.forEach(function (s) { sesById[s.id] = s; (sesPorCap[s.capacitacion_id] = sesPorCap[s.capacitacion_id] || []).push(s); });
     Object.keys(sesPorCap).forEach(function (k) { sesPorCap[k].sort(function (a, b) { return a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : b.id - a.id; }); });
     asistentes.forEach(function (a) { (asisPorSes[a.sesion_id] = asisPorSes[a.sesion_id] || []).push(a); });
+    eventoById = {}; eventosR.forEach(function (e) { eventoById[e.id] = e; });
+    accionById = {}; accionesPorEvento = {};
+    accionesC.forEach(function (a) {
+      accionById[a.id] = a;
+      if (a.evento_id) (accionesPorEvento[a.evento_id] = accionesPorEvento[a.evento_id] || []).push(a);
+    });
     $('estado-carga').style.display = 'none';
     $('contenido').style.display = '';
     rellenarFiltros();
@@ -150,13 +162,16 @@
     var cfe = $('cf-empresa'), cfActual = cfe.value;
     cfe.innerHTML = optsHtml(op, null, cfActual);
     if (!capInit) { iniciarFiltroCap(); capInit = true; }
+    rellenarFiltrosF3(op);
     var ftipo = $('fv-tipo'), actualTipo = ftipo.value;
     ftipo.innerHTML = optsHtml(mapOpts(TIPO_EVID), 'Todos', actualTipo);
   }
 
   function renderTodo() {
     renderStats(); renderEmpresas(); renderTrabajadores(); renderAutoevals(); renderPlan(); renderCapacitaciones(); renderEvidencias();
+    renderEventos(); renderAcciones(); renderIndicadores();
     cambiarTab(tab);
+    if (evtId) { if (eventoById[evtId]) renderEventoDerivado(); else MODAL.close('evt-overlay'); }
     if (aeId) { if (autoById[aeId]) renderAutoDetalle(); else MODAL.close('ae-overlay'); }
     if (cslCapId) { if (capById[cslCapId]) renderSesionesLista(); else MODAL.close('cs-lista-overlay'); }
     if (evlCtx) renderEvl();
@@ -164,7 +179,7 @@
 
   function cambiarTab(t) {
     tab = t;
-    ['empresas', 'trabajadores', 'autoevaluacion', 'plan', 'capacitaciones', 'evidencias'].forEach(function (k) {
+    ['empresas', 'trabajadores', 'autoevaluacion', 'plan', 'capacitaciones', 'eventos', 'acciones', 'indicadores', 'evidencias'].forEach(function (k) {
       $('tab-' + k).classList.toggle('active', k === t);
       $('tab-' + k).setAttribute('aria-selected', k === t ? 'true' : 'false');
       $('panel-' + k).style.display = k === t ? '' : 'none';
@@ -391,6 +406,14 @@
     if (e.entidad_tipo === 'cap_sesion') {
       var se = sesById[e.entidad_id], cp = se && capById[se.capacitacion_id];
       return se && cp ? 'Capacitación ' + fmtDateOnly(se.fecha) + ' · ' + cp.tema.slice(0, 60) : '(sesión eliminada)';
+    }
+    if (e.entidad_tipo === 'evento') {
+      var ev = eventoById[e.entidad_id];
+      return ev ? tituloEvento(ev) : '(evento eliminado)';
+    }
+    if (e.entidad_tipo === 'accion') {
+      var ac = accionById[e.entidad_id];
+      return ac ? 'Acción: ' + ac.descripcion.slice(0, 70) : '(acción eliminada)';
     }
     return '';
   }
@@ -775,6 +798,14 @@
       var se = sesById[id], cp = se && capById[se.capacitacion_id];
       if (!cp) return;
       titulo = 'Capacitación ' + fmtDateOnly(se.fecha) + ' · ' + cp.tema.slice(0, 60); empresaId = cp.empresa_id;
+    } else if (tipo === 'evento') {
+      var evt = eventoById[id];
+      if (!evt) return;
+      titulo = tituloEvento(evt); empresaId = evt.empresa_id;
+    } else if (tipo === 'accion') {
+      var acn = accionById[id];
+      if (!acn) return;
+      titulo = 'Acción: ' + acn.descripcion.slice(0, 70); empresaId = acn.empresa_id;
     } else {
       var p = planById[id], pa = p && autoById[p.autoeval_id];
       if (!pa) return;
@@ -1506,6 +1537,478 @@
     }
   }
 
+  function rellenarFiltrosF3(op) {
+    [['fe-empresa', 'Todas'], ['fc-empresa', 'Todas']].forEach(function (p) {
+      var el = $(p[0]), actual = el.value;
+      el.innerHTML = optsHtml(op, p[1], actual);
+    });
+    var anios = {};
+    eventosR.forEach(function (e) { anios[String(e.fecha_evento).slice(0, 4)] = 1; });
+    var fa = $('fe-anio'), act = fa.value;
+    fa.innerHTML = optsHtml(Object.keys(anios).sort().reverse().map(function (y) { return { v: y, t: y }; }), 'Todos', anios[act] ? act : '');
+    rellenarIndicadores();
+  }
+
+  // ══════════════ Fase 3: Eventos (accidentes, incidentes, condiciones inseguras, enfermedad laboral) ══════════════
+  // Los plazos legales, su estado y los indicadores los calculan las vistas del servidor (sst_eventos_resumen,
+  // sst_acciones_calc, sst_indicadores_mes/anio); aquí solo se muestran. NO se capturan datos médicos: el FURAT, la
+  // investigación firmada y la lección aprendida permanecen en Drive (evidencias).
+  var TIPO_EVT = { accidente: 'Accidente de trabajo', incidente: 'Incidente', condicion_insegura: 'Condición o acto inseguro', enfermedad_laboral: 'Enfermedad laboral' };
+  var COLOR_TIPO_EVT = { accidente: '#c0392b', incidente: '#d97706', condicion_insegura: '#2563eb', enfermedad_laboral: '#7c3aed' };
+  var ESTADO_EVT = { abierto: 'Abierto', en_investigacion: 'En investigación', investigado: 'Investigado', cerrado: 'Cerrado', anulado: 'Anulado' };
+  var COLOR_ESTADO_EVT = { abierto: '#d97706', en_investigacion: '#2563eb', investigado: '#0e7490', cerrado: '#15803d', anulado: '#a0aec0' };
+  var COLOR_GRAVEDAD = { leve: '#718096', grave: '#d97706', mortal: '#c0392b' };
+  var PLAZO_EVT = { cumplido: ['Cumplido', '#15803d'], tarde: ['Tarde', '#d97706'], vencido: ['Vencido', '#c0392b'], pendiente: ['Pendiente', '#2563eb'] };
+  var ORDEN_PLAZO = ['vencido', 'pendiente', 'tarde', 'cumplido'];
+  var ORIGEN_ACC = { evento: 'Evento', resultado_sgsst: 'Resultado del SG-SST', revision_direccion: 'Revisión por la dirección', auditoria: 'Auditoría', inspeccion: 'Inspección', otro: 'Otro' };
+  var TIPO_ACC = { correctiva: 'Correctiva', preventiva: 'Preventiva', mejora: 'De mejora' };
+  var ESTADO_ACC = { abierta: 'Abierta', en_curso: 'En curso', en_verificacion: 'En verificación', cerrada: 'Cerrada', cancelada: 'Cancelada' };
+  var SEMAFORO_ACC = { vencida: ['Vencida', '#c0392b'], por_vencer: ['Vence pronto', '#d97706'], al_dia: ['Al día', '#2563eb'], cerrada: ['Cerrada', '#15803d'], cancelada: ['Cancelada', '#a0aec0'] };
+  var NIVEL_CONTROL = { fuente: 'En la fuente', medio: 'En el medio', trabajador: 'En el trabajador', proceso: 'En el proceso' };
+
+  var eventosR = [], accionesC = [], indAt = [], indAnio = [];
+  var eventoById = {}, accionById = {}, accionesPorEvento = {};
+  var evtId = null, accId = null, accCtx = null;
+
+  function peorPlazo(lista) {
+    var vistos = lista.filter(function (x) { return x && x !== 'na'; });
+    if (!vistos.length) return 'na';
+    for (var i = 0; i < ORDEN_PLAZO.length; i++) if (vistos.indexOf(ORDEN_PLAZO[i]) >= 0) return ORDEN_PLAZO[i];
+    return 'na';
+  }
+  function plazoPill(etiqueta, estado, limite) {
+    if (!estado || estado === 'na') return '';
+    var p = PLAZO_EVT[estado] || [estado, '#718096'];
+    return '<div style="margin-bottom:2px;white-space:nowrap"><span class="mk-badge" style="background:' + p[1] + '">' + esc(p[0]) + '</span> <span style="font-size:0.74rem;color:#4a5568">' +
+      esc(etiqueta) + (limite ? ' · límite ' + esc(fmtDateOnly(limite)) : '') + '</span></div>';
+  }
+  function eventoActivo(e) { return e.estado !== 'cerrado' && e.estado !== 'anulado'; }
+  function eventoVencido(e) {
+    return eventoActivo(e) && (peorPlazo([e.plazo_reporte_arl, e.plazo_reporte_eps, e.plazo_territorial, e.plazo_investigacion, e.plazo_informe_arl]) === 'vencido' || e.n_acciones_vencidas > 0);
+  }
+  function tituloEvento(e) {
+    return (TIPO_EVT[e.tipo] || e.tipo) + ' del ' + fmtDateOnly(e.fecha_evento) + (e.trabajador_nombre ? ' · ' + e.trabajador_nombre : '');
+  }
+
+  function renderEventosStat() {
+    var n = eventosR.filter(eventoVencido).length + accionesC.filter(function (a) { return a.semaforo === 'vencida'; }).length;
+    $('s-eventos').textContent = n;
+  }
+
+  function filtrarEventos() {
+    var emp = $('fe-empresa').value, tipo = $('fe-tipo').value, est = $('fe-estado').value, anio = $('fe-anio').value, q = norm($('fe-txt').value);
+    return eventosR.filter(function (e) {
+      if (emp && String(e.empresa_id) !== emp) return false;
+      if (tipo && e.tipo !== tipo) return false;
+      if (anio && String(e.fecha_evento).slice(0, 4) !== anio) return false;
+      if (est === 'activos' && !eventoActivo(e)) return false;
+      if (est === 'vencidos' && !eventoVencido(e)) return false;
+      if ((est === 'cerrado' || est === 'anulado') && e.estado !== est) return false;
+      if (q && norm([e.descripcion, e.trabajador_nombre, e.lugar].join(' ')).indexOf(q) < 0) return false;
+      return true;
+    }).sort(function (a, b) { return a.fecha_evento < b.fecha_evento ? 1 : a.fecha_evento > b.fecha_evento ? -1 : b.id - a.id; });
+  }
+
+  function renderEventos() {
+    renderEventosStat();
+    var lista = filtrarEventos();
+    $('eventos-ct').textContent = '(' + lista.length + ')';
+    if (!lista.length) {
+      $('eventos-body').innerHTML = '<tr><td colspan="8"><div class="empty">' + (eventosR.length ? 'Ningún evento coincide con los filtros.' : 'Aún no hay eventos registrados. Es una buena noticia; cuando ocurra uno, regístralo con «Registrar evento».') + '</div></td></tr>';
+      return;
+    }
+    $('eventos-body').innerHTML = lista.map(function (e) {
+      var plazos = '';
+      if (e.tipo === 'accidente') {
+        plazos += plazoPill('FURAT ARL y EPS', peorPlazo([e.plazo_reporte_arl, e.plazo_reporte_eps]), e.limite_reporte_arl);
+        if (e.plazo_territorial !== 'na') plazos += plazoPill('Dirección Territorial', e.plazo_territorial, e.limite_territorial);
+      }
+      if (e.tipo === 'accidente' || e.tipo === 'incidente') plazos += plazoPill('Investigación', e.plazo_investigacion, e.limite_investigacion);
+      if (e.plazo_informe_arl !== 'na') plazos += plazoPill('Informe a la ARL', e.plazo_informe_arl, e.limite_informe_arl);
+      if (!plazos) plazos = '<span class="mk-sin">—</span>';
+      return '<tr class="mk-click" data-act="evt-abrir" data-id="' + esc(e.id) + '"' + (e.estado === 'anulado' ? ' style="opacity:0.6"' : '') + '>' +
+        '<td style="white-space:nowrap">' + esc(fmtDateOnly(e.fecha_evento)) + '</td>' +
+        '<td>' + badge(TIPO_EVT[e.tipo] || e.tipo, COLOR_TIPO_EVT[e.tipo] || '#718096') + (e.gravedad ? '<div style="margin-top:3px">' + badge(e.gravedad.charAt(0).toUpperCase() + e.gravedad.slice(1), COLOR_GRAVEDAD[e.gravedad] || '#718096') + '</div>' : '') + '</td>' +
+        '<td>' + (e.trabajador_nombre ? esc(e.trabajador_nombre) + '<div class="mk-sin" style="font-style:normal">' + esc(e.trabajador_cargo || '') + '</div>' : '<span class="mk-sin">—</span>') + '</td>' +
+        '<td><div class="sst-clamp" title="' + esc(e.descripcion) + '">' + esc(e.descripcion) + '</div>' + (e.lugar ? '<div class="mk-sin" style="font-style:normal">' + esc(e.lugar) + '</div>' : '') + '</td>' +
+        '<td>' + plazos + '</td>' +
+        '<td>' + badge(ESTADO_EVT[e.estado] || e.estado, COLOR_ESTADO_EVT[e.estado] || '#718096') + '</td>' +
+        '<td style="text-align:center">' + (e.n_acciones ? esc(e.n_acciones - e.n_acciones_abiertas) + ' de ' + esc(e.n_acciones) + ' cerradas' + (e.n_acciones_vencidas ? '<div style="color:#c0392b;font-size:0.72rem">' + esc(e.n_acciones_vencidas) + ' vencida(s)</div>' : '') : '<span class="mk-sin">sin acciones</span>') + '</td>' +
+        '<td><button class="btn-ver" data-act="evt-abrir" data-id="' + esc(e.id) + '">Abrir</button></td></tr>';
+    }).join('');
+  }
+
+  // ── Modal del evento ──
+  function trabajadoresParaEvento(empId, actualId) {
+    return trabajadores.filter(function (t) { return t.empresa_id === empId && (esActivo(t) || t.id === actualId); })
+      .sort(function (a, b) { return String(a.nombre).localeCompare(String(b.nombre)); });
+  }
+  function llenarTrabajadoresEvento(empId, sel) {
+    $('evt-trabajador').innerHTML = optsHtml(trabajadoresParaEvento(empId, sel).map(function (t) { return { v: t.id, t: t.nombre + (t.cargo ? ' — ' + t.cargo : '') }; }), '— Sin trabajador —', sel || '');
+  }
+  function esGrave() { return $('evt-tipo').value === 'accidente' && ['grave', 'mortal'].indexOf($('evt-gravedad').value) >= 0; }
+  function aplicarTipoEvento() {
+    var tipo = $('evt-tipo').value;
+    Array.prototype.forEach.call($('evt-overlay').querySelectorAll('[data-tipos]'), function (el) {
+      el.style.display = el.getAttribute('data-tipos').split(',').indexOf(tipo) >= 0 ? '' : 'none';
+    });
+    var grave = esGrave();
+    $('evt-terr-box').style.display = grave ? '' : 'none';
+    $('evt-informe-box').style.display = grave ? '' : 'none';
+    $('evt-prof-box').style.display = grave ? '' : 'none';
+    $('evt-trabajador-lbl').textContent = tipo === 'accidente' || tipo === 'enfermedad_laboral' ? 'Trabajador *' : 'Trabajador (si aplica)';
+  }
+
+  function abrirEvento(id) {
+    var e = id ? eventoById[id] : null;
+    if (!e && !empresas.some(function (x) { return x.activa; })) { showToast('Primero crea una empresa activa', '#e74c3c'); return; }
+    evtId = id || null;
+    var activas = empresas.filter(function (x) { return x.activa || (e && x.id === e.empresa_id); });
+    var emp0 = e ? e.empresa_id : Number($('fe-empresa').value) || (activas[0] && activas[0].id);
+    $('evt-titulo').textContent = e ? 'Evento: ' + (TIPO_EVT[e.tipo] || e.tipo) : 'Registrar evento';
+    $('evt-meta').innerHTML = e ? '<span>' + esc(nombreEmpresa(e.empresa_id)) + '</span><span>' + esc(ESTADO_EVT[e.estado] || e.estado) + '</span>' +
+      (e.cerrado_en ? '<span>Cerrado el ' + esc(fmtDateOnly(e.cerrado_en)) + '</span>' : '') : '';
+    $('evt-empresa').innerHTML = optsHtml(activas.map(function (x) { return { v: x.id, t: x.nombre }; }), null, emp0);
+    $('evt-empresa').disabled = !!e;
+    $('evt-tipo').value = e ? e.tipo : 'accidente';
+    $('evt-tipo').disabled = !!e;
+    $('evt-fecha').value = e ? e.fecha_evento : today();
+    $('evt-hora').value = e && e.hora_evento ? String(e.hora_evento).slice(0, 5) : '';
+    llenarTrabajadoresEvento(emp0, e ? e.trabajador_id : null);
+    $('evt-gravedad').value = e && e.gravedad ? e.gravedad : '';
+    $('evt-tipo-acc').value = e && e.tipo_accidente ? e.tipo_accidente : '';
+    $('evt-mecanismo').value = e && e.mecanismo ? e.mecanismo : '';
+    $('evt-agente').value = e && e.agente ? e.agente : '';
+    $('evt-dentro').value = e && e.dentro_empresa !== null && e.dentro_empresa !== undefined ? (e.dentro_empresa ? '1' : '0') : '';
+    $('evt-lugar').value = e ? e.lugar : '';
+    $('evt-descripcion').value = e ? e.descripcion : '';
+    $('evt-dias-inc').value = e ? e.dias_incapacidad : 0;
+    $('evt-dias-carg').value = e ? e.dias_cargados : 0;
+    $('evt-caso-hasta').value = e && e.caso_hasta ? e.caso_hasta : '';
+    $('evt-ref').value = e ? e.referencia_reporte : '';
+    $('evt-rep-arl').value = e && e.fecha_reporte_arl ? e.fecha_reporte_arl : '';
+    $('evt-rep-eps').value = e && e.fecha_reporte_eps ? e.fecha_reporte_eps : '';
+    $('evt-rep-terr').value = e && e.fecha_reporte_territorial ? e.fecha_reporte_territorial : '';
+    $('evt-fecha-inv').value = e && e.fecha_investigacion ? e.fecha_investigacion : '';
+    $('evt-informe-arl').value = e && e.informe_enviado_arl_en ? e.informe_enviado_arl_en : '';
+    $('evt-equipo').value = e ? e.equipo_investigador : '';
+    $('evt-prof').value = e ? e.profesional_licencia_sst : '';
+    $('evt-causas-inm').value = e ? e.causas_inmediatas : '';
+    $('evt-causas-bas').value = e ? e.causas_basicas : '';
+    var ti = e ? e.tipos_causa_inmediata || [] : [], tb = e ? e.tipos_causa_basica || [] : [];
+    $('evt-ti-acto').checked = ti.indexOf('acto_subestandar') >= 0; $('evt-ti-cond').checked = ti.indexOf('condicion_subestandar') >= 0;
+    $('evt-tb-pers').checked = tb.indexOf('factor_personal') >= 0; $('evt-tb-trab').checked = tb.indexOf('factor_trabajo') >= 0;
+    $('evt-leccion').value = e ? e.leccion_aprendida : '';
+    $('evt-leccion-soc').value = e && e.leccion_socializada_en ? e.leccion_socializada_en : '';
+    $('evt-obs').value = e ? e.observaciones : '';
+    $('evt-aud').innerHTML = e ? auditoriaHtml(e) : '';
+    aplicarTipoEvento();
+    renderEventoDerivado();
+    MODAL.open('evt-overlay', 'evt-fecha');
+  }
+
+  // Lo que depende del servidor (plazos, acciones, botones según el estado) se repinta sin tocar lo que se está escribiendo.
+  function renderEventoDerivado() {
+    var e = evtId ? eventoById[evtId] : null;
+    var aviso = $('evt-aviso');
+    if (!e) {
+      aviso.style.display = 'none';
+      $('evt-plazos-rep').innerHTML = ''; $('evt-plazos-inv').innerHTML = '';
+      $('evt-acciones').innerHTML = '<div class="mk-sin">Guarda el evento para poder agregarle acciones y soportes.</div>';
+      $('evt-btn-accion').style.display = 'none';
+      ['evt-btn-evid', 'evt-btn-reabrir', 'evt-btn-anular', 'evt-btn-iniciar', 'evt-btn-investigado', 'evt-btn-cerrar'].forEach(function (id) { $(id).style.display = 'none'; });
+      return;
+    }
+    $('evt-titulo').textContent = 'Evento: ' + (TIPO_EVT[e.tipo] || e.tipo);
+    var msgs = [];
+    if (e.estado === 'anulado') msgs.push('Evento anulado' + (e.motivo_anulacion ? ': ' + e.motivo_anulacion : '') + '. Solo un administrador puede modificarlo.');
+    if (e.tipo === 'accidente' && eventoActivo(e) && !evidenciasDe('evento', e.id).length) msgs.push('Falta enlazar el FURAT (y luego la investigación firmada) como evidencia desde Drive.');
+    aviso.style.display = msgs.length ? '' : 'none';
+    aviso.textContent = msgs.join(' ');
+    $('evt-plazos-rep').innerHTML = (e.tipo === 'accidente'
+      ? plazoPill('FURAT a la ARL (2 días hábiles, sin descontar festivos)', e.plazo_reporte_arl, e.limite_reporte_arl) +
+        plazoPill('FURAT a la EPS (2 días hábiles)', e.plazo_reporte_eps, e.limite_reporte_arl) +
+        plazoPill('Dirección Territorial, graves y mortales (2 días hábiles)', e.plazo_territorial, e.limite_territorial) : '');
+    $('evt-plazos-inv').innerHTML = plazoPill('Investigación (15 días siguientes al evento)', e.plazo_investigacion, e.limite_investigacion) +
+      plazoPill('Informe de la investigación a la ARL, graves y mortales (15 días)', e.plazo_informe_arl, e.limite_informe_arl);
+    var accs = accionesPorEvento[e.id] || [];
+    var puedeAgregar = eventoActivo(e);
+    $('evt-btn-accion').style.display = puedeAgregar ? '' : 'none';
+    $('evt-acciones').innerHTML = !accs.length
+      ? '<div class="mk-sin">Aún sin acciones. ' + (e.tipo === 'accidente' || e.tipo === 'incidente' ? 'La investigación exige al menos una medida de intervención (Res. 1401, art. 12).' : 'Registra qué se va a hacer, quién y para cuándo.') + '</div>'
+      : '<div class="table-wrap"><table class="mk-mini" style="min-width:560px"><thead><tr><th>Acción</th><th>Responsable</th><th>Fecha límite</th><th>Estado</th><th></th></tr></thead><tbody>' +
+        accs.map(function (a) {
+          var s = SEMAFORO_ACC[a.semaforo] || [a.semaforo, '#718096'];
+          return '<tr><td>' + esc(a.descripcion) + '</td><td>' + esc(a.responsable) + '</td><td>' + esc(fmtDateOnly(a.fecha_limite)) + '</td>' +
+            '<td>' + badge(ESTADO_ACC[a.estado] || a.estado, a.estado === 'cerrada' ? '#15803d' : a.estado === 'cancelada' ? '#a0aec0' : '#2563eb') +
+            (a.estado !== 'cerrada' && a.estado !== 'cancelada' && a.semaforo === 'vencida' ? ' <span class="mk-pill over">' + esc(s[0]) + '</span>' : '') + '</td>' +
+            '<td><button class="btn-edit" data-act="acc-editar" data-id="' + esc(a.id) + '">Editar</button></td></tr>';
+        }).join('') + '</tbody></table></div>';
+    var admin = AUTH.isAdmin();
+    var invest = e.tipo === 'accidente' || e.tipo === 'incidente';
+    $('evt-btn-evid').style.display = '';
+    $('evt-btn-evid').textContent = '🔗 FURAT e investigación en Drive (' + evidenciasDe('evento', e.id).length + ')';
+    $('evt-btn-iniciar').style.display = invest && e.estado === 'abierto' ? '' : 'none';
+    $('evt-btn-investigado').style.display = invest && (e.estado === 'abierto' || e.estado === 'en_investigacion') ? '' : 'none';
+    $('evt-btn-cerrar').style.display = eventoActivo(e) && (!invest || e.estado === 'investigado') ? '' : 'none';
+    $('evt-btn-anular').style.display = e.estado !== 'anulado' ? '' : 'none';
+    $('evt-btn-reabrir').style.display = admin && (e.estado === 'cerrado' || e.estado === 'anulado') ? '' : 'none';
+  }
+
+  function recogerEvento() {
+    var ti = [], tb = [];
+    if ($('evt-ti-acto').checked) ti.push('acto_subestandar');
+    if ($('evt-ti-cond').checked) ti.push('condicion_subestandar');
+    if ($('evt-tb-pers').checked) tb.push('factor_personal');
+    if ($('evt-tb-trab').checked) tb.push('factor_trabajo');
+    var dentro = $('evt-dentro').value;
+    return {
+      fecha_evento: $('evt-fecha').value, hora_evento: valOrNull('evt-hora'),
+      trabajador_id: $('evt-trabajador').value ? Number($('evt-trabajador').value) : null,
+      gravedad: $('evt-gravedad').value || null, tipo_accidente: $('evt-tipo-acc').value || null,
+      mecanismo: $('evt-mecanismo').value || null, agente: $('evt-agente').value || null,
+      dentro_empresa: dentro === '' ? null : dentro === '1', lugar: $('evt-lugar').value.trim(),
+      descripcion: $('evt-descripcion').value.trim(),
+      dias_incapacidad: parseInt($('evt-dias-inc').value, 10) || 0, dias_cargados: parseInt($('evt-dias-carg').value, 10) || 0,
+      caso_hasta: valOrNull('evt-caso-hasta'),
+      referencia_reporte: $('evt-ref').value.trim(), fecha_reporte_arl: valOrNull('evt-rep-arl'), fecha_reporte_eps: valOrNull('evt-rep-eps'),
+      fecha_reporte_territorial: valOrNull('evt-rep-terr'),
+      fecha_investigacion: valOrNull('evt-fecha-inv'), informe_enviado_arl_en: valOrNull('evt-informe-arl'),
+      equipo_investigador: $('evt-equipo').value.trim(), profesional_licencia_sst: $('evt-prof').value.trim(),
+      causas_inmediatas: $('evt-causas-inm').value.trim(), causas_basicas: $('evt-causas-bas').value.trim(),
+      tipos_causa_inmediata: ti, tipos_causa_basica: tb,
+      leccion_aprendida: $('evt-leccion').value.trim(), leccion_socializada_en: valOrNull('evt-leccion-soc'),
+      observaciones: $('evt-obs').value.trim(),
+    };
+  }
+
+  async function guardarEvento(nuevoEstado, motivoAnulacion) {
+    var tipo = $('evt-tipo').value, f = recogerEvento();
+    if (!f.fecha_evento) { showToast('Indica la fecha del evento', '#e74c3c'); return; }
+    if (f.descripcion.length < 3) { showToast('Describe qué pasó', '#e74c3c'); return; }
+    if (tipo === 'accidente' && !f.gravedad) { showToast('Indica la gravedad del accidente', '#e74c3c'); return; }
+    if ((tipo === 'accidente' || tipo === 'enfermedad_laboral') && !f.trabajador_id) { showToast('Indica el trabajador', '#e74c3c'); return; }
+    if (nuevoEstado) f.estado = nuevoEstado;
+    if (motivoAnulacion) f.motivo_anulacion = motivoAnulacion;
+    var btns = ['evt-ok', 'evt-btn-iniciar', 'evt-btn-investigado', 'evt-btn-cerrar'].map($);
+    btns.forEach(function (b) { btnBusy(b, true); });
+    var res, nuevoId = evtId;
+    if (evtId) res = await _sb.from('sst_eventos').update(f).eq('id', evtId);
+    else {
+      f.empresa_id = Number($('evt-empresa').value); f.tipo = tipo;
+      res = await _sb.from('sst_eventos').insert(f).select('id').single();
+      if (!res.error && res.data) nuevoId = res.data.id;
+    }
+    btns.forEach(function (b) { btnBusy(b, false); });
+    if (res.error) { fail('guardar el evento', res.error); return; }
+    showToast(evtId ? (nuevoEstado ? 'Evento ' + (ESTADO_EVT[nuevoEstado] || nuevoEstado).toLowerCase() : 'Evento actualizado') : 'Evento registrado');
+    var eraNuevo = !evtId;
+    await cargar(false);
+    if (eraNuevo && nuevoId) abrirEvento(nuevoId);
+    else if (evtId && eventoById[evtId]) renderEventoDerivado();
+  }
+
+  function anularEvento() {
+    var m = window.prompt('Motivo de la anulación del evento (por ejemplo, registro duplicado o error de digitación):', '');
+    if (m === null) return;
+    if (m.trim().length < 3) { showToast('Indica el motivo de la anulación', '#e74c3c'); return; }
+    guardarEvento('anulado', m.trim());
+  }
+
+  // ══════════════ Fase 3: Acciones correctivas, preventivas y de mejora ══════════════
+  function filtrarAcciones() {
+    var emp = $('fc-empresa').value, origen = $('fc-origen').value, alerta = $('fc-alerta').value, q = norm($('fc-txt').value), cerradas = $('fc-cerradas').value === '1';
+    return accionesC.filter(function (a) {
+      if (emp && String(a.empresa_id) !== emp) return false;
+      if (origen && a.origen !== origen) return false;
+      if (alerta && a.semaforo !== alerta) return false;
+      if (!cerradas && (a.estado === 'cerrada' || a.estado === 'cancelada')) return false;
+      if (q && norm([a.descripcion, a.responsable, a.hallazgo].join(' ')).indexOf(q) < 0) return false;
+      return true;
+    }).sort(function (a, b) { return a.fecha_limite < b.fecha_limite ? -1 : a.fecha_limite > b.fecha_limite ? 1 : a.id - b.id; });
+  }
+
+  function tarjetaAccion(a) {
+    var s = SEMAFORO_ACC[a.semaforo] || [a.semaforo, '#718096'];
+    var ev = a.evento_id ? eventoById[a.evento_id] : null;
+    var btns = '';
+    if (a.estado === 'abierta') btns += '<button class="btn-secondary" data-act="acc-mover" data-id="' + esc(a.id) + '" data-estado="en_curso">▶ Iniciar</button>';
+    if (a.estado === 'en_curso') btns += '<button class="btn-secondary" data-act="acc-mover" data-id="' + esc(a.id) + '" data-estado="en_verificacion">✔ Ejecutada</button>';
+    btns += '<button class="btn-edit" data-act="acc-editar" data-id="' + esc(a.id) + '">Abrir</button>';
+    return '<div class="sst-card ' + esc(a.semaforo) + '">' +
+      '<div style="margin-bottom:4px">' + badge(ORIGEN_ACC[a.origen] || a.origen, '#4a5568') + ' ' + badge(TIPO_ACC[a.tipo] || a.tipo, '#718096') + '</div>' +
+      '<div class="sst-clamp" style="max-width:none" title="' + esc(a.descripcion) + '">' + esc(a.descripcion) + '</div>' +
+      '<div class="sst-card-meta">' + esc(a.responsable) + ' · límite ' + esc(fmtDateOnly(a.fecha_limite)) +
+        (a.estado !== 'cerrada' && a.estado !== 'cancelada' ? ' <span class="mk-pill ' + (a.semaforo === 'vencida' ? 'over' : a.semaforo === 'por_vencer' ? 'mid' : 'ok') + '">' + esc(s[0]) + '</span>' : '') + '</div>' +
+      (ev ? '<div class="sst-card-meta">↳ <a href="#" data-act="evt-abrir" data-id="' + esc(ev.id) + '">' + esc(tituloEvento(ev)) + '</a></div>' : '') +
+      '<div class="sst-card-btns">' + btns + '</div></div>';
+  }
+
+  function renderAcciones() {
+    var lista = filtrarAcciones(), mostrarCerradas = $('fc-cerradas').value === '1';
+    $('acciones-ct').textContent = '(' + lista.length + ')';
+    var cols = ['abierta', 'en_curso', 'en_verificacion'].concat(mostrarCerradas ? ['cerrada', 'cancelada'] : []);
+    if (!lista.length && !accionesC.length) {
+      $('acciones-tablero').innerHTML = '<div class="empty">Aún no hay acciones. Se crean desde un evento o con «Nueva acción».</div>';
+      return;
+    }
+    $('acciones-tablero').innerHTML = '<div class="sst-kanban">' + cols.map(function (c) {
+      var items = lista.filter(function (a) { return a.estado === c; });
+      return '<div class="sst-col"><h4><span>' + esc(ESTADO_ACC[c]) + '</span><span>' + items.length + '</span></h4>' +
+        (items.length ? items.map(tarjetaAccion).join('') : '<div class="mk-sin" style="font-size:0.78rem">Sin acciones</div>') + '</div>';
+    }).join('') + '</div>';
+  }
+
+  function aplicarOrigenAccion() {
+    $('acc-evento-box').style.display = $('acc-origen').value === 'evento' ? '' : 'none';
+  }
+  function llenarEventosAccion(empId, sel) {
+    var op = eventosR.filter(function (e) { return e.empresa_id === empId && (eventoActivo(e) || e.id === sel); })
+      .sort(function (a, b) { return a.fecha_evento < b.fecha_evento ? 1 : -1; })
+      .map(function (e) { return { v: e.id, t: tituloEvento(e) + ' — ' + String(e.descripcion).slice(0, 50) }; });
+    $('acc-evento').innerHTML = optsHtml(op, 'Selecciona el evento…', sel || '');
+  }
+  function aplicarEstadoAccion() {
+    var est = $('acc-estado').value;
+    $('acc-cancel-box').style.display = est === 'cancelada' ? '' : 'none';
+    if ((est === 'en_verificacion' || est === 'cerrada') && !$('acc-ejecucion').value) $('acc-ejecucion').value = today();
+    if (est === 'cerrada' && !$('acc-verificacion').value) $('acc-verificacion').value = today();
+  }
+
+  // abrirAccion(id) edita; abrirAccion(null, { evento_id, empresa_id }) crea una acción (opcionalmente de un evento).
+  function abrirAccion(id, ctx) {
+    var a = id ? accionById[id] : null;
+    if (!a && !empresas.some(function (x) { return x.activa; })) { showToast('Primero crea una empresa activa', '#e74c3c'); return; }
+    accId = id || null; accCtx = !id && ctx ? ctx : null;
+    var activas = empresas.filter(function (x) { return x.activa || (a && x.id === a.empresa_id); });
+    var emp0 = a ? a.empresa_id : (ctx && ctx.empresa_id) || Number($('fc-empresa').value) || (activas[0] && activas[0].id);
+    $('acc-titulo').textContent = a ? 'Editar acción' : 'Nueva acción';
+    var ev = a && a.evento_id ? eventoById[a.evento_id] : (ctx && ctx.evento_id ? eventoById[ctx.evento_id] : null);
+    $('acc-meta').innerHTML = ev ? '<span>' + esc(tituloEvento(ev)) + '</span>' : '';
+    $('acc-empresa').innerHTML = optsHtml(activas.map(function (x) { return { v: x.id, t: x.nombre }; }), null, emp0);
+    $('acc-empresa').disabled = !!a || !!(ctx && ctx.evento_id);
+    $('acc-origen').value = a ? a.origen : (ctx && ctx.evento_id ? 'evento' : 'otro');
+    $('acc-origen').disabled = !!a || !!(ctx && ctx.evento_id);
+    llenarEventosAccion(emp0, a ? a.evento_id : (ctx ? ctx.evento_id : null));
+    $('acc-evento').disabled = !!a || !!(ctx && ctx.evento_id);
+    aplicarOrigenAccion();
+    $('acc-tipo').value = a ? a.tipo : 'correctiva';
+    $('acc-nivel').value = a && a.nivel_control ? a.nivel_control : '';
+    $('acc-hallazgo').value = a ? a.hallazgo : '';
+    $('acc-descripcion').value = a ? a.descripcion : '';
+    $('acc-responsable').value = a ? a.responsable : '';
+    var d30 = new Date(); d30.setDate(d30.getDate() + 30);
+    $('acc-limite').value = a ? a.fecha_limite : d30.getFullYear() + '-' + String(d30.getMonth() + 1).padStart(2, '0') + '-' + String(d30.getDate()).padStart(2, '0');
+    $('acc-estado').value = a ? a.estado : 'abierta';
+    $('acc-ejecucion').value = a && a.fecha_ejecucion ? a.fecha_ejecucion : '';
+    $('acc-verificacion').value = a && a.fecha_verificacion ? a.fecha_verificacion : '';
+    $('acc-eficaz').value = a && a.verificacion_eficaz !== null && a.verificacion_eficaz !== undefined ? (a.verificacion_eficaz ? '1' : '0') : '';
+    $('acc-resultado').value = a ? a.resultado_verificacion : '';
+    $('acc-verificado-por').value = a ? a.verificado_por : '';
+    $('acc-motivo').value = a ? a.motivo_cancelacion : '';
+    $('acc-obs').value = a ? a.observaciones : '';
+    $('acc-aud').innerHTML = a ? auditoriaHtml(a) : '';
+    var vistos = {}, dl = [];
+    accionesC.forEach(function (x) { var r = String(x.responsable || '').trim(); if (r && !vistos[r]) { vistos[r] = 1; dl.push(r); } });
+    $('acc-responsables').innerHTML = dl.sort().map(function (r) { return '<option value="' + esc(r) + '">'; }).join('');
+    $('acc-cancel-box').style.display = $('acc-estado').value === 'cancelada' ? '' : 'none';
+    var be = $('acc-btn-evid');
+    be.style.display = a ? '' : 'none';
+    if (a) be.textContent = '🔗 Soportes (' + evidenciasDe('accion', a.id).length + ')';
+    MODAL.open('acc-overlay', 'acc-descripcion');
+  }
+
+  async function guardarAccion() {
+    var desc = $('acc-descripcion').value.trim(), resp = $('acc-responsable').value.trim(), lim = $('acc-limite').value;
+    if (desc.length < 3) { showToast('Describe la acción', '#e74c3c'); return; }
+    if (resp.length < 2) { showToast('Indica el responsable', '#e74c3c'); return; }
+    if (!lim) { showToast('Indica la fecha límite', '#e74c3c'); return; }
+    var origen = $('acc-origen').value, eventoId = $('acc-evento').value ? Number($('acc-evento').value) : null;
+    if (!accId && origen === 'evento' && !eventoId) { showToast('Selecciona el evento que origina la acción', '#e74c3c'); return; }
+    var eficaz = $('acc-eficaz').value;
+    var fila = {
+      tipo: $('acc-tipo').value, nivel_control: $('acc-nivel').value || null, hallazgo: $('acc-hallazgo').value.trim(), descripcion: desc,
+      responsable: resp, fecha_limite: lim, estado: $('acc-estado').value, fecha_ejecucion: valOrNull('acc-ejecucion'),
+      fecha_verificacion: valOrNull('acc-verificacion'), verificacion_eficaz: eficaz === '' ? null : eficaz === '1',
+      resultado_verificacion: $('acc-resultado').value.trim(), verificado_por: $('acc-verificado-por').value.trim(),
+      motivo_cancelacion: $('acc-motivo').value.trim(), observaciones: $('acc-obs').value.trim(),
+    };
+    if (!accId) {
+      fila.empresa_id = Number($('acc-empresa').value); fila.origen = origen;
+      if (origen === 'evento') fila.evento_id = eventoId;
+    }
+    var btn = $('acc-ok'); btnBusy(btn, true);
+    var res = accId ? await _sb.from('sst_acciones').update(fila).eq('id', accId) : await _sb.from('sst_acciones').insert(fila);
+    btnBusy(btn, false);
+    if (res.error) { fail('guardar la acción', res.error); return; }
+    MODAL.close('acc-overlay');
+    showToast(accId ? 'Acción actualizada' : 'Acción registrada');
+    await cargar(false);
+  }
+
+  async function moverAccion(id, estado) {
+    var cambios = { estado: estado };
+    if (estado === 'en_verificacion') cambios.fecha_ejecucion = today();
+    var res = await _sb.from('sst_acciones').update(cambios).eq('id', id);
+    if (res.error) fail('mover la acción', res.error);
+    else showToast('Acción: ' + (ESTADO_ACC[estado] || estado).toLowerCase());
+    await cargar(false);
+  }
+
+  // ══════════════ Fase 3: Indicadores de accidentalidad ══════════════
+  function rellenarIndicadores() {
+    var cur = $('fi-empresa').value, op = empresas.map(function (e) { return { v: e.id, t: e.nombre }; });
+    var primera = (empresas.filter(function (e) { return e.activa; })[0] || empresas[0] || {}).id;
+    $('fi-empresa').innerHTML = optsHtml(op, null, cur || primera || '');
+    var emp = Number($('fi-empresa').value);
+    var anios = {}, y = parseInt(today().slice(0, 4), 10);
+    anios[y] = 1;
+    indAnio.forEach(function (x) { if (x.empresa_id === emp) anios[x.vigencia] = 1; });
+    var lista = Object.keys(anios).map(Number).sort(function (a, b) { return b - a; });
+    var actual = $('fi-anio').value;
+    $('fi-anio').innerHTML = optsHtml(lista.map(function (v) { return { v: v, t: String(v) }; }), null, actual && anios[actual] ? actual : y);
+  }
+  function fmtInd(v, dec) {
+    return v === null || v === undefined ? '—' : Number(v).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: dec === undefined ? 2 : dec });
+  }
+  function renderIndicadores() {
+    var emp = Number($('fi-empresa').value), anio = parseInt($('fi-anio').value, 10);
+    var cont = $('indicadores-contenido');
+    if (!emp || isNaN(anio)) { cont.innerHTML = '<div class="empty">Elige la empresa y el año.</div>'; return; }
+    var meses = indAt.filter(function (m) { return m.empresa_id === emp && m.vigencia === anio; }).sort(function (a, b) { return a.mes - b.mes; });
+    var a = indAnio.filter(function (x) { return x.empresa_id === emp && x.vigencia === anio; })[0];
+    if (!meses.length || !a) { cont.innerHTML = '<div class="empty">Sin datos para esta empresa y año.</div>'; return; }
+    var ref = mesRef(anio), declarado = meses.some(function (m) { return m.base_trabajadores === 'declarado'; });
+    var h = '';
+    if (declarado) h += '<div class="mk-flag">Esta empresa no tiene trabajadores registrados en algún mes: el cálculo usa el número de trabajadores declarado en la empresa. Registra a los trabajadores en la pestaña Trabajadores (con su fecha de ingreso) para que los indicadores sean exactos.</div>';
+    h += '<div class="mk-ctx-grid">' +
+      '<div class="mk-box"><h4>Accidentalidad de ' + esc(anio) + '</h4>' +
+        '<div class="mk-kv"><span>Accidentes de trabajo</span><span>' + esc(a.accidentes) + '</span></div>' +
+        '<div class="mk-kv"><span>Accidentes mortales</span><span>' + esc(a.accidentes_mortales) + '</span></div>' +
+        '<div class="mk-kv"><span>Proporción de accidentes mortales</span><span><strong>' + esc(a.proporcion_mortales === null ? '—' : fmtInd(a.proporcion_mortales) + ' %') + '</strong></span></div>' +
+        '<div class="mk-kv"><span>Promedio de trabajadores</span><span>' + esc(fmtInd(a.promedio_trabajadores)) + '</span></div></div>' +
+      '<div class="mk-box"><h4>Enfermedad laboral de ' + esc(anio) + '</h4>' +
+        '<div class="mk-kv"><span>Casos nuevos</span><span>' + esc(a.el_nuevos) + '</span></div>' +
+        '<div class="mk-kv"><span>Casos presentes (nuevos y antiguos)</span><span>' + esc(a.el_casos) + '</span></div>' +
+        '<div class="mk-kv"><span>Prevalencia (por 100.000 trabajadores)</span><span><strong>' + esc(fmtInd(a.prevalencia)) + '</strong></span></div>' +
+        '<div class="mk-kv"><span>Incidencia (por 100.000 trabajadores)</span><span><strong>' + esc(fmtInd(a.incidencia)) + '</strong></span></div></div></div>';
+    h += '<div class="mk-box" style="margin-bottom:14px"><h4>Frecuencia y severidad por mes</h4><div class="table-wrap"><table class="mk-mini sst-ind"><thead><tr><th>Indicador</th>' +
+      meses.map(function (m) { return '<th' + (m.mes === ref ? ' style="background:#fffbeb"' : '') + '>' + MES3[m.mes - 1] + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      [['Trabajadores', function (m) { return m.trabajadores; }, 0],
+       ['Accidentes de trabajo', function (m) { return m.accidentes; }, 0],
+       ['Frecuencia (por 100 trabajadores)', function (m) { return m.mes > ref && ref !== 13 ? null : m.frecuencia; }, 2],
+       ['Días de incapacidad', function (m) { return m.dias_incapacidad; }, 0],
+       ['Días cargados', function (m) { return m.dias_cargados; }, 0],
+       ['Severidad (días por 100 trabajadores)', function (m) { return m.mes > ref && ref !== 13 ? null : m.severidad; }, 2]].map(function (r) {
+        return '<tr><td>' + esc(r[0]) + '</td>' + meses.map(function (m) {
+          var v = r[1](m);
+          return '<td' + (m.mes === ref ? ' style="background:#fffbeb"' : '') + '>' + esc(fmtInd(v, r[2])) + '</td>';
+        }).join('') + '</tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div class="ef-help">Frecuencia = accidentes del mes / trabajadores del mes × 100. Severidad = (días de incapacidad + días cargados) / trabajadores del mes × 100. Los días de incapacidad se atribuyen al mes del accidente.</div></div>';
+    cont.innerHTML = h;
+  }
+
   MODAL.onClose = function (id) {
     if (id === 'ae-overlay') aeId = null;
     if (id === 'evl-overlay') evlCtx = null;
@@ -1515,6 +2018,8 @@
     if (id === 'cp-overlay') { cpEditId = null; cpCtx = null; }
     if (id === 'cs-lista-overlay') cslCapId = null;
     if (id === 'cs-overlay') { csEditId = null; csCapId = null; }
+    if (id === 'evt-overlay') evtId = null;
+    if (id === 'acc-overlay') { accId = null; accCtx = null; }
   };
 
   // ══════════════ Eventos ══════════════
@@ -1560,6 +2065,26 @@
     'cs-planilla': function () { if (csEditId) generarPlanilla(csEditId); },
     'cs-planilla-id': function (el) { generarPlanilla(Number(el.getAttribute('data-id'))); },
     'cs-evid': function () { if (csEditId) abrirEvl('cap_sesion', csEditId); },
+    'evt-nuevo': function () { abrirEvento(null); },
+    'evt-abrir': function (el) { abrirEvento(Number(el.getAttribute('data-id'))); },
+    'evt-guardar': function () { guardarEvento(null, null); },
+    'evt-estado': function (el) {
+      var nuevo = el.getAttribute('data-estado');
+      if (nuevo === 'abierto' && !window.confirm('¿Reabrir el evento? Volverá a estar abierto y se podrá editar.')) return;
+      guardarEvento(nuevo, null);
+    },
+    'evt-anular': anularEvento,
+    'evt-accion': function () {
+      var e = evtId ? eventoById[evtId] : null;
+      if (e) abrirAccion(null, { evento_id: e.id, empresa_id: e.empresa_id });
+    },
+    'evt-evid': function () { if (evtId) abrirEvl('evento', evtId); },
+    'fe-limpiar': function () { $('fe-empresa').value = ''; $('fe-tipo').value = ''; $('fe-estado').value = 'activos'; $('fe-anio').value = ''; $('fe-txt').value = ''; renderEventos(); },
+    'acc-nueva': function () { abrirAccion(null, null); },
+    'acc-editar': function (el) { abrirAccion(Number(el.getAttribute('data-id')), null); },
+    'acc-guardar': guardarAccion,
+    'acc-mover': function (el) { moverAccion(Number(el.getAttribute('data-id')), el.getAttribute('data-estado')); },
+    'acc-evid': function () { if (accId) abrirEvl('accion', accId); },
     'reintentar': function () { cargar(true); },
     'tab': function (el) { cambiarTab(el.getAttribute('data-tab')); },
     'cerrar-modal': function (el) { MODAL.close(el.getAttribute('data-modal')); },
@@ -1599,6 +2124,15 @@
   ['pn-empresa', 'pn-vigencia', 'pn-origen'].forEach(function (id) { $(id).addEventListener('input', actualizarNuevoPlan); $(id).addEventListener('change', actualizarNuevoPlan); });
   $('pa-aplica').addEventListener('change', function () { $('pa-motivo-box').style.display = this.value === '1' ? 'none' : ''; });
   ['cs-estado', 'cs-fecha'].forEach(function (id) { $(id).addEventListener('change', aplicarEstadoSesion); });
+  ['fe-empresa', 'fe-tipo', 'fe-estado', 'fe-anio', 'fe-txt'].forEach(function (id) { $(id).addEventListener('input', renderEventos); $(id).addEventListener('change', renderEventos); });
+  ['fc-empresa', 'fc-origen', 'fc-alerta', 'fc-txt', 'fc-cerradas'].forEach(function (id) { $(id).addEventListener('input', renderAcciones); $(id).addEventListener('change', renderAcciones); });
+  $('fi-empresa').addEventListener('change', function () { $('fi-anio').value = ''; rellenarIndicadores(); renderIndicadores(); });
+  $('fi-anio').addEventListener('change', renderIndicadores);
+  ['evt-tipo', 'evt-gravedad'].forEach(function (id) { $(id).addEventListener('change', aplicarTipoEvento); });
+  $('evt-empresa').addEventListener('change', function () { llenarTrabajadoresEvento(Number(this.value), null); });
+  $('acc-origen').addEventListener('change', aplicarOrigenAccion);
+  $('acc-empresa').addEventListener('change', function () { llenarEventosAccion(Number(this.value), null); });
+  $('acc-estado').addEventListener('change', aplicarEstadoAccion);
   ['an-empresa', 'an-vigencia'].forEach(function (id) { $(id).addEventListener('input', actualizarNuevaAuto); $(id).addEventListener('change', actualizarNuevaAuto); });
   ['an-empleador', 'an-responsable'].forEach(function (id) { $(id).addEventListener('input', function () { this.dataset.tocado = '1'; }); });
   // Selectores y campos que guardan al cambiar (calificación y observación de cada estándar).
