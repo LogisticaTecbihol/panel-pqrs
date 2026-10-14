@@ -93,6 +93,26 @@ Migraciones 0012–0014 (aplicadas con `apply_migration`; el MCP no las aplica c
   falsificables; el cliente solo inserta comentarios), `_tarea_adjuntos`, bucket privado
   `mercadeo-adjuntos`, Realtime sobre `mercadeo_tareas`.
 
+### Solicitudes desde panel-pedidos (migración 0019)
+
+Un usuario de panel-pedidos (otro proyecto Supabase, otra auth) diligencia un formulario allá y la
+solicitud nace aquí como tarea en la primera columna (estado `solicitada`, cuya etiqueta es
+**"Recibido"**; el código no cambia). Puente: Edge Function `solicitud-mercadeo-pedidos`
+(`verify_jwt=false`, secreto `PEDIDOS_BRIDGE_SECRET`, distinto de `INGEST_SHARED_SECRET`), llamada
+SOLO por la función `solicitud-mercadeo` de panel-pedidos (server→server, sin CORS). Acciones
+`preparar` (URLs firmadas de subida a `mercadeo-adjuntos`, ruta `solicitudes/<request_id>/…`),
+`crear` (idempotente por `origen_ref`) y `listar` ("Mis solicitudes", lista blanca de campos).
+
+- Columnas nuevas en `mercadeo_tareas`: `origen` (`panel_mercadeo`|`panel_pedidos`), `origen_ref`,
+  `solicitante_*`, `a_nombre_de_*`, `asunto` (9 códigos), `fecha_tentativa` (NO es compromiso:
+  la fecha comprometida sigue siendo `fecha_limite`). El trigger `mercadeo_tareas_origen` solo deja
+  fijar `origen='panel_pedidos'` sin sesión (service_role) y vuelve inmutables esas columnas.
+- `tipo` del Tablero se llena por mapeo fijo desde el asunto (en la función); prioridad `mejora`,
+  `urgente=false`: clase y aval los define Mercadeo.
+- Bitácora: `respuesta_solicitante` es lo único (más los cambios de estado) que se le muestra al
+  solicitante; los comentarios internos NUNCA salen.
+- Adjuntos subidos desde Pedidos: `subido_por` NULL + `subido_por_nombre`.
+
 Reglas de priorización (MKT-DOC-00 §B.5, MKT-P-04), aplicadas en el trigger `mercadeo_tareas_reglas`:
 clase 1 calendario > 2 soporte a ventas > 3 mejora > 4 exploratorio; una tarea vinculada a una
 actividad APROBADA en calendario (`mercadeo_actividades.en_calendario`) es clase 1; **urgente fuera

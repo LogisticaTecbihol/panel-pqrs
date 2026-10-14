@@ -1,15 +1,17 @@
 // ══════════════════════════════════════════════════════════════
 // Tablero de Mercadeo (kanban de tareas) — para las 5 empresas del holding
 // ══════════════════════════════════════════════════════════════
-// Flujo del manual: Solicitada -> Confirmada -> En producción -> En validación/aprobación ->
+// Flujo del manual: Recibido (código 'solicitada') -> Confirmada -> En producción -> En validación/aprobación ->
 // Entregada/Publicada (+ Cancelada, fuera de columnas). Cualquiera del equipo mueve tareas.
+// Las solicitudes enviadas desde panel-pedidos (origen 'panel_pedidos', migración 0019) nacen en
+// "Recibido"; Mercadeo puede responder al solicitante (evento 'respuesta_solicitante').
 //
 // Reglas de priorización (MKT-DOC-00 §B.5, MKT-P-04) — las aplica la BD (trigger de la
 // migración 0014); aquí solo se anticipan en la interfaz para dar mensajes claros:
 //  - Clase de prioridad: 1 calendario aprobado > 2 soporte a ventas > 3 mejora > 4 exploratorio.
 //    Una tarea vinculada a una actividad APROBADA en el calendario (CRM > Actividades) es clase 1.
 //  - Urgente fuera de calendario exige aval (Comité de Mercadeo / Gerencia General) + referencia + motivo.
-//  - Sin brief no hay fecha comprometida: salir de "Solicitada" exige descripción y fecha límite.
+//  - Sin brief no hay fecha comprometida: salir de "Recibido" exige descripción y fecha límite.
 // La cola de cada columna se ordena por regla (urgente, clase, fecha límite, antigüedad), no a mano:
 // arrastrar solo cambia de columna. Para teclado/táctil cada tarjeta tiene botones ◀ ▶.
 (async function () {
@@ -21,15 +23,22 @@
 
   // ── Catálogos (valores en BD = códigos ASCII) ──
   var COLUMNAS = [
-    { k: 'solicitada', t: 'Solicitada' },
+    { k: 'solicitada', t: 'Recibido' },
     { k: 'confirmada', t: 'Confirmada' },
     { k: 'en_produccion', t: 'En producción' },
     { k: 'en_validacion', t: 'En validación / aprobación' },
     { k: 'entregada', t: 'Entregada / Publicada' },
   ];
-  var ESTADO_T = { solicitada: 'Solicitada', confirmada: 'Confirmada', en_produccion: 'En producción', en_validacion: 'En validación / aprobación', entregada: 'Entregada / Publicada', cancelada: 'Cancelada' };
+  var ESTADO_T = { solicitada: 'Recibido', confirmada: 'Confirmada', en_produccion: 'En producción', en_validacion: 'En validación / aprobación', entregada: 'Entregada / Publicada', cancelada: 'Cancelada' };
   var ABIERTOS = ['solicitada', 'confirmada', 'en_produccion', 'en_validacion'];
   var TIPOS = { diseno: 'Diseño gráfico', redes: 'Redes sociales y contenido', evento: 'Evento', pop: 'Material POP', campana: 'Campaña', pauta: 'Pauta digital', otro: 'Otro' };
+  // Asunto del formulario de Pedidos (códigos de mercadeo_tareas.asunto).
+  var ASUNTOS = {
+    material_pop: 'Material POP', material_impreso: 'Material impreso', piezas_graficas: 'Piezas gráficas',
+    piezas_audiovisuales: 'Piezas audiovisuales', diseno_nuevo_producto: 'Diseño de nuevo producto',
+    diseno_ajuste_portafolios: 'Diseño y ajuste de portafolios', diseno_ajuste_institucional: 'Diseño y ajuste de material institucional',
+    desarrollo_marca: 'Desarrollo de marca', otros: 'Otros'
+  };
   var CLASES = { calendario: '1 · Calendario aprobado', soporte_ventas: '2 · Soporte a ventas (fecha dura)', mejora: '3 · Mejora / pieza nueva fuera de calendario', exploratorio: '4 · Exploratorio' };
   var CLASE_CORTA = { calendario: 'Calendario', soporte_ventas: 'Soporte ventas', mejora: 'Mejora', exploratorio: 'Exploratorio' };
   var CLASE_RANK = { calendario: 1, soporte_ventas: 2, mejora: 3, exploratorio: 4 };
@@ -110,13 +119,18 @@
     ft.innerHTML = '<option value="">Todos</option>' + optsHtml(Object.keys(TIPOS).map(function (k) { return [k, TIPOS[k]]; }), vT);
     var fc = $('f-clase'), vC = fc.value;
     fc.innerHTML = '<option value="">Todas</option>' + optsHtml(Object.keys(CLASES).map(function (k) { return [k, CLASES[k]]; }), vC);
+    var fa = $('f-asunto'), vA = fa.value;
+    fa.innerHTML = '<option value="">Todos</option>' + optsHtml(Object.keys(ASUNTOS).map(function (k) { return [k, ASUNTOS[k]]; }), vA);
   }
 
   // ══════════════ Filtros, orden y render ══════════════
   function filtrar() {
     var emp = $('f-empresa').value, resp = $('f-resp').value, tipo = $('f-tipo').value, clase = $('f-clase').value;
     var q = norm($('f-buscar').value), soloUrg = $('f-urg').checked, entreg = $('f-entregadas').value;
+    var origen = $('f-origen').value, asunto = $('f-asunto').value;
     return tareas.filter(function (t) {
+      if (origen && (t.origen || 'panel_mercadeo') !== origen) return false;
+      if (asunto && t.asunto !== asunto) return false;
       if (emp && t.empresas.indexOf(emp) < 0) return false;
       if (resp === 'mias' && t.responsables.indexOf(miId) < 0) return false;
       if (resp === 'sin' && t.responsables.length) return false;
@@ -124,7 +138,7 @@
       if (tipo && t.tipo !== tipo) return false;
       if (clase && t.prioridad !== clase) return false;
       if (soloUrg && !t.urgente) return false;
-      if (q && norm(t.titulo + ' ' + t.descripcion).indexOf(q) < 0) return false;
+      if (q && norm(t.titulo + ' ' + t.descripcion + ' ' + (t.solicitante_nombre || '') + ' ' + (t.a_nombre_de_nombre || '')).indexOf(q) < 0) return false;
       if (t.estado === 'entregada' && entreg === '30' && t.entregada_en && horasDesde(t.entregada_en) > 30 * 24) return false;
       return true;
     });
@@ -163,10 +177,14 @@
       return '<span class="kb-av' + (u && u.activo ? '' : ' inactivo') + '" title="' + esc(u ? u.nombre : 'Usuario inactivo') + '">' + esc(iniciales(u ? u.nombre : '?')) + '</span>';
     }).join('') : '<span class="mk-sin">sin responsable</span>';
     var act = t.actividad_id && actById[t.actividad_id] ? '<div class="kb-act">📅 ' + esc(actById[t.actividad_id].nombre) + '</div>' : '';
+    var esPed = t.origen === 'panel_pedidos';
+    var ped = esPed ? '<span class="kb-chip" title="Solicitud enviada desde panel-pedidos">📥 Pedidos</span>' : '';
+    var quien = esPed ? '<div class="kb-act">👤 ' + esc(t.a_nombre_de_nombre || t.solicitante_nombre || '—') +
+      (t.fecha_tentativa ? ' · lo necesita para ' + esc(fmtDateOnly(t.fecha_tentativa)) : '') + '</div>' : '';
     return '<div class="kb-card p-' + esc(t.prioridad) + (t.urgente ? ' urg' : '') + (sinAval ? ' sin-aval' : '') + '" draggable="true" tabindex="0" role="button" data-act="tarea-abrir" data-id="' + esc(t.id) + '" aria-label="Abrir tarea: ' + esc(t.titulo) + '">' +
-      '<div class="kb-card-top">' + urg + '<span class="kb-chip">' + esc(TIPOS[t.tipo] || t.tipo) + '</span><span class="kb-chip" title="Clase de prioridad">' + esc(CLASE_CORTA[t.prioridad] || t.prioridad) + '</span>' + edad + '</div>' +
+      '<div class="kb-card-top">' + urg + ped + '<span class="kb-chip">' + esc(TIPOS[t.tipo] || t.tipo) + '</span><span class="kb-chip" title="Clase de prioridad">' + esc(CLASE_CORTA[t.prioridad] || t.prioridad) + '</span>' + edad + '</div>' +
       '<div class="kb-title">' + esc(t.titulo) + '</div>' +
-      '<div class="kb-emp">' + empresaChips(t.empresas) + '</div>' + act +
+      '<div class="kb-emp">' + empresaChips(t.empresas) + '</div>' + act + quien +
       '<div class="kb-meta">' + (fechaHtml || '<span></span>') + '<span class="kb-avatars">' + avatars + '</span></div>' +
       '<div class="kb-move"><button data-act="mover" data-id="' + esc(t.id) + '" data-dir="-1" aria-label="Mover a la columna anterior"' + (idxCol === 0 ? ' disabled' : '') + '>◀</button>' +
       '<button data-act="mover" data-id="' + esc(t.id) + '" data-dir="1" aria-label="Mover a la columna siguiente"' + (idxCol === COLUMNAS.length - 1 ? ' disabled' : '') + '>▶</button></div>' +
@@ -292,6 +310,21 @@
     $('t-urg-ok').style.display = urg && !fuera ? '' : 'none';
   }
 
+  // Datos que dijo el solicitante en el formulario de Pedidos (solo lectura).
+  function solicitudHtml(t) {
+    var quien = esc(t.solicitante_nombre || '—') + (t.solicitante_rol ? ' <span class="tag">' + esc(t.solicitante_rol) + '</span>' : '') +
+      (t.solicitante_email ? ' · ' + esc(t.solicitante_email) : '');
+    var puedeUsarFecha = t.fecha_tentativa && !t.fecha_limite && t.estado === 'solicitada';
+    return '<h4>📥 Solicitud desde Pedidos</h4>' +
+      '<div class="form-grid cols2">' +
+      '<div><span class="ef-label">Solicitante (quien diligenció)</span>' + quien + '</div>' +
+      '<div><span class="ef-label">A nombre de</span>' + (t.a_nombre_de_nombre ? esc(t.a_nombre_de_nombre) : 'Él mismo') + '</div>' +
+      '<div><span class="ef-label">Asunto</span>' + esc(ASUNTOS[t.asunto] || t.asunto || '—') + '</div>' +
+      '<div><span class="ef-label">Fecha tentativa (no es compromiso)</span>' + esc(t.fecha_tentativa ? fmtDateOnly(t.fecha_tentativa) : '—') +
+      (puedeUsarFecha ? ' <button type="button" class="btn-secondary" data-act="usar-fecha">Usar como fecha límite</button>' : '') + '</div>' +
+      '</div>';
+  }
+
   function abrirTarea(id) {
     var t = id ? tareaById[id] : null;
     editId = t ? t.id : null;
@@ -322,6 +355,11 @@
     $('t-guardar').disabled = false; $('t-guardar').textContent = 'Guardar';
     $('t-flags').innerHTML = t && t.urgente && t.fuera_calendario && !t.aval_por
       ? '<div class="mk-flag">⚠️ Esta tarea figura como urgente fuera de calendario sin aval registrado (la actividad pudo dejar de estar aprobada). Registra el aval o quita la urgencia.</div>' : '';
+    var esPed = !!(t && t.origen === 'panel_pedidos');
+    $('t-solicitud').style.display = esPed ? '' : 'none';
+    $('t-solicitud').innerHTML = esPed ? solicitudHtml(t) : '';
+    $('t-resp-box').style.display = esPed ? '' : 'none';
+    $('t-resp-txt').value = '';
     if (t) { $('t-bitacora').innerHTML = '<div class="mk-sin">Cargando…</div>'; $('t-adjuntos').innerHTML = ''; $('t-audit').innerHTML = auditoriaHtml(t); $('t-coment-txt').value = ''; cargarDetalle(t.id); }
     MODAL.open('tarea-overlay', 't-titulo');
   }
@@ -444,7 +482,13 @@
   function evTexto(ev) {
     var d = ev.detalle || {};
     switch (ev.tipo_evento) {
-      case 'creacion': return 'Creó la tarea';
+      case 'creacion':
+        if (d.origen === 'panel_pedidos') {
+          return 'Solicitud recibida desde Pedidos' + (d.asunto ? ': <strong>' + esc(ASUNTOS[d.asunto] || d.asunto) + '</strong>' : '') +
+            (d.a_nombre_de ? ' · a nombre de <strong>' + esc(d.a_nombre_de) + '</strong>' : '');
+        }
+        return 'Creó la tarea';
+      case 'respuesta_solicitante': return '📣 Respuesta al solicitante: ' + esc(d.texto);
       case 'cambio_estado': return 'Cambió el estado: <strong>' + esc(ESTADO_T[d.de] || d.de) + '</strong> → <strong>' + esc(ESTADO_T[d.a] || d.a) + '</strong>';
       case 'asignacion': return 'Responsables: ' + nomUsuarios(d.de) + ' → <strong>' + nomUsuarios(d.a) + '</strong>';
       case 'aval_registrado': return 'Registró el aval de excepción (urgente fuera de calendario): <strong>' + esc(AVAL[d.por] || d.por) + '</strong> · ' + esc(d.referencia) + ' · ' + esc(d.motivo);
@@ -481,6 +525,17 @@
     cargarDetalle(editId);
   }
 
+  // Mensaje de Mercadeo que el solicitante ve en "Mis solicitudes" de panel-pedidos.
+  async function responder() {
+    var txt = $('t-resp-txt').value.trim();
+    if (!txt) { showToast('Escribe la respuesta', '#e74c3c'); return; }
+    var res = await _sb.from('mercadeo_tarea_bitacora').insert({ tarea_id: editId, tipo_evento: 'respuesta_solicitante', detalle: { texto: txt } });
+    if (res.error) { fail('responder al solicitante', res.error); return; }
+    $('t-resp-txt').value = '';
+    showToast('✅ Respuesta enviada al solicitante');
+    cargarDetalle(editId);
+  }
+
   async function abrirAdjunto(path) {
     var res = await _sb.storage.from('mercadeo-adjuntos').createSignedUrl(path, 3600);
     if (res.error || !res.data) { fail('abrir el archivo', res.error || { message: 'sin URL' }); return; }
@@ -500,7 +555,7 @@
   var ACCIONES = {
     'reintentar': function () { $('estado-carga').textContent = 'Cargando…'; cargar(true); },
     'limpiar': function () {
-      ['f-empresa', 'f-resp', 'f-tipo', 'f-clase'].forEach(function (k) { $(k).value = ''; });
+      ['f-empresa', 'f-resp', 'f-tipo', 'f-clase', 'f-origen', 'f-asunto'].forEach(function (k) { $(k).value = ''; });
       $('f-buscar').value = ''; $('f-urg').checked = false; $('f-canceladas').checked = false; $('f-entregadas').value = '30'; render();
     },
     'tarea-nueva': function () { abrirTarea(null); },
@@ -512,6 +567,8 @@
     'reabrir': function (id) { moverA(Number(id), 'solicitada'); },
     'emp-todas': function () { [].slice.call(document.querySelectorAll('.t-emp-chk')).forEach(function (c) { c.checked = true; }); },
     'comentar': comentar,
+    'responder': responder,
+    'usar-fecha': function () { var t = tareaById[editId]; if (t && t.fecha_tentativa) $('t-fecha').value = t.fecha_tentativa; },
     'adj-abrir': function (id, el) { abrirAdjunto(el.getAttribute('data-path')); },
     'adj-eliminar': function (id, el) { eliminarAdjunto(id, el.getAttribute('data-path')); },
   };
@@ -565,7 +622,7 @@
   });
 
   // Filtros en vivo
-  ['f-empresa', 'f-resp', 'f-tipo', 'f-clase', 'f-urg', 'f-entregadas', 'f-canceladas'].forEach(function (id) { $(id).addEventListener('change', render); });
+  ['f-empresa', 'f-resp', 'f-tipo', 'f-clase', 'f-origen', 'f-asunto', 'f-urg', 'f-entregadas', 'f-canceladas'].forEach(function (id) { $(id).addEventListener('change', render); });
   $('f-buscar').addEventListener('input', render);
 
   // Modal: reglas de calendario/aval en vivo, y subida de archivos en tareas existentes

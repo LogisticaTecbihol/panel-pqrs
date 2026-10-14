@@ -39,6 +39,10 @@
           <select id="f-tipo"><option value="">Todos</option></select></div>
         <div class="fg"><label for="f-clase">Clase</label>
           <select id="f-clase"><option value="">Todas</option></select></div>
+        <div class="fg"><label for="f-origen">Origen</label>
+          <select id="f-origen"><option value="">Todos</option><option value="panel_pedidos">Desde Pedidos</option><option value="panel_mercadeo">Creadas aquí</option></select></div>
+        <div class="fg"><label for="f-asunto">Asunto (Pedidos)</label>
+          <select id="f-asunto"><option value="">Todos</option></select></div>
         <div class="fg"><label for="f-buscar">Buscar</label>
           <input type="text" id="f-buscar" placeholder="Título o descripción…"></div>
         <div class="fg"><label for="f-urg" style="cursor:pointer"><input type="checkbox" id="f-urg"> Solo urgentes</label></div>
@@ -61,6 +65,7 @@
         <button class="btn-close" data-act="cerrar-modal" aria-label="Cerrar">✕</button></div>
       <div class="mbody">
         <div id="t-flags"></div>
+        <div id="t-solicitud" class="mk-box" style="display:none;margin-bottom:14px"></div>
         <div class="form-grid cols2">
           <div style="grid-column:1/-1"><label class="ef-label" for="t-titulo">Título *</label>
             <input class="ef" id="t-titulo" maxlength="200" autocomplete="off"></div>
@@ -92,7 +97,7 @@
 
         <label class="ef-label" for="t-desc">Descripción / brief</label>
         <textarea class="ef" id="t-desc" rows="4" maxlength="4000"></textarea>
-        <div class="ef-help">Para confirmar la tarea (sacarla de “Solicitada”) se requiere la descripción y la fecha límite.</div>
+        <div class="ef-help">Para confirmar la tarea (sacarla de “Recibido”) se requiere la descripción y la fecha límite.</div>
 
         <div id="t-nuevo-files" style="margin-top:14px">
           <label class="ef-label" for="t-files-nuevo">Adjuntar archivos (opcional)</label>
@@ -107,6 +112,12 @@
             <div style="margin-top:8px"><label class="ef-label" for="t-files">Subir archivos</label>
               <input type="file" id="t-files" multiple>
               <div class="ef-help">Máximo 25 MB por archivo.</div></div>
+          </div>
+          <div class="mk-box" id="t-resp-box" style="margin-top:14px;display:none">
+            <h4>Responder al solicitante</h4>
+            <div class="ef-help" style="margin-bottom:8px">Este mensaje lo verá la persona que hizo la solicitud en “Mis solicitudes” de panel-pedidos. Los comentarios internos de abajo NO se le muestran.</div>
+            <textarea class="ef" id="t-resp-txt" rows="2" maxlength="2000" placeholder="Escribe la respuesta para el solicitante…" aria-label="Respuesta al solicitante"></textarea>
+            <button class="btn-confirm" style="margin:8px 0 4px" data-act="responder">📣 Enviar respuesta</button>
           </div>
           <div class="mk-box" style="margin-top:14px">
             <h4>Comentarios y bitácora</h4>
@@ -133,6 +144,6 @@
   <script src="../js/shared/supabase-client.js?v=20261006"></script>
   <script src="../js/shared/modal.js?v=20261006"></script>
   <script src="../js/panel/auth.js?v=20261009"></script>
-  <script src="../js/panel/mercadeo.js?v=20261006"></script>
+  <script src="../js/panel/mercadeo.js?v=20261014"></script>
 </body>
 </html>
