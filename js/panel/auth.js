@@ -134,6 +134,77 @@ var AUTH = (function () {
   // por Realtime y, como respaldo, al volver a la pestaña.
   var _campana = { lista: [], abierta: false, canal: null };
 
+  // Sonido del aviso (mismo tono que la campanita de panel-pedidos). El navegador solo deja
+  // sonar a una página tras un clic o tecla del usuario en ESA carga (recargar lo reinicia):
+  // un único <audio> se desbloquea en el primer gesto y, si el aviso llega antes, el mensaje
+  // en pantalla lo dice en vez de fallar en silencio.
+  var _sonido = { url: null, el: null, listo: false, bloqueados: 0 };
+  var _GESTOS_SONIDO = ['click', 'keydown', 'touchend'];
+
+  function _sonidoWav() {
+    var sr = 44100, n = Math.floor(sr * 0.45), PI2 = 2 * Math.PI;
+    var buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    var w = function (o, s) { for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true);
+    v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+    for (var i = 0; i < n; i++) {
+      var t = i / sr, s = 0;
+      if (t < 0.18) {                                   // E6, decaimiento rápido tipo campana
+        var e1 = Math.exp(-t * 18);
+        s += Math.sin(PI2 * 1318 * t) * e1 * 0.40 + Math.sin(PI2 * 2636 * t) * e1 * 0.15 +
+             Math.sin(PI2 * 3954 * t) * e1 * 0.06;
+      }
+      if (t >= 0.11) {                                  // A5, entra a los 0.11 s
+        var t2 = t - 0.11, e2 = Math.exp(-t2 * 14);
+        s += Math.sin(PI2 * 880 * t2) * e2 * 0.45 + Math.sin(PI2 * 1760 * t2) * e2 * 0.12 +
+             Math.sin(PI2 * 2640 * t2) * e2 * 0.05;
+      }
+      v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, s)) * 32767 | 0, true);
+    }
+    return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  }
+
+  function _sonidoEl() {
+    if (!_sonido.el) {
+      if (!_sonido.url) _sonido.url = _sonidoWav();
+      _sonido.el = new Audio(_sonido.url);
+      _sonido.el.preload = 'auto';
+    }
+    return _sonido.el;
+  }
+
+  // Primer gesto real: deja el <audio> habilitado. Si el navegador lo rechaza, queda armado
+  // para el siguiente gesto.
+  function _sonidoDesbloquear() {
+    if (_sonido.listo) return;
+    try {
+      var a = _sonidoEl();
+      a.volume = 0;
+      var listo = function () {
+        _sonido.listo = true;
+        if (a.volume === 0) { a.pause(); try { a.currentTime = 0; } catch (e) { /* sin efecto */ } }
+        _GESTOS_SONIDO.forEach(function (g) { document.removeEventListener(g, _sonidoDesbloquear, true); });
+      };
+      var p = a.play();
+      if (p && p.then) p.then(listo).catch(function () { /* sigue armado */ });
+      else listo();
+    } catch (e) { /* sin audio: solo queda el aviso visual */ }
+  }
+
+  // Devuelve una promesa: true si sonó, false si el navegador lo bloqueó.
+  function _sonidoReproducir() {
+    try {
+      var a = _sonidoEl();
+      a.volume = 0.5;
+      try { a.currentTime = 0; } catch (e) { /* sin efecto */ }
+      var p = a.play();
+      if (p && p.then) return p.then(function () { return true; }, function () { return false; });
+      return Promise.resolve(true);
+    } catch (e) { return Promise.resolve(false); }
+  }
+
   function _montarCampana() {
     if (!hasModule('mercadeo')) return;
     var cont = document.getElementById('auth-info');
@@ -160,6 +231,7 @@ var AUTH = (function () {
     document.addEventListener('click', function () { if (_campana.abierta) _campanaAbrir(false); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && _campana.abierta) _campanaAbrir(false); });
     document.addEventListener('visibilitychange', function () { if (!document.hidden) _campanaCargar(); });
+    _GESTOS_SONIDO.forEach(function (g) { document.addEventListener(g, _sonidoDesbloquear, true); });
 
     _campanaCargar();
     try {
@@ -167,8 +239,15 @@ var AUTH = (function () {
         { event: '*', schema: 'public', table: 'mercadeo_notificaciones', filter: 'para_usuario_id=eq.' + _user.id },
         function (payload) {
           _campanaCargar();
-          if (payload && payload.eventType === 'INSERT' && payload.new && typeof showToast === 'function') {
-            showToast(payload.new.titulo || 'Nuevo aviso');
+          if (payload && payload.eventType === 'INSERT' && payload.new) {
+            var titulo = payload.new.titulo || 'Nuevo aviso';
+            _sonidoReproducir().then(function (sono) {
+              if (!sono) {
+                _sonido.bloqueados++;
+                if (_sonido.bloqueados === 1) titulo += ' — haz clic en la página para activar el sonido';
+              }
+              if (typeof showToast === 'function') showToast(titulo);
+            });
           }
         }).subscribe();
     } catch (e) { /* sin Realtime: queda la recarga al volver a la pestaña */ }

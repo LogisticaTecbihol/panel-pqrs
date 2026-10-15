@@ -131,7 +131,9 @@ SOLO por la función `solicitud-mercadeo` de panel-pedidos (server→server, sin
   - Campanita del equipo (`mercadeo_notificaciones`, RLS: cada quien lee/marca las suyas; las crea el
     trigger `trg_notificar_solicitud` al entrar una tarea `panel_pedidos` a cada usuario activo admin
     o con módulo `mercadeo`; Realtime). La dibuja `js/panel/auth.js` en todas las páginas y abre
-    `mercadeo.html?tarea=<id>`.
+    `mercadeo.html?tarea=<id>`. Al llegar un aviso suena el mismo tono que la campanita de
+    panel-pedidos; el navegador solo permite sonar tras un clic/tecla en ESA carga de página (una
+    recarga lo reinicia), así que si el aviso llega antes el toast lo dice en vez de fallar en silencio.
   - Aviso al solicitante: tras cada cambio de estado / rechazo / respuesta el Tablero llama a la Edge
     Function `notificar-solicitante` (`verify_jwt=true`, exige módulo `mercadeo`), que arma el aviso
     con lo que hay en la BD (nunca con lo que dice el navegador) y lo reenvía con
