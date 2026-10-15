@@ -112,6 +112,9 @@ SOLO por la función `solicitud-mercadeo` de panel-pedidos (server→server, sin
 - Bitácora: `respuesta_solicitante` es lo único (más los cambios de estado) que se le muestra al
   solicitante; los comentarios internos NUNCA salen.
 - Adjuntos subidos desde Pedidos: `subido_por` NULL + `subido_por_nombre`.
+- Asunto "Otros" (migración 0020): el solicitante escribe el asunto → `asunto_otro` (3-100 car.,
+  solo con `asunto = 'otros'`, inmutable); lo exigen las dos Edge Functions y el título de la tarea
+  pasa a `Otros: <asunto escrito> · <empresa> · <solicitante>`.
 
 Reglas de priorización (MKT-DOC-00 §B.5, MKT-P-04), aplicadas en el trigger `mercadeo_tareas_reglas`:
 clase 1 calendario > 2 soporte a ventas > 3 mejora > 4 exploratorio; una tarea vinculada a una

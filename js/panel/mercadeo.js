@@ -319,7 +319,8 @@
       '<div class="form-grid cols2">' +
       '<div><span class="ef-label">Solicitante (quien diligenció)</span>' + quien + '</div>' +
       '<div><span class="ef-label">A nombre de</span>' + (t.a_nombre_de_nombre ? esc(t.a_nombre_de_nombre) : 'Él mismo') + '</div>' +
-      '<div><span class="ef-label">Asunto</span>' + esc(ASUNTOS[t.asunto] || t.asunto || '—') + '</div>' +
+      '<div><span class="ef-label">Asunto</span>' + esc(ASUNTOS[t.asunto] || t.asunto || '—') +
+        (t.asunto_otro ? ' — <strong>' + esc(t.asunto_otro) + '</strong>' : '') + '</div>' +
       '<div><span class="ef-label">Fecha tentativa (no es compromiso)</span>' + esc(t.fecha_tentativa ? fmtDateOnly(t.fecha_tentativa) : '—') +
       (puedeUsarFecha ? ' <button type="button" class="btn-secondary" data-act="usar-fecha">Usar como fecha límite</button>' : '') + '</div>' +
       '</div>';

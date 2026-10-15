@@ -196,6 +196,11 @@ async function crear(admin: any, body: any) {
   if (!EMPRESAS_VALIDAS.includes(empresa)) throw new Rechazo(`empresa inválida: ${empresa}`)
   const asunto = ASUNTOS[body.asunto]
   if (!asunto) throw new Rechazo(`asunto inválido: ${body.asunto}`)
+  // Con asunto "Otros" el solicitante escribe el asunto (obligatorio); con cualquier otro se ignora.
+  let asuntoOtro: string | null = null
+  if (body.asunto === 'otros') {
+    asuntoOtro = texto(body.asunto_otro, 'El asunto', 3, 100).replace(/\s+/g, ' ')
+  }
 
   const fecha = body.fecha_tentativa
   if (typeof fecha !== 'string' || !FECHA_RE.test(fecha) || Number.isNaN(Date.parse(fecha + 'T00:00:00Z'))) {
@@ -248,7 +253,8 @@ async function crear(admin: any, body: any) {
     }
   }
 
-  const titulo = `${asunto.label} · ${empresa} · ${aNombreNombre || solicitanteNombre}`.slice(0, 200)
+  const etiquetaAsunto = asuntoOtro ? `Otros: ${asuntoOtro}` : asunto.label
+  const titulo = `${etiquetaAsunto} · ${empresa} · ${aNombreNombre || solicitanteNombre}`.slice(0, 200)
   const ins = await admin.from('mercadeo_tareas').insert({
     titulo,
     descripcion,
@@ -266,6 +272,7 @@ async function crear(admin: any, body: any) {
     a_nombre_de_id: aNombreId,
     a_nombre_de_nombre: aNombreNombre,
     asunto: body.asunto,
+    asunto_otro: asuntoOtro,
     fecha_tentativa: fecha,
   }).select('id, estado').single()
 
@@ -304,7 +311,7 @@ async function listar(admin: any, body: any) {
   const usuarioId = uuid(body.solicitante?.id, 'solicitante.id')
 
   const t = await admin.from('mercadeo_tareas')
-    .select('id, titulo, asunto, empresas, estado, descripcion, fecha_tentativa, fecha_limite, creado_en, confirmada_en, entregada_en, responsables, solicitante_nombre, a_nombre_de_nombre')
+    .select('id, titulo, asunto, asunto_otro, empresas, estado, descripcion, fecha_tentativa, fecha_limite, creado_en, confirmada_en, entregada_en, responsables, solicitante_nombre, a_nombre_de_nombre')
     .eq('origen', 'panel_pedidos')
     .or(`solicitante_id.eq.${usuarioId},a_nombre_de_id.eq.${usuarioId}`)
     .order('id', { ascending: false })
@@ -337,6 +344,7 @@ async function listar(admin: any, body: any) {
     id: x.id,
     titulo: x.titulo,
     asunto: x.asunto,
+    asunto_otro: x.asunto_otro,
     empresas: x.empresas,
     estado: x.estado,
     descripcion: x.descripcion,
