@@ -29,7 +29,7 @@
     { k: 'en_validacion', t: 'En validación / aprobación' },
     { k: 'entregada', t: 'Entregada / Publicada' },
   ];
-  var ESTADO_T = { solicitada: 'Recibido', confirmada: 'Confirmada', en_produccion: 'En producción', en_validacion: 'En validación / aprobación', entregada: 'Entregada / Publicada', cancelada: 'Cancelada' };
+  var ESTADO_T = { solicitada: 'Recibido', confirmada: 'Confirmada', en_produccion: 'En producción', en_validacion: 'En validación / aprobación', entregada: 'Entregada / Publicada', cancelada: 'Cancelada', rechazada: 'Rechazada' };
   var ABIERTOS = ['solicitada', 'confirmada', 'en_produccion', 'en_validacion'];
   var TIPOS = { diseno: 'Diseño gráfico', redes: 'Redes sociales y contenido', evento: 'Evento', pop: 'Material POP', campana: 'Campaña', pauta: 'Pauta digital', otro: 'Otro' };
   // Asunto del formulario de Pedidos (códigos de mercadeo_tareas.asunto).
@@ -225,15 +225,19 @@
   function renderCanceladas(lista) {
     var box = $('kb-canceladas');
     if (!$('f-canceladas').checked) { box.innerHTML = ''; return; }
-    var ts = lista.filter(function (t) { return t.estado === 'cancelada'; }).sort(function (a, b) { return b.id - a.id; });
-    box.innerHTML = '<div class="card" style="margin-top:14px"><div class="card-head"><h3>Canceladas (' + ts.length + ')</h3></div>' +
-      (ts.length ? '<div class="table-wrap"><table><thead><tr><th>Tarea</th><th>Tipo</th><th>Empresas</th><th>Cancelada por</th><th></th></tr></thead><tbody>' +
+    var ts = lista.filter(function (t) { return t.estado === 'cancelada' || t.estado === 'rechazada'; }).sort(function (a, b) { return b.id - a.id; });
+    box.innerHTML = '<div class="card" style="margin-top:14px"><div class="card-head"><h3>Canceladas y rechazadas (' + ts.length + ')</h3></div>' +
+      (ts.length ? '<div class="table-wrap"><table><thead><tr><th>Tarea</th><th>Tipo</th><th>Empresas</th><th>Estado</th><th>Por / motivo</th><th></th></tr></thead><tbody>' +
         ts.map(function (t) {
+          var rech = t.estado === 'rechazada';
           return '<tr><td>' + esc(t.titulo) + '</td><td>' + esc(TIPOS[t.tipo] || t.tipo) + '</td><td>' + empresaChips(t.empresas) + '</td>' +
-            '<td>' + esc(t.modificado_por_nombre || '—') + ' · ' + esc(fmtDateTime(t.modificado_en)) + '</td>' +
+            '<td><span class="kb-chip' + (rech ? ' urg' : '') + '">' + esc(ESTADO_T[t.estado]) + '</span></td>' +
+            '<td>' + (rech
+              ? esc(t.rechazada_por_nombre || '—') + ' · ' + esc(fmtDateTime(t.rechazada_en)) + '<br><strong>Motivo:</strong> ' + esc(t.motivo_rechazo || '—')
+              : esc(t.modificado_por_nombre || '—') + ' · ' + esc(fmtDateTime(t.modificado_en))) + '</td>' +
             '<td><div class="mk-actions"><button class="btn-ver" data-act="tarea-abrir" data-id="' + esc(t.id) + '">Ver</button>' +
-            '<button class="btn-edit" data-act="reabrir" data-id="' + esc(t.id) + '">Reabrir</button></div></td></tr>';
-        }).join('') + '</tbody></table></div>' : '<div class="empty">No hay tareas canceladas.</div>') + '</div>';
+            (rech ? '' : '<button class="btn-edit" data-act="reabrir" data-id="' + esc(t.id) + '">Reabrir</button>') + '</div></td></tr>';
+        }).join('') + '</tbody></table></div>' : '<div class="empty">No hay tareas canceladas ni rechazadas.</div>') + '</div>';
   }
 
   // ══════════════ Mover entre columnas ══════════════
@@ -252,6 +256,7 @@
       if (res.error) fail('mover la tarea', res.error); else showToast('No se pudo mover: no tienes permiso o la tarea ya no existe', '#e74c3c');
       return;
     }
+    avisarSolicitante(Number(id), 'estado', t.origen);
     cargar(false);
   }
 
@@ -326,7 +331,58 @@
       '<div><span class="ef-label">N° en Pedidos</span>' + esc(t.origen_numero ? 'SM-' + t.origen_numero : '—') + '</div>' +
       '<div><span class="ef-label">Aprobada en Pedidos por</span>' + esc(t.aprobada_por_nombre || '—') +
         (t.aprobada_en ? ' · ' + esc(fmtDateTime(t.aprobada_en)) : '') + '</div>' +
-      '</div>';
+      '</div>' +
+      (t.estado === 'rechazada'
+        ? '<div class="mk-flag" style="margin-top:10px">❌ Rechazada por <strong>' + esc(t.rechazada_por_nombre || '—') + '</strong>' +
+          (t.rechazada_en ? ' el ' + esc(fmtDateTime(t.rechazada_en)) : '') +
+          '<br><strong>Motivo:</strong> ' + esc(t.motivo_rechazo || '—') + '</div>'
+        : '');
+  }
+
+  // Avisa en la campanita de Pedidos a quien hizo la solicitud (estado | rechazo | respuesta).
+  // No bloquea ni deshace nada: si falla, el cambio ya quedó guardado y solo se informa.
+  async function avisarSolicitante(tareaId, evento, origen) {
+    if (origen !== 'panel_pedidos') return;
+    try {
+      var r = await _sb.functions.invoke('notificar-solicitante', { body: { tarea_id: tareaId, evento: evento } });
+      var ok = r && !r.error && r.data && r.data.ok;
+      if (!ok) {
+        var msg = '';
+        try { var j = r.error && r.error.context ? await r.error.context.json() : null; msg = j && j.error ? j.error : ''; } catch (_e) { /* sin cuerpo */ }
+        showToast('El cambio se guardó, pero no se pudo avisar al solicitante' + (msg ? ': ' + msg : ''), '#e67e22');
+      }
+    } catch (e) {
+      showToast('El cambio se guardó, pero no se pudo avisar al solicitante', '#e67e22');
+    }
+  }
+
+  // ── Rechazar una solicitud de Pedidos (con motivo) ──
+  function abrirRechazo() {
+    var t = tareaById[editId];
+    if (!t || t.origen !== 'panel_pedidos' || !esAbierta(t)) return;
+    $('r-detalle').textContent = (t.origen_numero ? 'SM-' + t.origen_numero + ' · ' : '') + t.titulo;
+    $('r-motivo').value = '';
+    $('r-confirmar').disabled = false;
+    MODAL.open('rechazo-overlay', 'r-motivo');
+  }
+
+  async function confirmarRechazo() {
+    var motivo = $('r-motivo').value.trim();
+    if (motivo.length < 3) { showToast('Escribe el motivo del rechazo (mínimo 3 caracteres)', '#e74c3c'); return; }
+    var id = editId, origen = tareaById[id] ? tareaById[id].origen : null;
+    var btn = $('r-confirmar');
+    btn.disabled = true;
+    var res = await _sb.from('mercadeo_tareas').update({ estado: 'rechazada', motivo_rechazo: motivo }).eq('id', id).select('id');
+    if (res.error || !res.data || !res.data.length) {
+      btn.disabled = false;
+      if (res.error) fail('rechazar la solicitud', res.error); else showToast('No se pudo rechazar: no tienes permiso o la tarea ya no existe', '#e74c3c');
+      return;
+    }
+    showToast('✅ Solicitud rechazada; se avisará al solicitante');
+    MODAL.close('rechazo-overlay');
+    MODAL.close('tarea-overlay');
+    avisarSolicitante(id, 'rechazo', origen);
+    await cargar(false);
   }
 
   function abrirTarea(id) {
@@ -337,9 +393,10 @@
     $('tarea-meta').innerHTML = t ? '<span>' + esc(ESTADO_T[t.estado]) + '</span>' : '';
     $('t-titulo').value = t ? t.titulo : '';
     $('t-tipo').innerHTML = optsHtml(Object.keys(TIPOS).map(function (k) { return [k, TIPOS[k]]; }), t ? t.tipo : 'diseno');
-    var estados = t ? Object.keys(ESTADO_T) : ['solicitada'];
+    // 'Rechazada' no se elige aquí (exige motivo: usa el botón "Rechazar solicitud") y es un estado final.
+    var estados = t ? Object.keys(ESTADO_T).filter(function (k) { return k !== 'rechazada' || t.estado === 'rechazada'; }) : ['solicitada'];
     $('t-estado').innerHTML = optsHtml(estados.map(function (k) { return [k, ESTADO_T[k]]; }), t ? t.estado : 'solicitada');
-    $('t-estado').disabled = !t;
+    $('t-estado').disabled = !t || t.estado === 'rechazada';
     $('t-actividad').innerHTML = opcionesActividad(t ? t.actividad_id : null);
     $('t-prioridad').innerHTML = optsHtml(Object.keys(CLASES).map(function (k) { return [k, CLASES[k]]; }), t ? t.prioridad : 'mejora');
     $('t-fecha').value = t && t.fecha_limite ? t.fecha_limite : '';
@@ -356,6 +413,8 @@
     $('t-nuevo-files').style.display = t ? 'none' : '';
     $('t-extra').style.display = t ? '' : 'none';
     $('t-eliminar').style.display = t && esAdmin ? '' : 'none';
+    // Mercadeo puede rechazar una solicitud de Pedidos mientras no esté entregada ni cancelada.
+    $('t-rechazar').style.display = t && t.origen === 'panel_pedidos' && esAbierta(t) ? '' : 'none';
     $('t-guardar').disabled = false; $('t-guardar').textContent = 'Guardar';
     $('t-flags').innerHTML = t && t.urgente && t.fuera_calendario && !t.aval_por
       ? '<div class="mk-flag">⚠️ Esta tarea figura como urgente fuera de calendario sin aval registrado (la actividad pudo dejar de estar aprobada). Registra el aval o quita la urgencia.</div>' : '';
@@ -424,7 +483,10 @@
     if (res.error) { fail('guardar la tarea', res.error); return; }
     if (!editId) await subirArchivos(nuevoId, $('t-files-nuevo').files);
     showToast(editId ? '✅ Tarea actualizada' : '✅ Tarea creada');
+    // Si cambió el estado de una solicitud de Pedidos, se avisa al solicitante (se captura antes de cerrar el modal).
+    var avisoEstado = editId && diff && diff.estado ? { id: editId, origen: orig ? orig.origen : null } : null;
     MODAL.close('tarea-overlay');
+    if (avisoEstado) avisarSolicitante(avisoEstado.id, 'estado', avisoEstado.origen);
     await cargar(false);
   }
 
@@ -493,7 +555,8 @@
         }
         return 'Creó la tarea';
       case 'respuesta_solicitante': return '📣 Respuesta al solicitante: ' + esc(d.texto);
-      case 'cambio_estado': return 'Cambió el estado: <strong>' + esc(ESTADO_T[d.de] || d.de) + '</strong> → <strong>' + esc(ESTADO_T[d.a] || d.a) + '</strong>';
+      case 'cambio_estado': return 'Cambió el estado: <strong>' + esc(ESTADO_T[d.de] || d.de) + '</strong> → <strong>' + esc(ESTADO_T[d.a] || d.a) + '</strong>' +
+        (d.motivo ? ' · <strong>Motivo:</strong> ' + esc(d.motivo) : '');
       case 'asignacion': return 'Responsables: ' + nomUsuarios(d.de) + ' → <strong>' + nomUsuarios(d.a) + '</strong>';
       case 'aval_registrado': return 'Registró el aval de excepción (urgente fuera de calendario): <strong>' + esc(AVAL[d.por] || d.por) + '</strong> · ' + esc(d.referencia) + ' · ' + esc(d.motivo);
       case 'comentario': return '💬 ' + esc(d.texto);
@@ -538,6 +601,7 @@
     $('t-resp-txt').value = '';
     showToast('✅ Respuesta enviada al solicitante');
     cargarDetalle(editId);
+    avisarSolicitante(editId, 'respuesta', 'panel_pedidos');
   }
 
   async function abrirAdjunto(path) {
@@ -572,6 +636,9 @@
     'emp-todas': function () { [].slice.call(document.querySelectorAll('.t-emp-chk')).forEach(function (c) { c.checked = true; }); },
     'comentar': comentar,
     'responder': responder,
+    'rechazo-abrir': abrirRechazo,
+    'rechazo-confirmar': confirmarRechazo,
+    'rechazo-cerrar': function () { MODAL.close('rechazo-overlay'); },
     'usar-fecha': function () { var t = tareaById[editId]; if (t && t.fecha_tentativa) $('t-fecha').value = t.fecha_tentativa; },
     'adj-abrir': function (id, el) { abrirAdjunto(el.getAttribute('data-path')); },
     'adj-eliminar': function (id, el) { eliminarAdjunto(id, el.getAttribute('data-path')); },
@@ -647,4 +714,12 @@
   document.addEventListener('visibilitychange', function () { if (!document.hidden) programarRecarga(); });
 
   await cargar(true);
+
+  // Enlace directo desde la campanita: ?tarea=<id> abre esa tarjeta.
+  var tareaParam = Number(new URLSearchParams(location.search).get('tarea'));
+  if (tareaParam && tareaById[tareaParam]) {
+    $('f-canceladas').checked = tareaById[tareaParam].estado === 'cancelada' || tareaById[tareaParam].estado === 'rechazada';
+    render();
+    abrirTarea(tareaParam);
+  }
 })();

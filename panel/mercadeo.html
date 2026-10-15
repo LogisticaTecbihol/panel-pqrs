@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mercadeo — Tablero</title>
-<link rel="stylesheet" href="../css/panel.css?v=20261006">
+<link rel="stylesheet" href="../css/panel.css?v=20261017">
 </head>
 <body data-modulo="mercadeo">
   <div class="header">
@@ -48,7 +48,7 @@
         <div class="fg"><label for="f-urg" style="cursor:pointer"><input type="checkbox" id="f-urg"> Solo urgentes</label></div>
         <div class="fg"><label for="f-entregadas">Entregadas</label>
           <select id="f-entregadas"><option value="30">Últimos 30 días</option><option value="todas">Todas</option></select></div>
-        <div class="fg"><label for="f-canceladas" style="cursor:pointer"><input type="checkbox" id="f-canceladas"> Ver canceladas</label></div>
+        <div class="fg"><label for="f-canceladas" style="cursor:pointer"><input type="checkbox" id="f-canceladas"> Ver canceladas y rechazadas</label></div>
         <button class="btn-clear-filters" data-act="limpiar">Limpiar filtros</button>
         <button class="btn-primary" data-act="tarea-nueva">➕ Nueva tarea</button>
       </div>
@@ -131,6 +131,7 @@
       <div class="mftr">
         <div class="mk-actions">
           <button class="btn-danger" id="t-eliminar" data-act="tarea-eliminar" style="display:none">🗑 Eliminar</button>
+          <button class="btn-danger" id="t-rechazar" data-act="rechazo-abrir" style="display:none">❌ Rechazar solicitud</button>
         </div>
         <div class="mftr-btns">
           <button class="btn-cancel" data-act="cerrar-modal">Cerrar</button>
@@ -140,10 +141,29 @@
     </div>
   </div>
 
+  <!-- ══ Modal: rechazar solicitud (motivo obligatorio) ══ -->
+  <div class="overlay" id="rechazo-overlay" role="dialog" aria-modal="true" aria-labelledby="rechazo-titulo">
+    <div class="modal-box" style="max-width:520px">
+      <div class="mhdr"><div><h2 id="rechazo-titulo">❌ Rechazar solicitud</h2><div class="meta" id="r-detalle"></div></div>
+        <button class="btn-close" data-act="rechazo-cerrar" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <label class="ef-label" for="r-motivo">Motivo del rechazo *</label>
+        <textarea class="ef" id="r-motivo" rows="4" maxlength="500" placeholder="Explícale al solicitante por qué no se puede atender…"></textarea>
+        <div class="ef-help">El solicitante recibe un aviso con este motivo y podrá corregir la solicitud y reenviarla a aprobación. El rechazo es definitivo para esta tarea.</div>
+      </div>
+      <div class="mftr">
+        <div class="mftr-btns">
+          <button class="btn-cancel" data-act="rechazo-cerrar">Cancelar</button>
+          <button class="btn-danger" id="r-confirmar" data-act="rechazo-confirmar">❌ Rechazar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="../js/shared/supabase-client.js?v=20261006"></script>
   <script src="../js/shared/modal.js?v=20261006"></script>
-  <script src="../js/panel/auth.js?v=20261009"></script>
-  <script src="../js/panel/mercadeo.js?v=20261016"></script>
+  <script src="../js/panel/auth.js?v=20261017"></script>
+  <script src="../js/panel/mercadeo.js?v=20261017"></script>
 </body>
 </html>

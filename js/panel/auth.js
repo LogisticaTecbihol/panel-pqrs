@@ -98,6 +98,7 @@ var AUTH = (function () {
 
       _renderAuthUI();
       _setupAuthListener();
+      _montarCampana();
     } finally {
       if (typeof _authResolve === 'function') _authResolve();
     }
@@ -125,6 +126,106 @@ var AUTH = (function () {
       if (e === document.body) return;
       if (!hasModule(e.getAttribute('data-modulo'))) e.style.display = 'none';
     });
+  }
+
+  // ── Campanita de avisos del equipo de Mercadeo ──
+  // Avisa cuando llega al Tablero una solicitud ya aprobada en Pedidos. Solo la ven quienes
+  // tienen el módulo 'mercadeo'; cada quien lee únicamente las suyas (RLS). Se actualiza sola
+  // por Realtime y, como respaldo, al volver a la pestaña.
+  var _campana = { lista: [], abierta: false, canal: null };
+
+  function _montarCampana() {
+    if (!hasModule('mercadeo')) return;
+    var cont = document.getElementById('auth-info');
+    if (!cont || document.getElementById('mk-bell')) return;
+    var wrap = document.createElement('div');
+    wrap.id = 'mk-bell';
+    wrap.className = 'mk-bell';
+    wrap.innerHTML =
+      '<button type="button" class="mk-bell-btn" id="mk-bell-btn" aria-label="Avisos" aria-haspopup="true" aria-expanded="false">🔔' +
+      '<span class="mk-bell-badge" id="mk-bell-badge" style="display:none">0</span></button>' +
+      '<div class="mk-bell-panel" id="mk-bell-panel" style="display:none" role="menu"></div>';
+    cont.insertBefore(wrap, cont.firstChild);
+
+    document.getElementById('mk-bell-btn').addEventListener('click', function (e) {
+      e.stopPropagation();
+      _campanaAbrir(!_campana.abierta);
+    });
+    document.getElementById('mk-bell-panel').addEventListener('click', function (e) {
+      e.stopPropagation();
+      var b = e.target.closest ? e.target.closest('[data-notif]') : null;
+      if (b) { _campanaAbrirAviso(b.getAttribute('data-notif')); return; }
+      if (e.target.closest && e.target.closest('[data-notif-todas]')) _campanaMarcarTodas();
+    });
+    document.addEventListener('click', function () { if (_campana.abierta) _campanaAbrir(false); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && _campana.abierta) _campanaAbrir(false); });
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) _campanaCargar(); });
+
+    _campanaCargar();
+    try {
+      _campana.canal = _sb.channel('mk-notif-' + _user.id).on('postgres_changes',
+        { event: '*', schema: 'public', table: 'mercadeo_notificaciones', filter: 'para_usuario_id=eq.' + _user.id },
+        function (payload) {
+          _campanaCargar();
+          if (payload && payload.eventType === 'INSERT' && payload.new && typeof showToast === 'function') {
+            showToast(payload.new.titulo || 'Nuevo aviso');
+          }
+        }).subscribe();
+    } catch (e) { /* sin Realtime: queda la recarga al volver a la pestaña */ }
+  }
+
+  async function _campanaCargar() {
+    var r = await _sb.from('mercadeo_notificaciones')
+      .select('id, tipo, tarea_id, titulo, mensaje, leida, creado_en')
+      .order('creado_en', { ascending: false }).limit(30);
+    if (r.error) return;
+    _campana.lista = r.data || [];
+    _campanaPintar();
+  }
+
+  function _campanaPintar() {
+    var sinLeer = _campana.lista.filter(function (n) { return !n.leida; }).length;
+    var badge = document.getElementById('mk-bell-badge');
+    if (!badge) return;
+    badge.textContent = sinLeer > 99 ? '99+' : String(sinLeer);
+    badge.style.display = sinLeer ? '' : 'none';
+    var panel = document.getElementById('mk-bell-panel');
+    var items = _campana.lista.map(function (n) {
+      return '<button type="button" class="mk-bell-item' + (n.leida ? '' : ' nuevo') + '" role="menuitem" data-notif="' + escHtml(n.id) + '">' +
+        '<span class="t">' + escHtml(n.titulo) + '</span>' +
+        (n.mensaje ? '<span class="m">' + escHtml(n.mensaje) + '</span>' : '') +
+        '<span class="f">' + escHtml(fmtDateTime(n.creado_en)) + '</span></button>';
+    }).join('');
+    panel.innerHTML =
+      '<div class="mk-bell-head"><strong>Avisos</strong>' +
+      (sinLeer ? '<button type="button" class="mk-bell-todas" data-notif-todas="1">Marcar todas como leídas</button>' : '') + '</div>' +
+      (items || '<div class="mk-bell-vacio">No tienes avisos.</div>');
+  }
+
+  function _campanaAbrir(abrir) {
+    _campana.abierta = abrir;
+    document.getElementById('mk-bell-panel').style.display = abrir ? '' : 'none';
+    document.getElementById('mk-bell-btn').setAttribute('aria-expanded', abrir ? 'true' : 'false');
+  }
+
+  async function _campanaAbrirAviso(id) {
+    var n = _campana.lista.filter(function (x) { return x.id === id; })[0];
+    if (!n) return;
+    if (!n.leida) {
+      n.leida = true;
+      _campanaPintar();
+      await _sb.from('mercadeo_notificaciones').update({ leida: true, leida_en: new Date().toISOString() }).eq('id', id);
+    }
+    _campanaAbrir(false);
+    if (n.tarea_id) location.href = 'mercadeo.html?tarea=' + encodeURIComponent(n.tarea_id);
+  }
+
+  async function _campanaMarcarTodas() {
+    var ids = _campana.lista.filter(function (n) { return !n.leida; }).map(function (n) { return n.id; });
+    if (!ids.length) return;
+    _campana.lista.forEach(function (n) { n.leida = true; });
+    _campanaPintar();
+    await _sb.from('mercadeo_notificaciones').update({ leida: true, leida_en: new Date().toISOString() }).in('id', ids);
   }
 
   function _setupAuthListener() {

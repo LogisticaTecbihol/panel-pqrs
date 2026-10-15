@@ -293,3 +293,19 @@ textarea.ef { resize: vertical; }
   .filters .fg select, .filters .fg input[type="text"] { flex: 1; }
   #main { padding: 14px 12px; }
 }
+
+/* ── Campanita de avisos de Mercadeo ── */
+.mk-bell { position: relative; }
+.mk-bell-btn { position: relative; background: transparent; border: 1px solid rgba(255,255,255,0.65); color: #fff; border-radius: 8px; padding: 5px 9px; cursor: pointer; font-size: 1rem; line-height: 1; }
+.mk-bell-btn:hover { background: rgba(255,255,255,0.15); }
+.mk-bell-badge { position: absolute; top: -7px; right: -7px; min-width: 18px; padding: 1px 5px; border-radius: 10px; background: #e74c3c; color: #fff; font-size: 0.68rem; font-weight: 700; line-height: 1.3; text-align: center; }
+.mk-bell-panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 2000; width: 340px; max-width: 92vw; max-height: 420px; overflow-y: auto; background: #fff; color: #2d3748; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+.mk-bell-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 0.85rem; }
+.mk-bell-todas { background: none; border: none; color: #1a5276; cursor: pointer; font-size: 0.76rem; font-weight: 700; }
+.mk-bell-item { display: block; width: 100%; text-align: left; background: #fff; border: none; border-bottom: 1px solid #edf2f7; padding: 10px 12px; cursor: pointer; }
+.mk-bell-item:hover { background: #f7fafc; }
+.mk-bell-item.nuevo { background: #ebf5fb; border-left: 3px solid #1a5276; }
+.mk-bell-item .t { display: block; font-size: 0.84rem; font-weight: 700; }
+.mk-bell-item .m { display: block; font-size: 0.78rem; color: #4a5568; margin-top: 2px; }
+.mk-bell-item .f { display: block; font-size: 0.7rem; color: #a0aec0; margin-top: 3px; }
+.mk-bell-vacio { padding: 18px; text-align: center; color: #a0aec0; font-size: 0.84rem; }

@@ -120,6 +120,24 @@ SOLO por la función `solicitud-mercadeo` de panel-pedidos (server→server, sin
 - Asunto "Otros" (migración 0020): el solicitante escribe el asunto → `asunto_otro` (3-100 car.,
   solo con `asunto = 'otros'`, inmutable); lo exigen las dos Edge Functions y el título de la tarea
   pasa a `Otros: <asunto escrito> · <empresa> · <solicitante>`.
+- Rechazo por Mercadeo y avisos (migración 0022):
+  - Estado nuevo `rechazada` (fuera de las columnas, como `cancelada`; estado FINAL). Solo para
+    tareas de Pedidos y mientras no estén entregadas/canceladas; motivo obligatorio (3–500). Quién y
+    cuándo (`rechazada_por_nombre`, `rechazada_en`) los pone el trigger `trg_rechazo`, no el
+    navegador. Botón "❌ Rechazar solicitud" en el detalle de la tarjeta.
+  - La unicidad de `origen_ref` es PARCIAL (no cuenta las rechazadas): el solicitante corrige y
+    reenvía en Pedidos, y al aprobarse de nuevo llega una tarea NUEVA con el mismo `origen_ref`
+    (la rechazada queda como historial; `crear` y `listar` de la función la ignoran).
+  - Campanita del equipo (`mercadeo_notificaciones`, RLS: cada quien lee/marca las suyas; las crea el
+    trigger `trg_notificar_solicitud` al entrar una tarea `panel_pedidos` a cada usuario activo admin
+    o con módulo `mercadeo`; Realtime). La dibuja `js/panel/auth.js` en todas las páginas y abre
+    `mercadeo.html?tarea=<id>`.
+  - Aviso al solicitante: tras cada cambio de estado / rechazo / respuesta el Tablero llama a la Edge
+    Function `notificar-solicitante` (`verify_jwt=true`, exige módulo `mercadeo`), que arma el aviso
+    con lo que hay en la BD (nunca con lo que dice el navegador) y lo reenvía con
+    `PEDIDOS_BRIDGE_SECRET` a la función `solicitud-mercadeo-aviso` de pedidos (`PEDIDOS_AVISO_URL`
+    opcional). Si falla, el cambio ya quedó guardado y el Tablero solo avisa. No hay `pg_net`: el
+    envío lo dispara la interfaz, no un trigger.
 
 Reglas de priorización (MKT-DOC-00 §B.5, MKT-P-04), aplicadas en el trigger `mercadeo_tareas_reglas`:
 clase 1 calendario > 2 soporte a ventas > 3 mejora > 4 exploratorio; una tarea vinculada a una

@@ -227,7 +227,8 @@ async function crear(admin: any, body: any) {
   const descripcion = texto(body.descripcion, 'La descripción', 10, 2000)
 
   // Idempotencia: el mismo envío (doble clic, reintento) devuelve la misma solicitud.
-  const previa = await admin.from('mercadeo_tareas').select('id, estado').eq('origen_ref', requestId).maybeSingle()
+  // Una tarea RECHAZADA por Mercadeo no cuenta: si el solicitante la corrige y la reenvía, llega como tarea nueva.
+  const previa = await admin.from('mercadeo_tareas').select('id, estado').eq('origen_ref', requestId).neq('estado', 'rechazada').maybeSingle()
   if (previa.error) throw previa.error
   if (previa.data) return respuesta(200, { ok: true, id: previa.data.id, estado: previa.data.estado, duplicada: true })
 
@@ -298,7 +299,7 @@ async function crear(admin: any, body: any) {
   if (ins.error) {
     // Carrera: otro envío con el mismo request_id ganó. Es el mismo envío: devolver esa tarea.
     if ((ins.error as any).code === '23505') {
-      const otra = await admin.from('mercadeo_tareas').select('id, estado').eq('origen_ref', requestId).maybeSingle()
+      const otra = await admin.from('mercadeo_tareas').select('id, estado').eq('origen_ref', requestId).neq('estado', 'rechazada').maybeSingle()
       if (otra.data) return respuesta(200, { ok: true, id: otra.data.id, estado: otra.data.estado, duplicada: true })
     }
     throw ins.error
