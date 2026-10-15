@@ -323,6 +323,9 @@
         (t.asunto_otro ? ' — <strong>' + esc(t.asunto_otro) + '</strong>' : '') + '</div>' +
       '<div><span class="ef-label">Fecha tentativa (no es compromiso)</span>' + esc(t.fecha_tentativa ? fmtDateOnly(t.fecha_tentativa) : '—') +
       (puedeUsarFecha ? ' <button type="button" class="btn-secondary" data-act="usar-fecha">Usar como fecha límite</button>' : '') + '</div>' +
+      '<div><span class="ef-label">N° en Pedidos</span>' + esc(t.origen_numero ? 'SM-' + t.origen_numero : '—') + '</div>' +
+      '<div><span class="ef-label">Aprobada en Pedidos por</span>' + esc(t.aprobada_por_nombre || '—') +
+        (t.aprobada_en ? ' · ' + esc(fmtDateTime(t.aprobada_en)) : '') + '</div>' +
       '</div>';
   }
 

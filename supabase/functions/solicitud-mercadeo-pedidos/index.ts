@@ -12,7 +12,12 @@
 //               por una función: evita el límite de tamaño del cuerpo).
 //   crear    -> inserta la tarea en `mercadeo_tareas` (origen 'panel_pedidos',
 //               estado 'solicitada' = "Recibido") + sus adjuntos. Idempotente
-//               por `request_id` (== origen_ref).
+//               por `request_id` (== origen_ref). Se llama cuando la solicitud
+//               YA fue aprobada en Pedidos (`aprobacion: true`, con quién la
+//               aprobó y su N° en Pedidos): ahí no se vuelve a exigir que la
+//               fecha tentativa sea futura (la aprobación puede tardar).
+//   firmar   -> URLs firmadas de lectura (1 h) de archivos ya subidos de una
+//               solicitud, para que el aprobador los revise antes de aprobar.
 //   listar   -> "Mis solicitudes": solo las del solicitante o hechas a su nombre,
 //               con una lista blanca de campos (nunca comentarios internos,
 //               avales ni la bitácora completa).
@@ -145,6 +150,7 @@ serve(async (req) => {
     switch (body?.action) {
       case 'preparar': return await preparar(admin, body)
       case 'crear': return await crear(admin, body)
+      case 'firmar': return await firmar(admin, body)
       case 'listar': return await listar(admin, body)
       default: throw new Rechazo(`action inválida: ${body?.action}`)
     }
@@ -206,7 +212,17 @@ async function crear(admin: any, body: any) {
   if (typeof fecha !== 'string' || !FECHA_RE.test(fecha) || Number.isNaN(Date.parse(fecha + 'T00:00:00Z'))) {
     throw new Rechazo('fecha_tentativa inválida (use AAAA-MM-DD)')
   }
-  if (fecha < hoyBogota()) throw new Rechazo('La fecha tentativa no puede ser anterior a hoy')
+  // Ya aprobada en Pedidos: la fecha tentativa es informativa y puede haber quedado atrás.
+  const yaAprobada = body.aprobacion === true
+  if (!yaAprobada && fecha < hoyBogota()) throw new Rechazo('La fecha tentativa no puede ser anterior a hoy')
+
+  let numeroOrigen: number | null = null
+  let aprobadaPor: string | null = null
+  if (yaAprobada) {
+    numeroOrigen = Number(body.numero_origen)
+    if (!Number.isInteger(numeroOrigen) || numeroOrigen < 1) throw new Rechazo('numero_origen inválido')
+    aprobadaPor = texto(body.aprobada_por, 'aprobada_por', 1, 120)
+  }
 
   const descripcion = texto(body.descripcion, 'La descripción', 10, 2000)
 
@@ -274,6 +290,9 @@ async function crear(admin: any, body: any) {
     asunto: body.asunto,
     asunto_otro: asuntoOtro,
     fecha_tentativa: fecha,
+    origen_numero: numeroOrigen,
+    aprobada_por_nombre: aprobadaPor,
+    aprobada_en: yaAprobada ? new Date().toISOString() : null,
   }).select('id, estado').single()
 
   if (ins.error) {
@@ -304,6 +323,28 @@ async function crear(admin: any, body: any) {
   }
 
   return respuesta(200, { ok: true, id: ins.data.id, estado: ins.data.estado })
+}
+
+// ── firmar ───────────────────────────────────────────────────
+// Solo archivos bajo solicitudes/<request_id>/ ; devuelve, por cada ruta, si existe y su URL de lectura.
+async function firmar(admin: any, body: any) {
+  const requestId = uuid(body.request_id, 'request_id')
+  const paths = Array.isArray(body.paths) ? body.paths : []
+  if (paths.length < 1 || paths.length > MAX_ARCHIVOS * 2) throw new Rechazo('Cantidad de rutas inválida')
+  const carpeta = `solicitudes/${requestId}/`
+  for (const p of paths) {
+    if (typeof p !== 'string' || !p.startsWith(carpeta) || p.includes('..')) throw new Rechazo('Ruta de archivo inválida')
+  }
+  const { data, error } = await admin.storage.from(BUCKET).createSignedUrls(paths, 3600)
+  if (error) throw error
+  const porRuta = new Map<string, any>()
+  for (const d of data || []) porRuta.set(d.path, d)
+  const archivos = paths.map((p: string) => {
+    const d = porRuta.get(p)
+    const url = d && !d.error ? d.signedUrl : null
+    return { path: p, existe: !!url, url }
+  })
+  return respuesta(200, { ok: true, archivos })
 }
 
 // ── listar ───────────────────────────────────────────────────

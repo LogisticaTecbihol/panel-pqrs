@@ -112,6 +112,11 @@ SOLO por la función `solicitud-mercadeo` de panel-pedidos (server→server, sin
 - Bitácora: `respuesta_solicitante` es lo único (más los cambios de estado) que se le muestra al
   solicitante; los comentarios internos NUNCA salen.
 - Adjuntos subidos desde Pedidos: `subido_por` NULL + `subido_por_nombre`.
+- Aprobación previa (migración 0021): la solicitud se aprueba en panel-pedidos ANTES de existir aquí;
+  la función `crear` se llama ya con `aprobacion: true`, `numero_origen` (SM-<n>) y `aprobada_por`
+  (columnas `origen_numero`, `aprobada_por_nombre`, `aprobada_en`, inmutables). Por eso el trigger de
+  origen ya no valida "fecha tentativa >= hoy" (la aprobación puede tardar; se valida al ENVIAR).
+  Acción `firmar`: URLs de lectura para que el aprobador revise adjuntos antes de aprobar.
 - Asunto "Otros" (migración 0020): el solicitante escribe el asunto → `asunto_otro` (3-100 car.,
   solo con `asunto = 'otros'`, inmutable); lo exigen las dos Edge Functions y el título de la tarea
   pasa a `Otros: <asunto escrito> · <empresa> · <solicitante>`.
