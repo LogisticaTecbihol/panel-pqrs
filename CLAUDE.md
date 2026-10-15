@@ -140,6 +140,14 @@ SOLO por la función `solicitud-mercadeo` de panel-pedidos (server→server, sin
     `PEDIDOS_BRIDGE_SECRET` a la función `solicitud-mercadeo-aviso` de pedidos (`PEDIDOS_AVISO_URL`
     opcional). Si falla, el cambio ya quedó guardado y el Tablero solo avisa. No hay `pg_net`: el
     envío lo dispara la interfaz, no un trigger.
+  - El solicitante EDITA su solicitud (migración 0023) hasta que se entregue o cancele. Los datos de
+    origen de una tarea son inmutables (`trg_origen`), así que si ya estaba en el Tablero la tarjeta se
+    RETIRA (acción `retirar` de `solicitud-mercadeo-pedidos`, solo con el secreto del puente): pasa a
+    `rechazada` con motivo "Retirada por el solicitante…" y el nombre del solicitante
+    (`trg_rechazo` respeta el nombre solo si no hay `auth.uid()`; con sesión sale del perfil). Al
+    aprobarse de nuevo llega como tarea NUEVA. `trg_notificar_retiro` avisa a la campanita
+    (`solicitud_modificada`, "↩ Solicitud retirada del Tablero…") solo cuando lo hace el puente.
+    `retirar` es idempotente y se niega (409) si la tarea ya está entregada o cancelada.
 
 Reglas de priorización (MKT-DOC-00 §B.5, MKT-P-04), aplicadas en el trigger `mercadeo_tareas_reglas`:
 clase 1 calendario > 2 soporte a ventas > 3 mejora > 4 exploratorio; una tarea vinculada a una

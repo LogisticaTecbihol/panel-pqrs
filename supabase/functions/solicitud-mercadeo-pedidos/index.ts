@@ -21,6 +21,12 @@
 //   listar   -> "Mis solicitudes": solo las del solicitante o hechas a su nombre,
 //               con una lista blanca de campos (nunca comentarios internos,
 //               avales ni la bitácora completa).
+//   retirar  -> el solicitante MODIFICÓ una solicitud ya aprobada: la tarjeta
+//               vigente sale del Tablero (estado 'rechazada' con el motivo) y la
+//               solicitud vuelve a aprobación en Pedidos; al aprobarse llega como
+//               tarea nueva. Idempotente (sin tarea vigente no hace nada) y se
+//               niega si Mercadeo ya la entregó o canceló. El trigger de la
+//               migración 0023 avisa al equipo (campanita).
 //
 // Autenticación: header x-bridge-secret contra el secreto PEDIDOS_BRIDGE_SECRET
 // (distinto de INGEST_SHARED_SECRET, que usa el script de Google Apps Script).
@@ -152,6 +158,7 @@ serve(async (req) => {
       case 'crear': return await crear(admin, body)
       case 'firmar': return await firmar(admin, body)
       case 'listar': return await listar(admin, body)
+      case 'retirar': return await retirar(admin, body)
       default: throw new Rechazo(`action inválida: ${body?.action}`)
     }
   } catch (e) {
@@ -324,6 +331,44 @@ async function crear(admin: any, body: any) {
   }
 
   return respuesta(200, { ok: true, id: ins.data.id, estado: ins.data.estado })
+}
+
+// ── retirar ──────────────────────────────────────────────────
+// La tarjeta vigente de una solicitud (origen_ref = request_id) sale del Tablero porque el
+// solicitante la modificó. Reutiliza el estado final 'rechazada': el trigger de la migración
+// 0023 respeta el nombre que manda el puente y avisa al equipo.
+async function retirar(admin: any, body: any) {
+  const requestId = uuid(body.request_id, 'request_id')
+  const por = texto(body.por?.nombre, 'por.nombre', 1, 120)
+  const motivo = texto(body.motivo, 'El motivo', 3, 500)
+
+  // A lo sumo una tarea no rechazada por origen_ref (índice único parcial).
+  const t = await admin.from('mercadeo_tareas').select('id, estado')
+    .eq('origen', 'panel_pedidos').eq('origen_ref', requestId).neq('estado', 'rechazada').maybeSingle()
+  if (t.error) throw t.error
+  // Ya no hay tarjeta vigente (p. ej. Mercadeo la rechazó antes o este mismo retiro ya corrió).
+  if (!t.data) return respuesta(200, { ok: true, retirada: false })
+
+  if (!ESTADOS_ABIERTOS.includes(t.data.estado)) {
+    throw new Rechazo(
+      `Mercadeo ya la marcó como ${t.data.estado === 'entregada' ? 'entregada' : 'cancelada'}; ya no se puede modificar`,
+      409,
+    )
+  }
+
+  const u = await admin.from('mercadeo_tareas')
+    .update({ estado: 'rechazada', motivo_rechazo: motivo, rechazada_por_nombre: por })
+    .eq('id', t.data.id).in('estado', ESTADOS_ABIERTOS).select('id').maybeSingle()
+  if (u.error) throw u.error
+  // Otro cambio la movió entre la lectura y la escritura: se vuelve a mirar.
+  if (!u.data) {
+    const otra = await admin.from('mercadeo_tareas').select('id, estado').eq('id', t.data.id).maybeSingle()
+    if (otra.error) throw otra.error
+    if (otra.data && otra.data.estado !== 'rechazada') {
+      throw new Rechazo('La solicitud cambió de estado en Mercadeo; intenta de nuevo', 409)
+    }
+  }
+  return respuesta(200, { ok: true, retirada: true, id: t.data.id })
 }
 
 // ── firmar ───────────────────────────────────────────────────
