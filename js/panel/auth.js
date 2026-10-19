@@ -1,12 +1,12 @@
 // Módulo de autenticación del panel (PQRS + Mercadeo + SST).
 // Mismo patrón que js/auth.js del panel de pedidos, simplificado: roles
-// admin/gestor/lector (PQRS y Encuestas), 'mercadeo' (solo Tablero y CRM de
-// Mercadeo) y 'sst' (solo el módulo SST), más usuarios_pqrs.modulos para habilitar
-// un módulo extra sin cambiar de rol. El equipo interno ve todas las empresas
-// (sin empresas por usuario).
+// admin/gestor/lector (PQRS), 'mercadeo' (solo Tablero y CRM de Mercadeo) y 'sst'
+// (solo el módulo SST), más usuarios_pqrs.modulos para habilitar un módulo extra sin
+// cambiar de rol. El equipo interno ve todas las empresas (sin empresas por usuario).
 //
-// Módulos: 'pqrs', 'encuestas' (por rol admin/gestor/lector), 'mercadeo' y 'sst'
-// (admin o la clave en modulos). Cada página declara su módulo con
+// Módulos: 'pqrs' (por rol admin/gestor/lector); 'mercadeo', 'sst' y 'encuestas'
+// (admin o la clave en modulos; Encuestas es de solo lectura y no tiene rol propio,
+// migración 0028). Cada página declara su módulo con
 // <body data-modulo="..."> y los enlaces/tarjetas con data-modulo se ocultan
 // si el usuario no lo tiene. La seguridad real es la RLS; esto es solo UX.
 var AUTH = (function () {
@@ -329,7 +329,7 @@ var AUTH = (function () {
   function hasModule(key) {
     if (!_profile) return false;
     if (_profile.rol === 'admin') return true;
-    if (key === 'pqrs' || key === 'encuestas') return ROLES_PQRS.indexOf(_profile.rol) >= 0;
+    if (key === 'pqrs') return ROLES_PQRS.indexOf(_profile.rol) >= 0;
     return (_profile.modulos || []).indexOf(key) >= 0;
   }
 

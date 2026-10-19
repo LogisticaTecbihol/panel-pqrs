@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════════
 // Encuesta de Satisfacción — pestañas Respuestas e Indicadores (solo lectura)
 // ══════════════════════════════════════════════════════════════
-// Los indicadores se calculan en el cliente con encuestas_satisfaccion (misma RLS: admin, gestor, lector).
+// Los indicadores se calculan en el cliente con encuestas_satisfaccion (misma RLS: admin o módulo 'encuestas').
 // Los filtros de empresa y fechas son compartidos por las dos pestañas. Definiciones en el <details> de la página.
 (async function () {
   await AUTH.authReady;

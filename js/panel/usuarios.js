@@ -7,18 +7,19 @@
   }
   document.getElementById('content').style.display = '';
 
-  // 'acceso' = lo que da el rol por sí solo (PQRS y Encuestas salen del rol, no de `modulos`).
+  // 'acceso' = lo que da el rol por sí solo (PQRS sale del rol, no de `modulos`; Encuestas es un módulo aparte).
   var ROLES = [
-    { v: 'lector', t: 'Lector', acceso: 'PQRS y Encuestas (solo lectura)' },
-    { v: 'gestor', t: 'Gestor', acceso: 'PQRS (gestionar) y Encuestas' },
+    { v: 'lector', t: 'Lector', acceso: 'PQRS (solo lectura)' },
+    { v: 'gestor', t: 'Gestor', acceso: 'PQRS (gestionar)' },
     { v: 'mercadeo', t: 'Mercadeo', acceso: null },
     { v: 'sst', t: 'SST', acceso: null },
     { v: 'admin', t: 'Admin', acceso: 'Todo: PQRS, Encuestas, Mercadeo, SST y gestión de usuarios' },
   ];
-  // Módulos extra. 'rol' = el rol que siempre lleva ese módulo (el admin tiene todos).
+  // Módulos extra. 'rol' = el rol que siempre lleva ese módulo (null: ninguno; el admin tiene todos).
   var MODULOS = [
     { key: 'mercadeo', rol: 'mercadeo', label: 'Mercadeo', acceso: 'Tablero, CRM e Indicadores de Mercadeo' },
     { key: 'sst', rol: 'sst', label: 'SST', acceso: 'SST (Seguridad y Salud en el Trabajo)' },
+    { key: 'encuestas', rol: null, label: 'Encuestas', acceso: 'Encuestas de satisfacción (solo lectura)' },
   ];
   var miId = AUTH.getUser().id;
   var usuarios = [];
@@ -26,9 +27,6 @@
   function rolTexto(v) {
     var r = ROLES.filter(function (x) { return x.v === v; })[0];
     return r ? r.t : v;
-  }
-  function moduloPropio(rol) {
-    return MODULOS.filter(function (m) { return m.rol === rol; })[0] || null;
   }
   function tieneModulo(rol, mods, key) {
     return rol === 'admin' || (mods || []).indexOf(key) >= 0;
@@ -57,7 +55,7 @@
   function pintar() {
     var cuerpo = document.getElementById('tbody');
     if (!usuarios.length) {
-      cuerpo.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#718096;padding:18px">Sin usuarios.</td></tr>';
+      cuerpo.innerHTML = '<tr><td colspan="8"style="text-align:center;color:#718096;padding:18px">Sin usuarios.</td></tr>';
       return;
     }
     cuerpo.innerHTML = usuarios.map(function (u) {

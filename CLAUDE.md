@@ -52,13 +52,18 @@ Panel interno del holding con dos áreas:
 - Roles del equipo interno: `admin` (todo, incluida gestión de usuarios),
   `gestor` (gestiona PQRS: estado, asignación, notas, adjuntos), `lector`
   (solo lectura), `mercadeo` (equipo de Mercadeo: SOLO Tablero y CRM, sin acceso a
-  PQRS/Encuestas; las policies de PQRS enumeran roles, por eso queda excluido).
-- Permisos por módulo: `usuarios_pqrs.modulos` (hoy solo `'mercadeo'`); el rol
-  `mercadeo` siempre lo lleva (CHECK). Un gestor/lector puede recibir el módulo sin
+  PQRS; las policies de PQRS enumeran roles, por eso queda excluido).
+- Permisos por módulo: `usuarios_pqrs.modulos` (`'mercadeo'`, `'sst'`, `'encuestas'`); el rol
+  `mercadeo` siempre lleva el suyo (CHECK), igual que `sst`. Un gestor/lector puede recibir un módulo sin
   cambiar de rol. `AUTH.hasModule(key)`; cada página declara su módulo con
   `<body data-modulo="...">` y los enlaces/tarjetas con `data-modulo` se ocultan
   si no lo tiene. En BD: `user_has_module_pqrs('mercadeo')` (admin siempre pasa).
-  La seguridad real es la RLS; el guard de página es solo UX.
+  La seguridad real es la RLS; el guard de página es solo UX. Única excepción: `pqrs`
+  no es módulo guardado, sale del rol (`admin`/`gestor`/`lector`).
+- **Encuestas es un módulo aparte** (migración 0028), de SOLO LECTURA y sin rol propio: el admin lo ve
+  siempre; lector, gestor, mercadeo y sst lo ven solo si tienen `'encuestas'` en `modulos` (ya NO por
+  su rol). La policy `encuestas_satisfaccion_select` usa `user_has_module_pqrs('encuestas')`; editar,
+  borrar y el historial de ediciones siguen siendo solo de admin. Al aplicarla no había gestores ni lectores.
 - Valores almacenados en códigos ASCII (`en_produccion`, `diseno`...) con mapa de
   etiquetas en el JS: una tilde en un CHECK ya causó un bug (migración 0008).
 - Empresas válidas (fijas, hardcodeadas en CHECK constraints y en el JS del
@@ -67,12 +72,13 @@ Panel interno del holding con dos áreas:
 ## Usuarios: editar rol y módulos (migración 0026)
 
 `panel/usuarios.html` + `js/panel/usuarios.js` (solo admin). El botón **Editar** de cada fila abre un modal con
-rol y módulos (`mercadeo`, `sst`), un resumen de «Cambios / Tendrá acceso a» y **Guardar cambios** (ya no hay
+rol y módulos (`mercadeo`, `sst`, `encuestas`), un resumen de «Cambios / Tendrá acceso a» y **Guardar cambios** (ya no hay
 autoguardado por clic). Activar/Desactivar sigue en la fila, con `confirm()`. El modal relee la fila antes de abrir.
 Reglas de la interfaz: el rol que lleva su módulo (`mercadeo`, `sst`) lo fija; el admin ve todos marcados y se
 guarda con `modulos = []`; al salir de un rol con módulo propio (o de admin) ese módulo se desmarca por defecto
-(el admin puede volver a marcarlo); volver al rol original restaura lo guardado. PQRS y Encuestas NO son módulos
-guardados: salen del rol (`AUTH.hasModule('pqrs'|'encuestas')`). El cambio se ve al recargar (el perfil se lee en
+(el admin puede volver a marcarlo); volver al rol original restaura lo guardado. `encuestas` no tiene rol propio
+(se marca aparte, para cualquier rol); PQRS no es módulo guardado, sale del rol. `create-user-pqrs` v7 acepta los
+tres módulos. El cambio se ve al recargar (el perfil se lee en
 cada carga de página, no hace falta volver a iniciar sesión).
 
 La seguridad está en la BD (la policy `usuarios_pqrs_update` sigue siendo «solo admin»); 0026 agrega:
