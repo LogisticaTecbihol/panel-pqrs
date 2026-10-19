@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gestión PQRS — Encuesta de Satisfacción</title>
-<link rel="stylesheet" href="../css/panel.css?v=20261019c">
+<link rel="stylesheet" href="../css/panel.css?v=20261019d">
 </head>
 <body data-modulo="encuestas">
   <div class="header">
@@ -58,7 +58,7 @@
               <tr>
                 <th>Fecha</th><th>Empresa</th><th>Municipio</th><th>Asesor</th><th>Canal</th>
                 <th>Producto</th><th>Asesor téc.</th><th>Logística</th><th>Tiempos</th><th>Precio</th><th>General</th>
-                <th>Comentarios</th>
+                <th>Comentarios</th><th id="th-acc" style="display:none">Editar</th>
               </tr>
             </thead>
             <tbody id="tbody"></tbody>
@@ -104,9 +104,46 @@
     </div>
   </div>
 
+  <!-- ══ Modal: editar una respuesta (solo administrador) ══ -->
+  <div class="overlay" id="editar-overlay" role="dialog" aria-modal="true" aria-labelledby="editar-titulo">
+    <div class="modal-box" style="max-width:640px">
+      <div class="mhdr"><div><h2 id="editar-titulo">Editar respuesta</h2><div class="meta"><span id="ee-meta"></span></div></div>
+        <button class="btn-close" data-act="editar-cerrar" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div class="enc-form">
+          <div><label class="ef-label" for="ee-empresa">Empresa</label><select class="ef" id="ee-empresa"></select></div>
+          <div><label class="ef-label" for="ee-municipio">Municipio</label><input class="ef" id="ee-municipio" maxlength="100" autocomplete="off"></div>
+          <div><label class="ef-label" for="ee-asesor">Asesor</label><input class="ef" id="ee-asesor" maxlength="100" autocomplete="off"></div>
+          <div><label class="ef-label" for="ee-canal">Canal de adquisición</label>
+            <select class="ef" id="ee-canal">
+              <option value="Directo">Directo</option><option value="Distribuidor autorizado">Distribuidor autorizado</option>
+              <option value="Tienda agropecuaria local">Tienda agropecuaria local</option><option value="Otro">Otro</option>
+            </select></div>
+          <div class="full" id="ee-otro-wrap" style="display:none"><label class="ef-label" for="ee-otro">Canal: texto de “Otro”</label><input class="ef" id="ee-otro" maxlength="100" autocomplete="off"></div>
+          <div class="full"><label class="ef-label" for="ee-coment">Comentarios</label><textarea class="ef" id="ee-coment" maxlength="2000" rows="4"></textarea></div>
+        </div>
+
+        <div class="ef-label" style="margin-top:16px">Calificaciones del cliente</div>
+        <div class="enc-cal" id="ee-cal"></div>
+        <div class="ind-note">Las calificaciones y la fecha de recepción no se pueden modificar.</div>
+        <div class="mk-aud" id="ee-aud"></div>
+
+        <details class="enc-hist" id="ee-hist"><summary>Historial de cambios</summary><div id="ee-hist-body"></div></details>
+      </div>
+      <div class="mftr">
+        <span class="mk-sub"></span>
+        <div class="mftr-btns">
+          <button class="btn-cancel" data-act="editar-cerrar">Cancelar</button>
+          <button class="btn-primary" id="ee-guardar">Guardar cambios</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="../js/shared/supabase-client.js?v=20261006"></script>
+  <script src="../js/shared/modal.js?v=20261006"></script>
   <script src="../js/panel/auth.js?v=20261018"></script>
-  <script src="../js/panel/encuestas.js?v=20261019c"></script>
+  <script src="../js/panel/encuestas.js?v=20261019d"></script>
 </body>
 </html>

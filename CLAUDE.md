@@ -213,6 +213,19 @@ Empresa), distribución, calificación por pregunta, segmentos (empresa, canal, 
 gris) y alertas (respuestas con algún 1 o 2). Asesor y municipio se agrupan sin mayúsculas ni tildes. Reutiliza las clases `.ind-*`
 de los Indicadores de Mercadeo (más `.enc-*`) y el CSS de `.mk-tabs`.
 
+### Edición de respuestas (solo admin, migración 0027)
+
+Antes la tabla era inmutable. Ahora un ADMIN puede corregir desde la pestaña Respuestas (botón "✏️ Editar" + modal) empresa, municipio,
+asesor, canal (y su texto "Otro") y comentarios. Las 6 calificaciones y `creado_en` NO se editan: lo impide el trigger
+`trg_encuestas_satisfaccion_edicion` con un RAISE, aunque la policy lo dejara pasar. La policy `encuestas_satisfaccion_update` es solo
+`get_user_role_pqrs() = 'admin'`; el botón solo se dibuja con `AUTH.isAdmin()` (UX), la seguridad es la BD. El trigger sella
+`modificado_por` / `modificado_por_nombre` / `modificado_en` (el navegador no los puede falsificar), normaliza espacios solo en lo que
+cambió (el histórico trae espacios sobrantes y no deben contarse como cambios) y guarda el antes/después en
+`encuestas_satisfaccion_historial` (SELECT solo admin; nadie escribe ahí salvo el trigger). Sin sesión (service_role: `ingest-formulario`,
+importación, SQL de mantenimiento) el trigger no interviene. Si nada cambió no se sella ni se registra. El cliente solo envía los campos
+modificados. Las respuestas editadas llevan el chip "✏️ Editada" (tooltip con quién y cuándo) en Respuestas y en las alertas de Indicadores;
+los indicadores usan los valores corregidos. Dos admins editando a la vez: gana el último guardado (el historial conserva ambos cambios).
+
 Pruebas: no hay suite en el repo. Para verificar la UI se usó jsdom con un cliente Supabase
 simulado en memoria; la RLS y los triggers se probaron en SQL dentro de transacciones que se revierten
 (`DO` + `SET LOCAL ROLE authenticated` + `RAISE EXCEPTION` final).

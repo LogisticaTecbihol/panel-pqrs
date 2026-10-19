@@ -6,6 +6,7 @@
 (async function () {
   await AUTH.authReady;
 
+  var esAdmin = AUTH.isAdmin();            // solo el admin ve "Editar"; la protección real es la RLS + trigger de la BD (migración 0027)
   var _all = [];
   var tab = location.hash === '#indicadores' ? 'indicadores' : 'respuestas';
   var hayPrev = false;                     // true cuando hay "Desde" y "Hasta" y por tanto periodo anterior comparable
@@ -137,8 +138,15 @@
 
   function canalDe(r) { return r.canal_adquisicion === 'Otro' ? (r.canal_adquisicion_otro || 'Otro') : r.canal_adquisicion; }
 
+  // Chip para las respuestas que un admin corrigió (quién y cuándo, en el tooltip).
+  function chipEditada(r) {
+    if (!r.modificado_en) return '';
+    return '<span class="enc-editada" title="' + esc('Modificada por ' + (r.modificado_por_nombre || '—') + ' el ' + fmtDateTime(r.modificado_en)) + '">✏️ Editada</span>';
+  }
+
   function renderRespuestas() {
     var rows = filtrar();
+    $('th-acc').style.display = esAdmin ? '' : 'none';
 
     var kpiHtml = CAMPOS.map(function (campo) {
       var vals = rows.map(function (r) { return r[campo]; }).filter(function (v) { return v != null; });
@@ -153,7 +161,7 @@
 
     $('tbody').innerHTML = rows.map(function (r) {
       return '<tr>' +
-        '<td>' + fmtDate(r.creado_en) + '</td>' +
+        '<td>' + fmtDate(r.creado_en) + chipEditada(r) + '</td>' +
         '<td><span class="sigla-badge sigla-' + r.empresa_sigla + '">' + r.empresa_sigla + '</span></td>' +
         '<td>' + escHtml(r.municipio) + '</td>' +
         '<td>' + escHtml(r.asesor_nombre || '') + '</td>' +
@@ -165,8 +173,101 @@
         '<td>' + r.calificacion_relacion_calidad_precio + '</td>' +
         '<td>' + r.calificacion_satisfaccion_general + '</td>' +
         '<td>' + escHtml(r.comentarios_adicionales || '') + '</td>' +
+        (esAdmin ? '<td><button class="btn-edit" data-act="editar" data-id="' + esc(r.id) + '" aria-label="' +
+          esc('Editar la respuesta del ' + fmtDate(r.creado_en) + ' de ' + r.municipio) + '">✏️ Editar</button></td>' : '') +
         '</tr>';
     }).join('');
+  }
+
+  // ══════════════ Edición de una respuesta (solo admin) ══════════════
+  // Editable: empresa, municipio, asesor, canal (y su texto "Otro") y comentarios. Las calificaciones y la fecha no: lo impide el
+  // trigger de la BD, que además sella quién/cuándo y guarda el antes/después en encuestas_satisfaccion_historial.
+  var CAMPO_EDIT = {
+    empresa_sigla: 'Empresa', municipio: 'Municipio', asesor_nombre: 'Asesor', canal_adquisicion: 'Canal',
+    canal_adquisicion_otro: 'Canal: texto de “Otro”', comentarios_adicionales: 'Comentarios',
+  };
+  var editando = null, guardando = false;
+
+  function textoONull(v) { v = (v || '').trim(); return v === '' ? null : v; }
+  function valHist(v) { return v === null || v === undefined || v === '' ? '<em>(vacío)</em>' : esc(v); }
+
+  function alternarOtro() { $('ee-otro-wrap').style.display = $('ee-canal').value === 'Otro' ? '' : 'none'; }
+
+  function abrirEdicion(id) {
+    var r = _all.filter(function (x) { return String(x.id) === String(id); })[0];
+    if (!r || !esAdmin) return;
+    editando = r;
+    $('ee-meta').textContent = 'Respuesta del ' + fmtDate(r.creado_en) + ' · n.º ' + r.id;
+    $('ee-empresa').innerHTML = EMPRESAS.map(function (e) {
+      return '<option value="' + esc(e.sigla) + '"' + (e.sigla === r.empresa_sigla ? ' selected' : '') + '>' + esc(e.sigla) + '</option>';
+    }).join('');
+    $('ee-municipio').value = r.municipio || '';
+    $('ee-asesor').value = r.asesor_nombre || '';
+    $('ee-canal').value = r.canal_adquisicion;
+    $('ee-otro').value = r.canal_adquisicion_otro || '';
+    $('ee-coment').value = r.comentarios_adicionales || '';
+    alternarOtro();
+    $('ee-cal').innerHTML = CAMPOS.map(function (c) { return '<span>' + esc(CAMPO_CORTO[c]) + ' <b>' + esc(r[c]) + '</b></span>'; }).join('');
+    $('ee-aud').textContent = r.modificado_en ? 'Última modificación por ' + (r.modificado_por_nombre || '—') + ' el ' + fmtDateTime(r.modificado_en) : 'Esta respuesta no se ha modificado.';
+    $('ee-guardar').disabled = false;
+    MODAL.open('editar-overlay', 'ee-municipio');
+    cargarHistorial(r.id);
+  }
+
+  async function cargarHistorial(id) {
+    var cont = $('ee-hist-body'), tit = $('ee-hist').querySelector('summary');
+    $('ee-hist').open = false;
+    tit.textContent = 'Historial de cambios';
+    cont.textContent = 'Cargando…';
+    var res = await _sb.from('encuestas_satisfaccion_historial').select('*').eq('encuesta_id', id).order('modificado_en', { ascending: false });
+    if (!editando || editando.id !== id) return;   // el modal se cerró o cambió de respuesta mientras cargaba
+    if (res.error) { cont.textContent = 'No se pudo cargar el historial: ' + errMsg(res.error); return; }
+    var h = res.data || [];
+    tit.textContent = 'Historial de cambios (' + h.length + ')';
+    cont.innerHTML = h.length ? h.map(function (it) {
+      var cambios = it.cambios || {};
+      return '<div class="bitacora-item"><strong>' + esc(it.modificado_por_nombre) + '</strong><div class="meta">' + esc(fmtDateTime(it.modificado_en)) + '</div>' +
+        Object.keys(cambios).map(function (k) {
+          return '<div>' + esc(CAMPO_EDIT[k] || k) + ': ' + valHist(cambios[k].antes) + ' → ' + valHist(cambios[k].despues) + '</div>';
+        }).join('') + '</div>';
+    }).join('') : '<div class="mk-sin">Esta respuesta no se ha modificado.</div>';
+  }
+
+  async function guardarEdicion() {
+    if (!editando || guardando) return;
+    var r = editando, canal = $('ee-canal').value;
+    var nuevo = {
+      empresa_sigla: $('ee-empresa').value,
+      municipio: $('ee-municipio').value.trim(),
+      asesor_nombre: textoONull($('ee-asesor').value),
+      canal_adquisicion: canal,
+      canal_adquisicion_otro: canal === 'Otro' ? textoONull($('ee-otro').value) : null,
+      comentarios_adicionales: textoONull($('ee-coment').value),
+    };
+    if (!nuevo.municipio) { showToast('El municipio es obligatorio.', '#e74c3c'); $('ee-municipio').focus(); return; }
+
+    // Solo viaja lo que cambió. Se compara contra el valor guardado sin espacios sobrantes (el histórico trae espacios al final
+    // y no deben contarse como cambios que el admin no hizo).
+    var cambios = {};
+    Object.keys(nuevo).forEach(function (k) {
+      var orig = typeof r[k] === 'string' ? textoONull(r[k]) : (r[k] === undefined ? null : r[k]);
+      if (nuevo[k] !== orig) cambios[k] = nuevo[k];
+    });
+    if (!Object.keys(cambios).length) { MODAL.close('editar-overlay'); showToast('No hay cambios que guardar.'); return; }
+
+    guardando = true; $('ee-guardar').disabled = true;
+    var res = await _sb.from('encuestas_satisfaccion').update(cambios).eq('id', r.id).select().single();
+    guardando = false; $('ee-guardar').disabled = false;
+    if (res.error) {
+      showToast(res.error.code === 'PGRST116'
+        ? 'No se pudo guardar: tu usuario no tiene permiso para editar o la respuesta ya no existe.'
+        : 'Error al guardar: ' + errMsg(res.error), '#e74c3c');
+      return;
+    }
+    Object.assign(r, res.data);   // conserva _f (la fecha no cambia)
+    MODAL.close('editar-overlay');
+    render();
+    showToast('✅ Respuesta actualizada');
   }
 
   // ══════════════ Pestaña Indicadores: cálculo ══════════════
@@ -346,7 +447,7 @@
       var chips = CAMPOS.filter(function (c) { return r[c] != null && r[c] <= 2; }).map(function (c) {
         return '<span class="enc-chip">' + esc(CAMPO_CORTO[c]) + ' ' + esc(r[c]) + '</span>';
       }).join('');
-      return '<tr><td>' + esc(fmtDate(r.creado_en)) + '</td>' +
+      return '<tr><td>' + esc(fmtDate(r.creado_en)) + chipEditada(r) + '</td>' +
         '<td><span class="sigla-badge sigla-' + esc(r.empresa_sigla) + '">' + esc(r.empresa_sigla) + '</span></td>' +
         '<td>' + esc(r.municipio) + '</td><td>' + esc(r.asesor_nombre || '') + '</td><td>' + esc(canalDe(r)) + '</td>' +
         '<td>' + chips + '</td><td class="ind-num">' + esc(r[GENERAL]) + '</td>' +
@@ -404,7 +505,12 @@
   var ACCIONES = {
     'tab': function (id, el) { cambiarTab(el.getAttribute('data-tab')); },
     'preset': function (id) { aplicarPreset(id); },
+    'editar': function (id) { abrirEdicion(id); },
+    'editar-cerrar': function () { MODAL.close('editar-overlay'); },
   };
+  MODAL.onClose = function (id) { if (id === 'editar-overlay') editando = null; };
+  $('ee-guardar').addEventListener('click', guardarEdicion);
+  $('ee-canal').addEventListener('change', alternarOtro);
 
   document.addEventListener('click', function (e) {
     var el = e.target.closest ? e.target.closest('[data-act]') : null;
