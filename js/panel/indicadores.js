@@ -34,6 +34,7 @@
   var visitas = [], cierres = [];          // derivados de la bitácora (ver derivarBitacora)
   var baseEmp = [], base = [], baseIds = {};   // base = tareas que pasan empresa + responsable; baseEmp solo empresa
   var fDesde = '', fHasta = '', fEmp = '', fResp = '', hoy = '';
+  var excluidas = 0;                       // tareas marcadas "no contar en indicadores" (pruebas); no entran en ningún cálculo
 
   function $(id) { return document.getElementById(id); }
   function esc(v) { return escHtml(v === null || v === undefined ? '' : String(v)); }
@@ -93,12 +94,14 @@
   async function cargar(primera) {
     try {
       var rs = await Promise.all([
-        fetchAll('mercadeo_tareas', 'id,titulo,estado,tipo,prioridad,urgente,fuera_calendario,empresas,responsables,fecha_limite,creado_en,confirmada_en,entregada_en,origen,asunto', 'id'),
+        fetchAll('mercadeo_tareas', 'id,titulo,estado,tipo,prioridad,urgente,fuera_calendario,empresas,responsables,fecha_limite,creado_en,confirmada_en,entregada_en,origen,asunto,excluir_indicadores', 'id'),
         fetchAll('mercadeo_tarea_bitacora', 'tarea_id,detalle,creado_en', 'id', function (q) { return q.eq('tipo_evento', 'cambio_estado'); }),
         _sb.rpc('list_equipo_mercadeo'),
       ]);
       for (var i = 0; i < rs.length; i++) if (rs[i].error) throw rs[i].error;
-      tareas = rs[0].data.filter(function (t) { return t.creado_en; });   // creado_en lo sella el servidor; sin él no se puede ubicar en un periodo
+      // Las marcadas como prueba (excluir_indicadores) no cuentan. creado_en lo sella el servidor; sin él no se puede ubicar en un periodo.
+      excluidas = rs[0].data.filter(function (t) { return t.excluir_indicadores; }).length;
+      tareas = rs[0].data.filter(function (t) { return t.creado_en && !t.excluir_indicadores; });
       bitacora = rs[1].data; equipo = rs[2].data || [];
     } catch (err) {
       if (primera) {
@@ -473,7 +476,8 @@
     var pH = addDias(d, -1), pD = addDias(d, -dias);
     var cur = calc(d, h), prev = calc(pD, pH), snap = snapshot();
     $('ind-periodo').textContent = 'Periodo: ' + fmtDateOnly(d) + ' – ' + fmtDateOnly(h) + ' (' + dias + (dias === 1 ? ' día' : ' días') + ') · comparado con ' + fmtDateOnly(pD) + ' – ' + fmtDateOnly(pH) +
-      ' · ' + fmtN(base.length) + ' de ' + fmtN(tareas.length) + ' tareas con los filtros actuales';
+      ' · ' + fmtN(base.length) + ' de ' + fmtN(tareas.length) + ' tareas con los filtros actuales' +
+      (excluidas ? ' · ' + fmtN(excluidas) + (excluidas === 1 ? ' tarea marcada como prueba no se cuenta' : ' tareas marcadas como prueba no se cuentan') : '');
     renderKpis(cur, prev, snap);
     renderVolumen(cur, snap);
     renderTiempos(cur, snap);

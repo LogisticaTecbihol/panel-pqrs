@@ -188,10 +188,11 @@
     var act = t.actividad_id && actById[t.actividad_id] ? '<div class="kb-act">📅 ' + esc(actById[t.actividad_id].nombre) + '</div>' : '';
     var esPed = t.origen === 'panel_pedidos';
     var ped = esPed ? '<span class="kb-chip" title="Solicitud enviada desde panel-pedidos">📥 Pedidos</span>' : '';
+    var prueba = t.excluir_indicadores ? '<span class="kb-chip" title="Marcada como prueba: no cuenta en los indicadores">🧪 Prueba</span>' : '';
     var quien = esPed ? '<div class="kb-act">👤 ' + esc(t.a_nombre_de_nombre || t.solicitante_nombre || '—') +
       (t.fecha_tentativa ? ' · lo necesita para ' + esc(fmtDateOnly(t.fecha_tentativa)) : '') + '</div>' : '';
     return '<div class="kb-card p-' + esc(t.prioridad) + (t.urgente ? ' urg' : '') + (sinAval ? ' sin-aval' : '') + uClase + '"' + uEstilo + ' draggable="true" tabindex="0" role="button" data-act="tarea-abrir" data-id="' + esc(t.id) + '" aria-label="Abrir tarea: ' + esc(t.titulo) + '">' + franja +
-      '<div class="kb-card-top">' + urg + ped + '<span class="kb-chip">' + esc(TIPOS[t.tipo] || t.tipo) + '</span><span class="kb-chip" title="Clase de prioridad">' + esc(CLASE_CORTA[t.prioridad] || t.prioridad) + '</span>' + edad + '</div>' +
+      '<div class="kb-card-top">' + urg + ped + prueba + '<span class="kb-chip">' + esc(TIPOS[t.tipo] || t.tipo) + '</span><span class="kb-chip" title="Clase de prioridad">' + esc(CLASE_CORTA[t.prioridad] || t.prioridad) + '</span>' + edad + '</div>' +
       '<div class="kb-title">' + esc(t.titulo) + '</div>' +
       '<div class="kb-emp">' + empresaChips(t.empresas) + '</div>' + act + quien +
       '<div class="kb-meta">' + (fechaHtml || '<span></span>') + '<span class="kb-avatars">' + avatars + '</span></div>' +
@@ -437,6 +438,9 @@
     $('t-nuevo-files').style.display = t ? 'none' : '';
     $('t-extra').style.display = t ? '' : 'none';
     $('t-eliminar').style.display = t && esAdmin ? '' : 'none';
+    // Solo un administrador marca una tarea como de prueba (no cuenta en los indicadores); el trigger lo exige también en la BD.
+    $('t-excluir-box').style.display = t && esAdmin ? '' : 'none';
+    $('t-excluir').checked = !!(t && t.excluir_indicadores);
     // Mercadeo puede rechazar una solicitud de Pedidos mientras no esté entregada ni cancelada.
     $('t-rechazar').style.display = t && t.origen === 'panel_pedidos' && esAbierta(t) ? '' : 'none';
     $('t-guardar').disabled = false; $('t-guardar').textContent = 'Guardar';
@@ -456,7 +460,7 @@
     var resp = [].slice.call(document.querySelectorAll('.t-resp-chk:checked')).map(function (c) { return c.value; });
     var actId = Number($('t-actividad').value) || null;
     var urg = $('t-urgente').checked, fuera = !actAprobada(actId);
-    return {
+    var d = {
       titulo: $('t-titulo').value.trim(), descripcion: $('t-desc').value.trim(), estado: $('t-estado').value,
       tipo: $('t-tipo').value, prioridad: $('t-prioridad').value, urgente: urg, actividad_id: actId,
       empresas: empresas, responsables: resp, fecha_limite: $('t-fecha').value || null,
@@ -464,6 +468,8 @@
       aval_referencia: urg && fuera ? $('t-aval-ref').value.trim() : '',
       aval_motivo: urg && fuera ? $('t-aval-motivo').value.trim() : '',
     };
+    if (esAdmin && editId) d.excluir_indicadores = $('t-excluir').checked;   // a un no-admin ni se le envía la columna
+    return d;
   }
 
   function validar(d) {
@@ -597,6 +603,7 @@
           if (k === 'tipo') return 'tipo (' + esc(TIPOS[de] || de) + ' → ' + esc(TIPOS[a] || a) + ')';
           if (k === 'prioridad') return 'clase (' + esc(CLASE_CORTA[de] || de) + ' → ' + esc(CLASE_CORTA[a] || a) + ')';
           if (k === 'urgente') return 'urgente (' + (de ? 'sí' : 'no') + ' → ' + (a ? 'sí' : 'no') + ')';
+          if (k === 'excluir_indicadores') return a ? 'la marcó como prueba (no cuenta en los indicadores)' : 'volvió a contarla en los indicadores';
           if (k === 'fecha_limite') return 'fecha límite (' + esc(de ? fmtDateOnly(de) : '—') + ' → ' + esc(a ? fmtDateOnly(a) : '—') + ')';
           if (k === 'empresas') return 'empresas (' + nomUsuarios(de) + ' → ' + nomUsuarios(a) + ')';
           if (k === 'actividad_id') return 'actividad (' + esc(de && actById[de] ? actById[de].nombre : '—') + ' → ' + esc(a && actById[a] ? actById[a].nombre : '—') + ')';

@@ -89,11 +89,11 @@
         fetchAll('mercadeo_presupuesto_gastos', '*', 'id'),
         fetchAll('mercadeo_comerciales', '*', 'nombre'),
         _sb.rpc('list_equipo_mercadeo'),
-        fetchAll('mercadeo_tareas', 'id,titulo,estado,empresas,urgente,fuera_calendario,aval_por,aval_referencia,aval_motivo,aval_registrado_por_nombre,aval_registrado_en,fecha_limite,creado_en,confirmada_en,entregada_en', 'id'),
+        fetchAll('mercadeo_tareas', 'id,titulo,estado,empresas,urgente,fuera_calendario,aval_por,aval_referencia,aval_motivo,aval_registrado_por_nombre,aval_registrado_en,fecha_limite,creado_en,confirmada_en,entregada_en,excluir_indicadores', 'id'),
       ]);
       for (var i = 0; i < rs.length; i++) if (rs[i].error) throw rs[i].error;
       leads = rs[0].data; seguimientos = rs[1].data; actividades = rs[2].data;
-      presupuesto = rs[3].data; gastos = rs[4].data; comerciales = rs[5].data; equipo = rs[6].data || []; tareas = rs[7].data;
+      presupuesto = rs[3].data; gastos = rs[4].data; comerciales = rs[5].data; equipo = rs[6].data || []; tareas = rs[7].data.filter(function (t) { return !t.excluir_indicadores; });   // las pruebas marcadas por un admin no cuentan en los KPI
     } catch (err) {
       if (primera) {
         $('estado-carga').innerHTML = 'No se pudieron cargar los datos: ' + esc(errMsg(err)) +

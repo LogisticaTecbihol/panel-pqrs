@@ -96,6 +96,10 @@
 
         <div style="margin:14px 0 10px"><span class="ef-label">Empresas *</span><div class="mk-checks" id="t-empresas"></div></div>
         <div style="margin-bottom:12px"><span class="ef-label">Responsables</span><div class="mk-checks" id="t-resp"></div></div>
+        <div id="t-excluir-box" class="mk-box" style="display:none;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.86rem"><input type="checkbox" id="t-excluir"> No contar en los indicadores (solicitud de prueba)</label>
+          <div class="ef-help">Solo administradores. La tarea sigue en el Tablero, pero no entra en el módulo Indicadores ni en CRM &gt; Indicadores. El cambio queda en el historial.</div>
+        </div>
 
         <label class="ef-label" for="t-desc">Descripción / brief</label>
         <textarea class="ef" id="t-desc" rows="4" maxlength="4000"></textarea>
@@ -167,6 +171,6 @@
   <script src="../js/shared/modal.js?v=20261006"></script>
   <script src="../js/shared/equipo-color.js?v=20261019c"></script>
   <script src="../js/panel/auth.js?v=20261018"></script>
-  <script src="../js/panel/mercadeo.js?v=20261019c"></script>
+  <script src="../js/panel/mercadeo.js?v=20261019d"></script>
 </body>
 </html>

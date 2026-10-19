@@ -172,6 +172,12 @@ calculan en el cliente.
   responsable. Gráficos con barras CSS (sin librerías). Las definiciones de "a tiempo" y "confirmada en ≤ 24 h" son las de
   CRM > Indicadores salvo que aquí también se excluyen las rechazadas del % de confirmación (el CRM las cuenta como tarde).
   "Abiertas / vencidas / antigüedad" son foto de hoy, no del periodo. Todo se calcula en el cliente con `fetchAll`.
+- **Tareas de prueba** (migración 0025): columna `mercadeo_tareas.excluir_indicadores`. Un ADMIN la marca desde el detalle de
+  la tarjeta (casilla "No contar en los indicadores"; el trigger `trg_excluir_indicadores` rechaza a cualquiera que no sea
+  admin y una tarea nueva de un no-admin nace en false). La tarea sigue en el Tablero (chip 🧪 Prueba) y conserva su historial,
+  pero Indicadores y CRM > Indicadores la ignoran (filtro en el cliente: `indicadores.js` y `crm.js`). Cada cambio queda en la
+  bitácora como `cambio_datos`. Las tarjetas-resumen del propio Tablero NO aplican el filtro. Marcadas el 2026-10-19: #47, #51
+  y #55 (pruebas de Diana Marquez / PARCELAR, todas rechazadas), con un UPDATE aparte, no dentro de la migración.
 
 Pruebas: no hay suite en el repo. Para verificar la UI se usó jsdom con un cliente Supabase
 simulado en memoria; la RLS y los triggers se probaron en SQL dentro de transacciones que se revierten
