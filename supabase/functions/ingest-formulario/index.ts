@@ -23,7 +23,29 @@ const AREAS = ['Produccion', 'Servicio al cliente', 'Ventas', 'Estado del produc
 const URGENCIAS = ['ALTO', 'MEDIO', 'BAJA']
 const CANALES = ['Directo', 'Distribuidor autorizado', 'Tienda agropecuaria local', 'Otro']
 
+// Los Forms no siempre usan la palabra sola: p. ej. el de IAS ofrece
+// "Queja (Relacionada con el servicio o atención)". Se reconoce por la primera
+// palabra, sin importar tildes ni mayúsculas, y se guarda el valor canónico.
+function normalizarTipoSolicitud(valor: unknown): string | null {
+  if (typeof valor !== 'string') return null
+  const v = valor.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim()
+  const prefijos: [string, string][] = [
+    ['peticion', 'Petición'],
+    ['queja', 'Queja'],
+    ['reclamo', 'Reclamo'],
+    ['sugerencia', 'Sugerencia'],
+  ]
+  for (const [prefijo, canonico] of prefijos) {
+    if (v.startsWith(prefijo)) return canonico
+  }
+  return null
+}
+
+// Cada rechazo queda en el log de la función (los logs de Supabase solo guardan el
+// código 400; el motivo, que antes solo veía el Apps Script del Form, se pierde).
+// Solo el motivo: nunca se registra el contenido del PQRS (datos personales).
 function badRequest(message: string) {
+  console.error('ingest-formulario rechazó (400):', message)
   return new Response(JSON.stringify({ ok: false, error: message }), {
     status: 400,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -39,6 +61,7 @@ serve(async (req) => {
     const secretHeader = req.headers.get('x-ingest-secret')
     const expectedSecret = Deno.env.get('INGEST_SHARED_SECRET')
     if (!expectedSecret || secretHeader !== expectedSecret) {
+      console.error('ingest-formulario rechazó (401): secreto ausente o incorrecto')
       return new Response(JSON.stringify({ ok: false, error: 'No autorizado' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -80,7 +103,7 @@ async function handlePqrs(supabaseAdmin: ReturnType<typeof createClient>, body: 
     nombre_completo,
     contacto,
     identificacion_cliente,
-    tipo_solicitud,
+    tipo_solicitud: tipoSolicitudRaw,
     fecha_evento,
     area_relacionada,
     referencia_pedido,
@@ -94,8 +117,10 @@ async function handlePqrs(supabaseAdmin: ReturnType<typeof createClient>, body: 
     adjuntos, // [{drive_file_id, nombre, tipo_mime, tamano_bytes, url}]
   } = body
 
+  const tipo_solicitud = normalizarTipoSolicitud(tipoSolicitudRaw)
+
   if (!contacto) return badRequest('contacto es requerido')
-  if (!TIPOS_SOLICITUD.includes(tipo_solicitud)) return badRequest(`tipo_solicitud inválido: ${tipo_solicitud}`)
+  if (!tipo_solicitud || !TIPOS_SOLICITUD.includes(tipo_solicitud)) return badRequest(`tipo_solicitud inválido: ${tipoSolicitudRaw}`)
   if (!AREAS.includes(area_relacionada)) return badRequest(`area_relacionada inválida: ${area_relacionada}`)
   if (!descripcion) return badRequest('descripcion es requerida')
   if (!URGENCIAS.includes(urgencia)) return badRequest(`urgencia inválida: ${urgencia}`)
@@ -162,7 +187,7 @@ async function handlePqrs(supabaseAdmin: ReturnType<typeof createClient>, body: 
   // ya quedó guardado pase lo que pase con el correo.
   if (!creado_en) {
     try {
-      await enviarAvisoEquipo(pqrsRow.folio, body)
+      await enviarAvisoEquipo(pqrsRow.folio, { ...body, tipo_solicitud })
       await supabaseAdmin.from('pqrs_bitacora').insert({
         pqrs_id: pqrsRow.id,
         tipo_evento: 'notificacion_enviada',
