@@ -294,6 +294,52 @@ textarea.ef { resize: vertical; }
 .kb-ley-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--uc, #a0aec0); flex: none; }
 .kb-ley-chip.on { background: var(--uc, #4a5568); border-color: var(--uc, #4a5568); color: #fff; }
 .kb-ley-chip.on .kb-ley-dot { background: #fff; }
+
+/* ── Indicadores de Mercadeo (sin librerías de gráficos: barras con CSS) ── */
+.ind-periodo { font-size: 0.8rem; color: #4a5568; margin: 0 0 12px; }
+.ind-h { font-size: 1.02rem; font-weight: 700; color: #1a5276; margin: 26px 0 10px; }
+.ind-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 16px; align-items: start; }
+.ind-grid .full { grid-column: 1 / -1; }
+.ind-grid .card-head { padding: 10px 16px; }
+.ind-grid .mbody { padding: 14px 16px; }
+.ind-grid .card-head .mk-sub { font-size: 0.74rem; color: #718096; }
+.ind-delta { display: block; font-size: 0.72rem; margin-top: 3px; color: #718096; }
+.ind-delta.good { color: #15803d; font-weight: 700; }
+.ind-delta.bad { color: #c0392b; font-weight: 700; }
+.ind-bars { display: flex; flex-direction: column; gap: 8px; }
+.ind-bar-row { display: grid; grid-template-columns: minmax(80px, 36%) 1fr auto; gap: 8px; align-items: center; font-size: 0.8rem; }
+.ind-bar-l { color: #2d3748; line-height: 1.2; overflow-wrap: anywhere; }
+.ind-bar-t { background: #edf2f7; border-radius: 4px; height: 12px; overflow: hidden; }
+.ind-bar-t i { display: block; height: 100%; background: #2471a3; border-radius: 4px; min-width: 2px; }
+.ind-bar-v { font-weight: 700; color: #2d3748; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ind-bar-v small { font-weight: 400; color: #718096; }
+.ind-mini { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.ind-mini > div { flex: 1; min-width: 90px; background: #f7fafc; border-radius: 8px; padding: 8px 10px; }
+.ind-mini b { display: block; font-size: 1.15rem; color: #2d3748; }
+.ind-mini span { font-size: 0.7rem; color: #718096; text-transform: uppercase; letter-spacing: 0.3px; }
+.ind-note { font-size: 0.74rem; color: #718096; margin-top: 10px; }
+.ind-stack { display: flex; height: 20px; border-radius: 6px; overflow: hidden; background: #edf2f7; margin: 4px 0 8px; }
+.ind-stack i { display: block; height: 100%; }
+.ind-key { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.76rem; color: #4a5568; margin-bottom: 4px; }
+.ind-key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: baseline; }
+.ind-trend { display: flex; align-items: flex-end; gap: 10px; padding-top: 20px; }
+.ind-trend-col { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.ind-trend-bars { display: flex; align-items: flex-end; justify-content: center; gap: 4px; height: 140px; width: 100%; }
+.ind-trend-bar { width: 36%; max-width: 28px; border-radius: 4px 4px 0 0; position: relative; min-height: 2px; background: #2471a3; }
+.ind-trend-bar.ent { background: #15803d; }
+.ind-trend-bar span { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 0.68rem; font-weight: 700; color: #2d3748; }
+.ind-trend-mes { font-size: 0.72rem; color: #718096; margin-top: 5px; white-space: nowrap; }
+.ind-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--uc, #a0aec0); margin-right: 6px; vertical-align: baseline; }
+.ind-celda-barra { display: flex; align-items: center; gap: 8px; }
+.ind-celda-barra .ind-bar-t { flex: 1; min-width: 40px; height: 8px; }
+.ind-num { text-align: right; font-variant-numeric: tabular-nums; }
+.ind-malo { color: #c0392b; font-weight: 700; }
+.ind-defs { margin-top: 22px; background: #fff; border-radius: 10px; padding: 12px 18px; box-shadow: 0 1px 5px rgba(0,0,0,0.07); font-size: 0.8rem; color: #4a5568; }
+.ind-defs summary { cursor: pointer; font-weight: 700; color: #1a5276; }
+.ind-defs ul { margin: 8px 0 0 18px; line-height: 1.55; }
+.ind-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.ind-presets button { background: #f0f4f8; border: 1px solid #cbd5e0; border-radius: 14px; padding: 3px 10px; font-size: 0.74rem; font-weight: 600; color: #4a5568; cursor: pointer; }
+.ind-presets button:hover { background: #e2e8f0; }
 .kb-move { display: flex; justify-content: flex-end; gap: 4px; margin-top: 6px; }
 .kb-move button { background: #f0f4f8; border: 1px solid #cbd5e0; border-radius: 5px; width: 30px; height: 24px; cursor: pointer; font-size: 0.72rem; color: #4a5568; }
 .kb-move button:hover:not(:disabled) { background: #e2e8f0; }

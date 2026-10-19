@@ -26,11 +26,12 @@ Panel interno del holding con dos áreas:
 
 - `index.html` — redirige a `panel/login.html`.
 - `panel/` — páginas del panel interno: login, **inicio** (tarjetas de módulos), dashboard/detalle (PQRS),
-  encuestas, **mercadeo** (tablero), **crm**, usuarios.
+  encuestas, **mercadeo** (tablero), **crm**, **indicadores** (KPI del tablero), usuarios.
 - `js/panel/` — lógica de cada página.
 - `js/shared/supabase-client.js` — cliente Supabase + utilidades comunes (`fetchAll`, `parseMonto`,
   fechas sin desfase de zona horaria, `errMsg`, `auditoriaHtml`...).
 - `js/shared/modal.js` — modales accesibles (foco, Escape, trampa de foco) de las páginas de Mercadeo.
+- `js/shared/equipo-color.js` — color por responsable (`EQUIPO_COLOR`), compartido por el Tablero y los Indicadores.
 - `css/panel.css` — estilos (sistema de diseño del holding).
 - `supabase/migrations/` — migraciones SQL, aplicadas con el MCP de Supabase
   (`apply_migration`), igual que en panel-pedidos.
@@ -157,6 +158,20 @@ quién y cuándo y alimenta el KPI de excepciones); sin brief (descripción) y f
 de "solicitada". La cola de cada columna se ordena por regla (no a mano): arrastrar solo cambia de
 columna (HTML5 DnD; en táctil/teclado, botones ◀ ▶). Los KPI (pestaña Indicadores del CRM) se
 calculan en el cliente.
+
+### Color por responsable e Indicadores
+
+- **Color por responsable** (`js/shared/equipo-color.js`): paleta fija de 12 tonos asignada por POSICIÓN al ordenar los
+  ids de `list_equipo_mercadeo()`; los inactivos conservan su casilla pero se ven en gris. Agregar a alguien al módulo
+  puede recolorear a quien tenga un id mayor (si se quieren colores fijos: columna de color en `usuarios_pqrs`). El Tablero
+  tiñe la tarjeta (un responsable) o pone una franja dividida (varios) y tiene una leyenda que filtra por responsable.
+- **Indicadores** (`panel/indicadores.html` + `js/panel/indicadores.js`, mismo permiso `mercadeo`, sin migración, solo
+  lectura): rango Desde/Hasta (por defecto el mes en curso) con filtros de empresa y responsable y comparativo contra el
+  periodo anterior de igual duración. Cuatro grupos: Volumen y flujo, Tiempos (confirmación, ciclo, tiempo por etapa con el
+  historial `cambio_estado` de la bitácora, antigüedad), Cumplimiento (a tiempo, calendario/urgentes, vencidas) y Carga por
+  responsable. Gráficos con barras CSS (sin librerías). Las definiciones de "a tiempo" y "confirmada en ≤ 24 h" son las de
+  CRM > Indicadores salvo que aquí también se excluyen las rechazadas del % de confirmación (el CRM las cuenta como tarde).
+  "Abiertas / vencidas / antigüedad" son foto de hoy, no del periodo. Todo se calcula en el cliente con `fetchAll`.
 
 Pruebas: no hay suite en el repo. Para verificar la UI se usó jsdom con un cliente Supabase
 simulado en memoria; la RLS y los triggers se probaron en SQL dentro de transacciones que se revierten

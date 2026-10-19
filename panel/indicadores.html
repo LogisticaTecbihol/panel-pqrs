@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mercadeo — Indicadores</title>
+<link rel="stylesheet" href="../css/panel.css?v=20261019b">
+</head>
+<body data-modulo="mercadeo">
+  <div class="header">
+    <div>
+      <h1>Mercadeo</h1>
+      <div class="sub">Indicadores de gestión del Tablero de tareas</div>
+    </div>
+    <nav>
+      <a href="inicio.html">Inicio</a>
+      <a href="dashboard.html" data-modulo="pqrs">PQRS</a>
+      <a href="encuestas.html" data-modulo="encuestas">Encuestas</a>
+      <a href="mercadeo.html" data-modulo="mercadeo">Tablero</a>
+      <a href="crm.html" data-modulo="mercadeo">CRM</a>
+      <a href="indicadores.html" data-modulo="mercadeo" class="active">Indicadores</a>
+      <a href="sst.html" data-modulo="sst">SST</a>
+      <a href="usuarios.html" class="auth-admin-only" data-display="inline" style="display:none">Usuarios</a>
+    </nav>
+    <div id="auth-info"></div>
+  </div>
+
+  <div id="main">
+    <div id="estado-carga" class="empty">Cargando…</div>
+
+    <div id="contenido" style="display:none">
+      <div class="filters">
+        <div class="fg"><label for="f-desde">Desde</label><input type="date" id="f-desde"></div>
+        <div class="fg"><label for="f-hasta">Hasta</label><input type="date" id="f-hasta"></div>
+        <div class="ind-presets" role="group" aria-label="Periodos rápidos">
+          <button type="button" data-act="preset" data-id="mes">Mes actual</button>
+          <button type="button" data-act="preset" data-id="mes-ant">Mes anterior</button>
+          <button type="button" data-act="preset" data-id="30d">Últimos 30 días</button>
+          <button type="button" data-act="preset" data-id="anio">Año en curso</button>
+        </div>
+        <div class="fg"><label for="f-empresa">Empresa</label>
+          <select id="f-empresa"><option value="">Todas</option></select></div>
+        <div class="fg"><label for="f-resp">Responsable</label>
+          <select id="f-resp"></select></div>
+        <button class="btn-clear-filters" data-act="limpiar">Limpiar filtros</button>
+        <button class="btn-primary" data-act="actualizar">🔄 Actualizar</button>
+      </div>
+      <div class="ind-periodo" id="ind-periodo" aria-live="polite"></div>
+
+      <div class="stats" id="ind-kpis"></div>
+
+      <h2 class="ind-h">Volumen y flujo</h2>
+      <div class="ind-grid" id="ind-volumen"></div>
+
+      <h2 class="ind-h">Tiempos</h2>
+      <div class="ind-grid" id="ind-tiempos"></div>
+
+      <h2 class="ind-h">Cumplimiento</h2>
+      <div class="ind-grid" id="ind-cumplimiento"></div>
+
+      <h2 class="ind-h">Carga por responsable</h2>
+      <div class="ind-grid" id="ind-carga"></div>
+
+      <details class="ind-defs">
+        <summary>¿Cómo se calcula cada indicador?</summary>
+        <ul>
+          <li><strong>Recibidas</strong>: tareas creadas dentro del periodo (por fecha de creación). <strong>Entregadas</strong>: tareas que pasaron a “Entregada / Publicada” dentro del periodo (por fecha de entrega).</li>
+          <li><strong>Entregadas a tiempo</strong>: entregadas en el periodo que tenían fecha límite y se entregaron en esa fecha o antes (misma regla del CRM).</li>
+          <li><strong>Confirmación</strong>: horas entre la creación y la confirmación (salida de “Recibido”). El % en ≤ 24 h cuenta solo las solicitudes ya resueltas (confirmadas, o con más de 24 h sin confirmar) y excluye las canceladas y rechazadas.</li>
+          <li><strong>Ciclo</strong>: días entre la creación y la entrega, de las tareas entregadas en el periodo (incluye reprocesos si la tarea se reabrió).</li>
+          <li><strong>Tiempo por etapa</strong>: promedio de días que las tareas permanecieron en cada columna, según el historial de cambios de estado; cuenta las permanencias que terminaron dentro del periodo.</li>
+          <li><strong>Abiertas, vencidas y antigüedad</strong> son una foto de hoy (no dependen del periodo, solo de los filtros de empresa y responsable). Vencida: abierta con fecha límite anterior a hoy.</li>
+          <li><strong>Canceladas / rechazadas</strong>: tareas que pasaron a ese estado dentro del periodo.</li>
+          <li><strong>Comparativo</strong>: periodo inmediatamente anterior de igual duración. Una tarea con varias empresas o varios responsables cuenta una vez en cada una.</li>
+        </ul>
+      </details>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../js/shared/supabase-client.js?v=20261006"></script>
+  <script src="../js/shared/equipo-color.js?v=20261019c"></script>
+  <script src="../js/panel/auth.js?v=20261018"></script>
+  <script src="../js/panel/indicadores.js?v=20261019a"></script>
+</body>
+</html>

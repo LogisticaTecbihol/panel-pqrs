@@ -67,22 +67,7 @@
     var p = String(nombre || '?').trim().split(/\s+/);
     return ((p[0] || '?').charAt(0) + (p.length > 1 ? p[1].charAt(0) : '')).toUpperCase();
   }
-  // Color por responsable: paleta fija de 12 tonos, ordenada para que los primeros queden lo más separados posible.
-  // Cada persona del equipo toma el tono que le toca por su posición al ordenar los ids (los inactivos conservan su
-  // casilla, así desactivar a alguien no cambia los colores de los demás); con más de 12 personas los tonos se repiten.
-  // Los inactivos se ven en gris, igual que las tareas sin responsable.
-  var HUES = [220, 15, 140, 320, 270, 185, 50, 355, 85, 300, 165, 240];
-  var colorUsuario = {};
-  function asignarColores() {
-    colorUsuario = {};
-    var orden = equipo.slice().sort(function (a, b) { return a.id < b.id ? -1 : 1; });
-    orden.forEach(function (u, i) { if (u.activo) colorUsuario[u.id] = HUES[i % HUES.length]; });
-  }
-  // Variables CSS del color de una persona: --uc sólido (avatar, punto), --ut tinte de fondo, --ub borde del tinte.
-  function estiloColor(id) {
-    var h = colorUsuario[id];
-    return h === undefined ? '' : '--uc:hsl(' + h + ',62%,31%);--ut:hsl(' + h + ',80%,91%);--ub:hsl(' + h + ',55%,74%)';
-  }
+  // Color por responsable: js/shared/equipo-color.js (compartido con los Indicadores).
   function empresaChips(arr) {
     arr = arr || [];
     if (SIGLAS.every(function (s) { return arr.indexOf(s) >= 0; })) return '<span class="sigla-badge" style="background:#1a5276;color:#fff">TODO EL HOLDING</span>';
@@ -113,7 +98,7 @@
     }
     tareaById = {}; tareas.forEach(function (t) { tareaById[t.id] = t; });
     actById = {}; actividades.forEach(function (a) { actById[a.id] = a; });
-    asignarColores();
+    EQUIPO_COLOR.asignar(equipo);
     $('estado-carga').style.display = 'none';
     $('contenido').style.display = '';
     rellenarFiltros();
@@ -193,13 +178,13 @@
     var urg = t.urgente ? '<span class="kb-chip urg" title="' + (t.aval_por ? 'Aval: ' + esc(AVAL[t.aval_por]) : 'Urgente') + '">🔥 Urgente' + (t.fuera_calendario ? (t.aval_por ? ' · aval ' + esc(t.aval_por === 'comite' ? 'Comité' : 'GG') : ' ⚠ sin aval') : '') + '</span>' : '';
     var avatars = t.responsables.length ? t.responsables.map(function (id) {
       var u = equipo.filter(function (x) { return x.id === id; })[0];
-      return '<span class="kb-av' + (u && u.activo ? '' : ' inactivo') + '" style="' + estiloColor(id) + '" title="' + esc(u ? u.nombre : 'Usuario inactivo') + '">' + esc(iniciales(u ? u.nombre : '?')) + '</span>';
+      return '<span class="kb-av' + (u && u.activo ? '' : ' inactivo') + '" style="' + EQUIPO_COLOR.estilo(id) + '" title="' + esc(u ? u.nombre : 'Usuario inactivo') + '">' + esc(iniciales(u ? u.nombre : '?')) + '</span>';
     }).join('') : '<span class="mk-sin">sin responsable</span>';
     // Un responsable con color: la tarjeta se tiñe de su color; dos o más: franja superior dividida (fondo blanco).
-    var colores = t.responsables.filter(function (id) { return colorUsuario[id] !== undefined; });
+    var colores = t.responsables.filter(function (id) { return EQUIPO_COLOR.tiene(id); });
     var uClase = colores.length === 1 ? ' u1' : colores.length > 1 ? ' um' : '';
-    var uEstilo = colores.length === 1 ? ' style="' + estiloColor(colores[0]) + '"' : '';
-    var franja = colores.length > 1 ? '<div class="kb-franja" aria-hidden="true">' + colores.map(function (id) { return '<i style="' + estiloColor(id) + '"></i>'; }).join('') + '</div>' : '';
+    var uEstilo = colores.length === 1 ? ' style="' + EQUIPO_COLOR.estilo(colores[0]) + '"' : '';
+    var franja = colores.length > 1 ? '<div class="kb-franja" aria-hidden="true">' + colores.map(function (id) { return '<i style="' + EQUIPO_COLOR.estilo(id) + '"></i>'; }).join('') + '</div>' : '';
     var act = t.actividad_id && actById[t.actividad_id] ? '<div class="kb-act">📅 ' + esc(actById[t.actividad_id].nombre) + '</div>' : '';
     var esPed = t.origen === 'panel_pedidos';
     var ped = esPed ? '<span class="kb-chip" title="Solicitud enviada desde panel-pedidos">📥 Pedidos</span>' : '';
@@ -221,7 +206,7 @@
     if (!activos.length) { $('kb-leyenda').innerHTML = ''; return; }
     var sel = $('f-resp').value;
     var chips = activos.map(function (u) {
-      return '<button type="button" class="kb-ley-chip' + (sel === u.id ? ' on' : '') + '" style="' + estiloColor(u.id) + '" data-act="ley-resp" data-id="' + esc(u.id) +
+      return '<button type="button" class="kb-ley-chip' + (sel === u.id ? ' on' : '') + '" style="' + EQUIPO_COLOR.estilo(u.id) + '" data-act="ley-resp" data-id="' + esc(u.id) +
         '" aria-pressed="' + (sel === u.id) + '" title="Ver solo las tareas de ' + esc(u.nombre) + '"><i class="kb-ley-dot"></i>' + esc(u.nombre) + '</button>';
     });
     chips.push('<button type="button" class="kb-ley-chip sin' + (sel === 'sin' ? ' on' : '') + '" data-act="ley-resp" data-id="sin" aria-pressed="' + (sel === 'sin') +
