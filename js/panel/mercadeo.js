@@ -4,7 +4,9 @@
 // Flujo del manual: Recibido (código 'solicitada') -> Confirmada -> En producción -> En validación/aprobación ->
 // Entregada/Publicada (+ Cancelada, fuera de columnas). Cualquiera del equipo mueve tareas.
 // Las solicitudes enviadas desde panel-pedidos (origen 'panel_pedidos', migración 0019) nacen en
-// "Recibido"; Mercadeo puede responder al solicitante (evento 'respuesta_solicitante').
+// "Recibido"; Mercadeo puede responder al solicitante (evento 'respuesta_solicitante') y el solicitante o un
+// aprobador puede dejarle una observación a Mercadeo (evento 'observacion_solicitante', migración 0024; la
+// escribe el puente de Pedidos y avisa por campanita, aquí solo se lee en la bitácora de la tarjeta).
 //
 // Reglas de priorización (MKT-DOC-00 §B.5, MKT-P-04) — las aplica la BD (trigger de la
 // migración 0014); aquí solo se anticipan en la interfaz para dar mensajes claros:
@@ -555,6 +557,8 @@
         }
         return 'Creó la tarea';
       case 'respuesta_solicitante': return '📣 Respuesta al solicitante: ' + esc(d.texto);
+      case 'observacion_solicitante':
+        return '💬 <strong>Observación ' + (d.como === 'aprobador' ? 'del aprobador' : 'del solicitante') + ':</strong> <span style="white-space:pre-wrap">' + esc(d.texto) + '</span>';
       case 'cambio_estado': return 'Cambió el estado: <strong>' + esc(ESTADO_T[d.de] || d.de) + '</strong> → <strong>' + esc(ESTADO_T[d.a] || d.a) + '</strong>' +
         (d.motivo ? ' · <strong>Motivo:</strong> ' + esc(d.motivo) : '');
       case 'asignacion': return 'Responsables: ' + nomUsuarios(d.de) + ' → <strong>' + nomUsuarios(d.a) + '</strong>';

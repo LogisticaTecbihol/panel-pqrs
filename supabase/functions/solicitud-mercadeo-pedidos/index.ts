@@ -18,9 +18,14 @@
 //               fecha tentativa sea futura (la aprobación puede tardar).
 //   firmar   -> URLs firmadas de lectura (1 h) de archivos ya subidos de una
 //               solicitud, para que el aprobador los revise antes de aprobar.
-//   listar   -> "Mis solicitudes": solo las del solicitante o hechas a su nombre,
-//               con una lista blanca de campos (nunca comentarios internos,
-//               avales ni la bitácora completa).
+//   listar   -> "Mis solicitudes": solo las del solicitante o hechas a su nombre
+//               (`solicitante.id`), o las tareas vigentes de una lista de solicitudes
+//               (`request_ids`, para la vista de aprobadores), con una lista blanca
+//               de campos (nunca comentarios internos, avales ni la bitácora completa).
+//   observar -> el solicitante, a nombre de quién se hizo o un aprobador le escribe una
+//               OBSERVACIÓN a Mercadeo sobre los requisitos de la solicitud. Queda en la
+//               bitácora de la tarjeta vigente y el trigger de la migración 0024 avisa al
+//               equipo (campanita). Solo mientras Mercadeo no la haya entregado ni cancelado.
 //   retirar  -> el solicitante MODIFICÓ una solicitud ya aprobada: la tarjeta
 //               vigente sale del Tablero (estado 'rechazada' con el motivo) y la
 //               solicitud vuelve a aprobación en Pedidos; al aprobarse llega como
@@ -63,6 +68,7 @@ const MAX_ARCHIVOS = 5
 const MAX_ARCHIVO_BYTES = 25 * 1024 * 1024
 const MAX_ABIERTAS_POR_SOLICITANTE = 30
 const MAX_CREADAS_POR_HORA = 10
+const MAX_OBSERVACIONES_POR_HORA = 10
 const ESTADOS_ABIERTOS = ['solicitada', 'confirmada', 'en_produccion', 'en_validacion']
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -159,6 +165,7 @@ serve(async (req) => {
       case 'firmar': return await firmar(admin, body)
       case 'listar': return await listar(admin, body)
       case 'retirar': return await retirar(admin, body)
+      case 'observar': return await observar(admin, body)
       default: throw new Rechazo(`action inválida: ${body?.action}`)
     }
   } catch (e) {
@@ -371,6 +378,56 @@ async function retirar(admin: any, body: any) {
   return respuesta(200, { ok: true, retirada: true, id: t.data.id })
 }
 
+// ── observar ─────────────────────────────────────────────────
+// El solicitante, a nombre de quién se hizo o un aprobador le escribe una observación a Mercadeo
+// (requisitos, especificaciones, retroalimentación sobre lo que Mercadeo actualizó). Pedidos ya
+// verificó sesión y permisos; aquí se valida la tarea vigente y el estado. Queda en la bitácora de
+// la tarjeta ('observacion_solicitante') y el trigger de la migración 0024 avisa al equipo.
+async function observar(admin: any, body: any) {
+  const requestId = uuid(body.request_id, 'request_id')
+  const porId = uuid(body.por?.id, 'por.id')
+  const porNombre = texto(body.por?.nombre, 'por.nombre', 1, 120)
+  const como = body.como
+  if (como !== 'solicitante' && como !== 'aprobador') throw new Rechazo('como inválido')
+  // Se conservan los saltos de línea, pero no los espacios ni las líneas en blanco de sobra.
+  const limpio = typeof body.texto === 'string'
+    ? body.texto.replace(/[ \t]+/g, ' ').replace(/ ?\r?\n ?/g, '\n').replace(/\n{3,}/g, '\n\n')
+    : body.texto
+  const obs = texto(limpio, 'La observación', 5, 1000)
+
+  // A lo sumo una tarea no rechazada por origen_ref (índice único parcial).
+  const t = await admin.from('mercadeo_tareas').select('id, estado')
+    .eq('origen', 'panel_pedidos').eq('origen_ref', requestId).neq('estado', 'rechazada').maybeSingle()
+  if (t.error) throw t.error
+  if (!t.data) throw new Rechazo('La solicitud no está en el Tablero de Mercadeo', 409)
+  if (body.tarea_id != null && Number(body.tarea_id) !== Number(t.data.id)) {
+    throw new Rechazo('La solicitud cambió en Mercadeo; recarga la lista e inténtalo de nuevo', 409)
+  }
+  if (!ESTADOS_ABIERTOS.includes(t.data.estado)) {
+    throw new Rechazo(
+      `Mercadeo ya la marcó como ${t.data.estado === 'entregada' ? 'entregada' : 'cancelada'}; ya no se pueden enviar observaciones`,
+      409,
+    )
+  }
+
+  // Tope por tarjeta (freno al ruido en la campanita del equipo; holgado para el uso normal).
+  const desde = new Date(Date.now() - 3600 * 1000).toISOString()
+  const recientes = await admin.from('mercadeo_tarea_bitacora').select('id', { count: 'exact', head: true })
+    .eq('tarea_id', t.data.id).eq('tipo_evento', 'observacion_solicitante').gte('creado_en', desde)
+  if (recientes.error) throw recientes.error
+  if ((recientes.count ?? 0) >= MAX_OBSERVACIONES_POR_HORA) {
+    throw new Rechazo('Has enviado muchas observaciones en poco tiempo; intenta de nuevo en un rato', 429)
+  }
+
+  const ins = await admin.from('mercadeo_tarea_bitacora').insert({
+    tarea_id: t.data.id,
+    tipo_evento: 'observacion_solicitante',
+    detalle: { texto: obs, como, solicitante_nombre: porNombre, solicitante_id: porId },
+  })
+  if (ins.error) throw ins.error
+  return respuesta(200, { ok: true, id: t.data.id })
+}
+
 // ── firmar ───────────────────────────────────────────────────
 // Solo archivos bajo solicitudes/<request_id>/ ; devuelve, por cada ruta, si existe y su URL de lectura.
 async function firmar(admin: any, body: any) {
@@ -394,15 +451,21 @@ async function firmar(admin: any, body: any) {
 }
 
 // ── listar ───────────────────────────────────────────────────
+// Dos modos: las del usuario (`solicitante.id`) o las tareas vigentes de una lista de solicitudes
+// (`request_ids`, la vista de aprobadores de Pedidos; la tarea rechazada/retirada no cuenta).
 async function listar(admin: any, body: any) {
-  const usuarioId = uuid(body.solicitante?.id, 'solicitante.id')
-
-  const t = await admin.from('mercadeo_tareas')
+  let q = admin.from('mercadeo_tareas')
     .select('id, titulo, asunto, asunto_otro, empresas, estado, descripcion, fecha_tentativa, fecha_limite, creado_en, confirmada_en, entregada_en, responsables, solicitante_nombre, a_nombre_de_nombre')
     .eq('origen', 'panel_pedidos')
-    .or(`solicitante_id.eq.${usuarioId},a_nombre_de_id.eq.${usuarioId}`)
-    .order('id', { ascending: false })
-    .limit(200)
+  if (Array.isArray(body.request_ids)) {
+    if (body.request_ids.length < 1) return respuesta(200, { ok: true, solicitudes: [] })
+    if (body.request_ids.length > 200) throw new Rechazo('Demasiadas solicitudes en una consulta')
+    q = q.in('origen_ref', body.request_ids.map((x: unknown) => uuid(x, 'request_ids'))).neq('estado', 'rechazada')
+  } else {
+    const usuarioId = uuid(body.solicitante?.id, 'solicitante.id')
+    q = q.or(`solicitante_id.eq.${usuarioId},a_nombre_de_id.eq.${usuarioId}`)
+  }
+  const t = await q.order('id', { ascending: false }).limit(200)
   if (t.error) throw t.error
   const tareas = t.data || []
   if (!tareas.length) return respuesta(200, { ok: true, solicitudes: [] })
@@ -413,7 +476,7 @@ async function listar(admin: any, body: any) {
   const [bit, adj, usr] = await Promise.all([
     admin.from('mercadeo_tarea_bitacora')
       .select('tarea_id, tipo_evento, detalle, usuario_nombre, creado_en')
-      .in('tarea_id', ids).in('tipo_evento', ['respuesta_solicitante', 'cambio_estado'])
+      .in('tarea_id', ids).in('tipo_evento', ['respuesta_solicitante', 'cambio_estado', 'observacion_solicitante'])
       .order('id', { ascending: true }),
     admin.from('mercadeo_tarea_adjuntos').select('tarea_id, nombre_original, tamano_bytes').in('tarea_id', ids).order('id', { ascending: true }),
     idsResp.length
@@ -446,7 +509,9 @@ async function listar(admin: any, body: any) {
     historial: (bit.data || []).filter((b: any) => b.tarea_id === x.id).map((b: any) =>
       b.tipo_evento === 'cambio_estado'
         ? { tipo: 'estado', estado: b.detalle?.a, en: b.creado_en }
-        : { tipo: 'respuesta', texto: b.detalle?.texto ?? '', por: b.usuario_nombre || 'Mercadeo', en: b.creado_en }),
+        : b.tipo_evento === 'observacion_solicitante'
+          ? { tipo: 'observacion', texto: b.detalle?.texto ?? '', por: b.usuario_nombre || 'Solicitante', como: b.detalle?.como ?? 'solicitante', en: b.creado_en }
+          : { tipo: 'respuesta', texto: b.detalle?.texto ?? '', por: b.usuario_nombre || 'Mercadeo', en: b.creado_en }),
     adjuntos: (adj.data || []).filter((a: any) => a.tarea_id === x.id)
       .map((a: any) => ({ nombre: a.nombre_original, tamano: a.tamano_bytes })),
   }))
