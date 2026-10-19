@@ -275,8 +275,25 @@ textarea.ef { resize: vertical; }
 .kb-fecha.venc { color: #c0392b; font-weight: 700; }
 .kb-fecha.pronto { color: #b7791f; font-weight: 700; }
 .kb-avatars { display: flex; padding-left: 6px; }
-.kb-av { width: 24px; height: 24px; border-radius: 50%; background: #2471a3; color: #fff; font-size: 0.64rem; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-left: -6px; border: 2px solid #fff; }
+.kb-av { width: 24px; height: 24px; border-radius: 50%; background: var(--uc, #2471a3); color: #fff; font-size: 0.64rem; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-left: -6px; border: 2px solid #fff; }
 .kb-av.inactivo { background: #a0aec0; }
+/* Color por responsable (el JS fija --uc sólido, --ut tinte, --ub borde del tinte). Un responsable: tarjeta teñida; varios: franja dividida arriba. */
+.kb-card.u1 { background: var(--ut); box-shadow: 0 1px 4px rgba(0,0,0,0.12), inset 0 0 0 1px var(--ub); }
+.kb-card.u1:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.18), inset 0 0 0 1px var(--ub); }
+.kb-card.u1 .kb-chip:not(.urg):not(.warn) { background: rgba(255,255,255,0.75); }
+.kb-card.u1 .kb-move button { background: rgba(255,255,255,0.75); }
+.kb-card.um { overflow: hidden; }
+.kb-franja { display: flex; height: 6px; margin: -10px -12px 8px; }
+.kb-franja i { flex: 1; background: var(--uc); }
+/* Leyenda de colores (chips que filtran por responsable) */
+.kb-ley { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 10px; }
+.kb-ley:empty { display: none; }
+.kb-ley-t { font-size: 0.74rem; font-weight: 700; color: #4a5568; margin-right: 2px; }
+.kb-ley-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 14px; border: 1px solid var(--ub, #cbd5e0); background: var(--ut, #edf2f7); color: #2d3748; font-size: 0.76rem; font-weight: 600; cursor: pointer; }
+.kb-ley-chip:hover { border-color: var(--uc, #718096); }
+.kb-ley-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--uc, #a0aec0); flex: none; }
+.kb-ley-chip.on { background: var(--uc, #4a5568); border-color: var(--uc, #4a5568); color: #fff; }
+.kb-ley-chip.on .kb-ley-dot { background: #fff; }
 .kb-move { display: flex; justify-content: flex-end; gap: 4px; margin-top: 6px; }
 .kb-move button { background: #f0f4f8; border: 1px solid #cbd5e0; border-radius: 5px; width: 30px; height: 24px; cursor: pointer; font-size: 0.72rem; color: #4a5568; }
 .kb-move button:hover:not(:disabled) { background: #e2e8f0; }

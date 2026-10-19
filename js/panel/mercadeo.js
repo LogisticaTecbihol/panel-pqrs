@@ -67,6 +67,22 @@
     var p = String(nombre || '?').trim().split(/\s+/);
     return ((p[0] || '?').charAt(0) + (p.length > 1 ? p[1].charAt(0) : '')).toUpperCase();
   }
+  // Color por responsable: paleta fija de 12 tonos, ordenada para que los primeros queden lo más separados posible.
+  // Cada persona del equipo toma el tono que le toca por su posición al ordenar los ids (los inactivos conservan su
+  // casilla, así desactivar a alguien no cambia los colores de los demás); con más de 12 personas los tonos se repiten.
+  // Los inactivos se ven en gris, igual que las tareas sin responsable.
+  var HUES = [220, 15, 140, 320, 270, 185, 50, 355, 85, 300, 165, 240];
+  var colorUsuario = {};
+  function asignarColores() {
+    colorUsuario = {};
+    var orden = equipo.slice().sort(function (a, b) { return a.id < b.id ? -1 : 1; });
+    orden.forEach(function (u, i) { if (u.activo) colorUsuario[u.id] = HUES[i % HUES.length]; });
+  }
+  // Variables CSS del color de una persona: --uc sólido (avatar, punto), --ut tinte de fondo, --ub borde del tinte.
+  function estiloColor(id) {
+    var h = colorUsuario[id];
+    return h === undefined ? '' : '--uc:hsl(' + h + ',62%,31%);--ut:hsl(' + h + ',80%,91%);--ub:hsl(' + h + ',55%,74%)';
+  }
   function empresaChips(arr) {
     arr = arr || [];
     if (SIGLAS.every(function (s) { return arr.indexOf(s) >= 0; })) return '<span class="sigla-badge" style="background:#1a5276;color:#fff">TODO EL HOLDING</span>';
@@ -97,6 +113,7 @@
     }
     tareaById = {}; tareas.forEach(function (t) { tareaById[t.id] = t; });
     actById = {}; actividades.forEach(function (a) { actById[a.id] = a; });
+    asignarColores();
     $('estado-carga').style.display = 'none';
     $('contenido').style.display = '';
     rellenarFiltros();
@@ -176,14 +193,19 @@
     var urg = t.urgente ? '<span class="kb-chip urg" title="' + (t.aval_por ? 'Aval: ' + esc(AVAL[t.aval_por]) : 'Urgente') + '">🔥 Urgente' + (t.fuera_calendario ? (t.aval_por ? ' · aval ' + esc(t.aval_por === 'comite' ? 'Comité' : 'GG') : ' ⚠ sin aval') : '') + '</span>' : '';
     var avatars = t.responsables.length ? t.responsables.map(function (id) {
       var u = equipo.filter(function (x) { return x.id === id; })[0];
-      return '<span class="kb-av' + (u && u.activo ? '' : ' inactivo') + '" title="' + esc(u ? u.nombre : 'Usuario inactivo') + '">' + esc(iniciales(u ? u.nombre : '?')) + '</span>';
+      return '<span class="kb-av' + (u && u.activo ? '' : ' inactivo') + '" style="' + estiloColor(id) + '" title="' + esc(u ? u.nombre : 'Usuario inactivo') + '">' + esc(iniciales(u ? u.nombre : '?')) + '</span>';
     }).join('') : '<span class="mk-sin">sin responsable</span>';
+    // Un responsable con color: la tarjeta se tiñe de su color; dos o más: franja superior dividida (fondo blanco).
+    var colores = t.responsables.filter(function (id) { return colorUsuario[id] !== undefined; });
+    var uClase = colores.length === 1 ? ' u1' : colores.length > 1 ? ' um' : '';
+    var uEstilo = colores.length === 1 ? ' style="' + estiloColor(colores[0]) + '"' : '';
+    var franja = colores.length > 1 ? '<div class="kb-franja" aria-hidden="true">' + colores.map(function (id) { return '<i style="' + estiloColor(id) + '"></i>'; }).join('') + '</div>' : '';
     var act = t.actividad_id && actById[t.actividad_id] ? '<div class="kb-act">📅 ' + esc(actById[t.actividad_id].nombre) + '</div>' : '';
     var esPed = t.origen === 'panel_pedidos';
     var ped = esPed ? '<span class="kb-chip" title="Solicitud enviada desde panel-pedidos">📥 Pedidos</span>' : '';
     var quien = esPed ? '<div class="kb-act">👤 ' + esc(t.a_nombre_de_nombre || t.solicitante_nombre || '—') +
       (t.fecha_tentativa ? ' · lo necesita para ' + esc(fmtDateOnly(t.fecha_tentativa)) : '') + '</div>' : '';
-    return '<div class="kb-card p-' + esc(t.prioridad) + (t.urgente ? ' urg' : '') + (sinAval ? ' sin-aval' : '') + '" draggable="true" tabindex="0" role="button" data-act="tarea-abrir" data-id="' + esc(t.id) + '" aria-label="Abrir tarea: ' + esc(t.titulo) + '">' +
+    return '<div class="kb-card p-' + esc(t.prioridad) + (t.urgente ? ' urg' : '') + (sinAval ? ' sin-aval' : '') + uClase + '"' + uEstilo + ' draggable="true" tabindex="0" role="button" data-act="tarea-abrir" data-id="' + esc(t.id) + '" aria-label="Abrir tarea: ' + esc(t.titulo) + '">' + franja +
       '<div class="kb-card-top">' + urg + ped + '<span class="kb-chip">' + esc(TIPOS[t.tipo] || t.tipo) + '</span><span class="kb-chip" title="Clase de prioridad">' + esc(CLASE_CORTA[t.prioridad] || t.prioridad) + '</span>' + edad + '</div>' +
       '<div class="kb-title">' + esc(t.titulo) + '</div>' +
       '<div class="kb-emp">' + empresaChips(t.empresas) + '</div>' + act + quien +
@@ -193,8 +215,23 @@
       '</div>';
   }
 
+  // Leyenda de colores: un chip por persona activa; al hacer clic filtra por ese responsable (el mismo filtro "Responsable").
+  function renderLeyenda() {
+    var activos = equipo.filter(function (u) { return u.activo; });
+    if (!activos.length) { $('kb-leyenda').innerHTML = ''; return; }
+    var sel = $('f-resp').value;
+    var chips = activos.map(function (u) {
+      return '<button type="button" class="kb-ley-chip' + (sel === u.id ? ' on' : '') + '" style="' + estiloColor(u.id) + '" data-act="ley-resp" data-id="' + esc(u.id) +
+        '" aria-pressed="' + (sel === u.id) + '" title="Ver solo las tareas de ' + esc(u.nombre) + '"><i class="kb-ley-dot"></i>' + esc(u.nombre) + '</button>';
+    });
+    chips.push('<button type="button" class="kb-ley-chip sin' + (sel === 'sin' ? ' on' : '') + '" data-act="ley-resp" data-id="sin" aria-pressed="' + (sel === 'sin') +
+      '" title="Ver solo las tareas sin responsable"><i class="kb-ley-dot"></i>Sin asignar</button>');
+    $('kb-leyenda').innerHTML = '<span class="kb-ley-t">Color por responsable:</span>' + chips.join('');
+  }
+
   function render() {
     renderStats();
+    renderLeyenda();
     var lista = filtrar();
     $('kb-board').innerHTML = COLUMNAS.map(function (c, idx) {
       var ts = lista.filter(function (t) { return t.estado === c.k; }).sort(comparar);
@@ -629,6 +666,13 @@
     'limpiar': function () {
       ['f-empresa', 'f-resp', 'f-tipo', 'f-clase', 'f-origen', 'f-asunto'].forEach(function (k) { $(k).value = ''; });
       $('f-buscar').value = ''; $('f-urg').checked = false; $('f-canceladas').checked = false; $('f-entregadas').value = '30'; render();
+    },
+    'ley-resp': function (id) {
+      var f = $('f-resp');
+      f.value = f.value === id ? '' : id;
+      render();
+      var b = document.querySelector('.kb-ley-chip[data-id="' + id + '"]');
+      if (b) b.focus({ preventScroll: true });   // render() reconstruye la leyenda: se devuelve el foco al chip para quien usa teclado
     },
     'tarea-nueva': function () { abrirTarea(null); },
     'tarea-abrir': function (id) { abrirTarea(Number(id)); },
