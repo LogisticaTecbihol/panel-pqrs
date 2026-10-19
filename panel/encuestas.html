@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gestión PQRS — Encuesta de Satisfacción</title>
-<link rel="stylesheet" href="../css/panel.css?v=20261017">
+<link rel="stylesheet" href="../css/panel.css?v=20261019c">
 </head>
 <body data-modulo="encuestas">
   <div class="header">
@@ -23,34 +23,83 @@
   </div>
 
   <div id="main">
+    <div class="mk-tabs" role="tablist">
+      <button class="mk-tab active" id="tab-respuestas" role="tab" aria-selected="true" aria-controls="panel-respuestas" data-act="tab" data-tab="respuestas">📋 Respuestas</button>
+      <button class="mk-tab" id="tab-indicadores" role="tab" aria-selected="false" aria-controls="panel-indicadores" data-act="tab" data-tab="indicadores">📈 Indicadores</button>
+    </div>
+
     <div class="filters">
-      <div class="fg"><label>Empresa</label>
+      <div class="fg"><label for="f-empresa">Empresa</label>
         <select id="f-empresa"><option value="">Todas</option>
           <option value="PARCELAR">PARCELAR</option><option value="GREEN">GREEN</option>
           <option value="RESO">RESO</option><option value="IASO">IASO</option><option value="IAS">IAS</option>
         </select>
       </div>
-      <div class="fg"><label>Desde</label><input type="date" id="f-desde"></div>
-      <div class="fg"><label>Hasta</label><input type="date" id="f-hasta"></div>
+      <div class="fg"><label for="f-desde">Desde</label><input type="date" id="f-desde"></div>
+      <div class="fg"><label for="f-hasta">Hasta</label><input type="date" id="f-hasta"></div>
+      <div class="ind-presets" role="group" aria-label="Periodos rápidos">
+        <button type="button" data-act="preset" data-id="90d">Últimos 90 días</button>
+        <button type="button" data-act="preset" data-id="12m">Últimos 12 meses</button>
+        <button type="button" data-act="preset" data-id="anio">Año en curso</button>
+        <button type="button" data-act="preset" data-id="todo">Todo el histórico</button>
+      </div>
       <button class="btn-clear-filters" id="btn-clear-filters">Limpiar filtros</button>
     </div>
 
-    <div class="kpi-row" id="kpi-row"></div>
+    <!-- ── Respuestas ── -->
+    <div id="panel-respuestas" role="tabpanel" aria-labelledby="tab-respuestas">
+      <div class="kpi-row" id="kpi-row"></div>
 
-    <div class="card">
-      <div class="card-head"><h3>Respuestas</h3><span id="count-tag" style="font-size:0.8rem;color:#718096"></span></div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th><th>Empresa</th><th>Municipio</th><th>Asesor</th><th>Canal</th>
-              <th>Producto</th><th>Asesor téc.</th><th>Logística</th><th>Tiempos</th><th>Precio</th><th>General</th>
-              <th>Comentarios</th>
-            </tr>
-          </thead>
-          <tbody id="tbody"></tbody>
-        </table>
-        <div class="empty" id="empty-msg" style="display:none">No hay respuestas con estos filtros.</div>
+      <div class="card">
+        <div class="card-head"><h3>Respuestas</h3><span id="count-tag" style="font-size:0.8rem;color:#718096"></span></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th><th>Empresa</th><th>Municipio</th><th>Asesor</th><th>Canal</th>
+                <th>Producto</th><th>Asesor téc.</th><th>Logística</th><th>Tiempos</th><th>Precio</th><th>General</th>
+                <th>Comentarios</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+          <div class="empty" id="empty-msg" style="display:none">No hay respuestas con estos filtros.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Indicadores ── -->
+    <div id="panel-indicadores" role="tabpanel" aria-labelledby="tab-indicadores" style="display:none">
+      <div class="ind-periodo" id="ind-periodo" aria-live="polite"></div>
+      <div class="empty" id="ind-vacio" style="display:none">No hay respuestas con estos filtros.</div>
+
+      <div id="ind-contenido">
+        <div class="stats" id="ind-kpis"></div>
+
+        <h2 class="ind-h">Resumen y tendencia</h2>
+        <div class="ind-grid" id="ind-resumen"></div>
+
+        <h2 class="ind-h">Por dimensión</h2>
+        <div class="ind-grid" id="ind-dim"></div>
+
+        <h2 class="ind-h">Segmentos</h2>
+        <div class="ind-grid" id="ind-seg"></div>
+
+        <h2 class="ind-h">Alertas de atención</h2>
+        <div class="ind-grid" id="ind-alertas"></div>
+
+        <details class="ind-defs">
+          <summary>¿Cómo se calcula cada indicador?</summary>
+          <ul>
+            <li><strong>Calificaciones</strong>: cada pregunta se responde de 1 a 5. <strong>Promedio</strong>: media de esas calificaciones. El color compara contra la meta: verde si es ≥ 4,5, ámbar entre 4,0 y 4,5, rojo si es menor a 4,0.</li>
+            <li><strong>Satisfechos</strong>: % de respuestas con calificación 4 o 5 (estándar CSAT). <strong>Insatisfechos</strong>: % con calificación 1 o 2. El 3 cuenta como neutro.</li>
+            <li><strong>Dimensión más fuerte / más débil</strong>: la de mayor y menor promedio entre las cinco preguntas específicas (producto, asesor técnico, logística, tiempos y precio); “satisfacción general” no entra en la comparación.</li>
+            <li><strong>Filtros</strong>: la empresa y las fechas aplican a todos los indicadores, salvo la gráfica mensual, que no depende de las fechas (solo de la empresa).</li>
+            <li><strong>Comparativo</strong>: solo aparece cuando eliges “Desde” y “Hasta”; se compara con el periodo inmediatamente anterior de igual duración.</li>
+            <li><strong>Segmentos</strong>: empresa, canal de adquisición, asesor y municipio. Asesores y municipios se agrupan sin distinguir mayúsculas ni tildes. Un segmento con menos de 5 respuestas se ve en gris: su promedio es poco representativo.</li>
+            <li><strong>Alertas</strong>: respuestas con calificación 1 o 2 en cualquiera de las seis preguntas, de la más reciente a la más antigua.</li>
+          </ul>
+        </details>
       </div>
     </div>
   </div>
@@ -58,6 +107,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="../js/shared/supabase-client.js?v=20261006"></script>
   <script src="../js/panel/auth.js?v=20261018"></script>
-  <script src="../js/panel/encuestas.js"></script>
+  <script src="../js/panel/encuestas.js?v=20261019c"></script>
 </body>
 </html>

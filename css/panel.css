@@ -334,6 +334,20 @@ textarea.ef { resize: vertical; }
 .ind-celda-barra .ind-bar-t { flex: 1; min-width: 40px; height: 8px; }
 .ind-num { text-align: right; font-variant-numeric: tabular-nums; }
 .ind-malo { color: #c0392b; font-weight: 700; }
+.ind-ok { color: #15803d; font-weight: 700; }
+.ind-med { color: #b45309; font-weight: 700; }
+.ind-poca { color: #718096; font-style: italic; }
+/* Indicadores de Encuestas */
+.ind-trend-bar.uno { width: 60%; max-width: 34px; }
+.enc-trend { overflow-x: auto; }
+.enc-trend .ind-trend-col { min-width: 44px; }
+.enc-trend .ind-trend-mes { text-align: center; line-height: 1.25; }
+.enc-trend .ind-trend-mes small { color: #718096; }
+.enc-stack { min-width: 140px; margin: 0; }
+.enc-scroll { max-height: 340px; overflow: auto; }
+.enc-scroll thead th { position: sticky; top: 0; }
+.enc-chip { display: inline-block; background: #fde8e8; color: #922b21; border-radius: 10px; padding: 1px 8px; margin: 0 4px 2px 0; font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
+.enc-coment { white-space: normal; min-width: 200px; max-width: 340px; }
 .ind-defs { margin-top: 22px; background: #fff; border-radius: 10px; padding: 12px 18px; box-shadow: 0 1px 5px rgba(0,0,0,0.07); font-size: 0.8rem; color: #4a5568; }
 .ind-defs summary { cursor: pointer; font-weight: 700; color: #1a5276; }
 .ind-defs ul { margin: 8px 0 0 18px; line-height: 1.55; }

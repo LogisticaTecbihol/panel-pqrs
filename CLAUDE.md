@@ -179,6 +179,17 @@ calculan en el cliente.
   bitácora como `cambio_datos`. Las tarjetas-resumen del propio Tablero NO aplican el filtro. Marcadas el 2026-10-19: #47, #51
   y #55 (pruebas de Diana Marquez / PARCELAR, todas rechazadas), con un UPDATE aparte, no dentro de la migración.
 
+## Encuestas > pestaña Indicadores
+
+`panel/encuestas.html` + `js/panel/encuestas.js` tienen dos pestañas (Respuestas / Indicadores; `#indicadores` abre la segunda).
+Sin migración ni escritura: solo lee `encuestas_satisfaccion` (con `fetchAll`) y calcula en el cliente. Los filtros Empresa / Desde /
+Hasta son compartidos por las dos pestañas y filtran por fecha LOCAL (`_f`). Definiciones: satisfecho = 4 o 5 (CSAT), insatisfecho = 1 o 2;
+semáforo del promedio contra la meta 4,5 (ámbar desde 4,0), constantes `META` / `META_MEDIA` / `MIN_N` al inicio del JS. El comparativo
+con el periodo anterior de igual duración solo existe si hay Desde y Hasta. Secciones: KPIs, tendencia mensual (12 meses, solo respeta
+Empresa), distribución, calificación por pregunta, segmentos (empresa, canal, asesor, municipio; con menos de 5 respuestas se ve en
+gris) y alertas (respuestas con algún 1 o 2). Asesor y municipio se agrupan sin mayúsculas ni tildes. Reutiliza las clases `.ind-*`
+de los Indicadores de Mercadeo (más `.enc-*`) y el CSS de `.mk-tabs`.
+
 Pruebas: no hay suite en el repo. Para verificar la UI se usó jsdom con un cliente Supabase
 simulado en memoria; la RLS y los triggers se probaron en SQL dentro de transacciones que se revierten
 (`DO` + `SET LOCAL ROLE authenticated` + `RAISE EXCEPTION` final).
