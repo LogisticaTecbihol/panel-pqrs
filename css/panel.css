@@ -386,3 +386,21 @@ textarea.ef { resize: vertical; }
 .mk-bell-item .m { display: block; font-size: 0.78rem; color: #4a5568; margin-top: 2px; }
 .mk-bell-item .f { display: block; font-size: 0.7rem; color: #a0aec0; margin-top: 3px; }
 .mk-bell-vacio { padding: 18px; text-align: center; color: #a0aec0; font-size: 0.84rem; }
+
+/* Usuarios: tabla y modal «Editar permisos» */
+.btn-edit:disabled { opacity: 0.45; cursor: not-allowed; }
+.us-acc { white-space: nowrap; }
+.us-yo { font-size: 0.72rem; color: #718096; font-weight: 700; margin-left: 6px; }
+.us-nota { color: #718096; font-size: 0.78rem; }
+.us-rol { background: #edf2f7; color: #4a5568; }
+.us-rol-admin { background: #1a5276; color: #fff; }
+.us-rol-gestor { background: #d6eaf8; color: #1a5276; }
+.us-rol-mercadeo { background: #fdebd0; color: #935116; }
+.us-rol-sst { background: #d5f5e3; color: #1e8449; }
+.us-campo { margin-bottom: 16px; }
+.us-chk { display: flex; align-items: center; gap: 8px; font-size: 0.86rem; padding: 4px 0; }
+.us-chk input:disabled { cursor: not-allowed; }
+.us-resumen { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; font-size: 0.82rem; color: #2d3748; }
+.us-resumen ul { margin: 4px 0 0 18px; }
+.us-res-tit { font-size: 0.72rem; font-weight: 700; color: #4a5568; text-transform: uppercase; letter-spacing: 0.3px; }
+.us-alerta { margin-top: 10px; background: #fef5e7; border: 1px solid #f5cba7; color: #935116; border-radius: 6px; padding: 7px 10px; font-size: 0.8rem; font-weight: 600; }

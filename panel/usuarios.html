@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gestión PQRS — Usuarios</title>
-<link rel="stylesheet" href="../css/panel.css?v=20261017">
+<link rel="stylesheet" href="../css/panel.css?v=20261019">
 </head>
 <body>
   <div class="header">
@@ -59,7 +59,7 @@
         <div class="card-head"><h3>Equipo</h3></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Mercadeo</th><th>SST</th><th>Activo</th><th></th></tr></thead>
+            <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Mercadeo</th><th>SST</th><th>Activo</th><th>Acciones</th></tr></thead>
             <tbody id="tbody"></tbody>
           </table>
         </div>
@@ -67,9 +67,43 @@
     </div>
   </div>
 
+  <!-- ══ Modal: editar rol y módulos de un usuario existente ══ -->
+  <div class="overlay" id="editar-overlay" role="dialog" aria-modal="true" aria-labelledby="editar-titulo">
+    <div class="modal-box" style="max-width:520px">
+      <div class="mhdr"><div><h2 id="editar-titulo">Editar permisos</h2><div class="meta"><span id="e-usuario"></span></div></div>
+        <button class="btn-close" data-act="editar-cerrar" aria-label="Cerrar">✕</button></div>
+      <div class="mbody">
+        <div class="us-campo">
+          <label class="ef-label" for="e-rol">Rol</label>
+          <select class="ef" id="e-rol">
+            <option value="lector">Lector (PQRS, solo lectura)</option>
+            <option value="gestor">Gestor (PQRS)</option>
+            <option value="mercadeo">Mercadeo (solo Tablero y CRM)</option>
+            <option value="sst">SST (solo módulo SST)</option>
+            <option value="admin">Admin (todo)</option>
+          </select>
+        </div>
+        <div class="us-campo">
+          <span class="ef-label">Módulos adicionales</span>
+          <label class="us-chk"><input type="checkbox" id="e-mod-mercadeo"> Tablero y CRM de Mercadeo</label>
+          <label class="us-chk"><input type="checkbox" id="e-mod-sst"> SST (Seguridad y Salud en el Trabajo)</label>
+          <div class="ef-help">El rol Mercadeo y el rol SST llevan su módulo siempre; el Admin tiene todos.</div>
+        </div>
+        <div class="us-resumen" id="e-resumen" aria-live="polite"></div>
+      </div>
+      <div class="mftr">
+        <div class="mftr-btns">
+          <button class="btn-cancel" data-act="editar-cerrar">Cancelar</button>
+          <button class="btn-primary" id="e-guardar">Guardar cambios</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="../js/shared/supabase-client.js?v=20261006"></script>
+  <script src="../js/shared/modal.js?v=20261006"></script>
   <script src="../js/panel/auth.js?v=20261018"></script>
-  <script src="../js/panel/usuarios.js?v=20261009"></script>
+  <script src="../js/panel/usuarios.js?v=20261019"></script>
 </body>
 </html>

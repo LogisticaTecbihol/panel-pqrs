@@ -64,6 +64,29 @@ Panel interno del holding con dos áreas:
 - Empresas válidas (fijas, hardcodeadas en CHECK constraints y en el JS del
   panel, no una tabla catálogo): `PARCELAR`, `GREEN`, `RESO`, `IASO`, `IAS`.
 
+## Usuarios: editar rol y módulos (migración 0026)
+
+`panel/usuarios.html` + `js/panel/usuarios.js` (solo admin). El botón **Editar** de cada fila abre un modal con
+rol y módulos (`mercadeo`, `sst`), un resumen de «Cambios / Tendrá acceso a» y **Guardar cambios** (ya no hay
+autoguardado por clic). Activar/Desactivar sigue en la fila, con `confirm()`. El modal relee la fila antes de abrir.
+Reglas de la interfaz: el rol que lleva su módulo (`mercadeo`, `sst`) lo fija; el admin ve todos marcados y se
+guarda con `modulos = []`; al salir de un rol con módulo propio (o de admin) ese módulo se desmarca por defecto
+(el admin puede volver a marcarlo); volver al rol original restaura lo guardado. PQRS y Encuestas NO son módulos
+guardados: salen del rol (`AUTH.hasModule('pqrs'|'encuestas')`). El cambio se ve al recargar (el perfil se lee en
+cada carga de página, no hace falta volver a iniciar sesión).
+
+La seguridad está en la BD (la policy `usuarios_pqrs_update` sigue siendo «solo admin»); 0026 agrega:
+- `trg_usuarios_proteger` (BEFORE UPDATE): `id` nunca cambia; `email` y `created_at` no cambian con sesión; **sin
+  auto-edición** (con sesión no se cambia el propio rol/módulos/activo; el nombre sí); **siempre ≥1 admin activo**
+  (con `pg_advisory_xact_lock`, para que dos admins no se degraden a la vez); normaliza `modulos`.
+- `trg_usuarios_proteger_baja` (BEFORE DELETE): no se borra al último admin activo (llega por la cascada de `auth.users`).
+- `usuarios_pqrs_auditoria` + `trg_usuarios_auditar`: una fila por cambio de rol/módulos/activo con `antes`/`despues`,
+  quién (`hecho_por`, nombre copiado; «Sistema» sin sesión) y cuándo. Solo la leen los admins; no hay pantalla que la
+  muestre (consultar con SQL). No registra altas (las hace `create-user-pqrs` con service_role) ni cambios de nombre.
+- Sin sesión (`auth.uid() IS NULL`: service_role, SQL del dashboard) se salta auto-edición y columnas fijas, pero NO
+  la regla del último admin.
+Probado en SQL dentro de una transacción revertida (`DO` + `SET LOCAL ROLE authenticated` + `request.jwt.claims`).
+
 ## Configuración pendiente tras clonar (secretos del Edge Function)
 
 Configurar con `supabase secrets set` (o desde el dashboard del proyecto,
