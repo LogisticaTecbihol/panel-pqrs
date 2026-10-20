@@ -48,26 +48,20 @@ REVOKE ALL ON FUNCTION public.user_has_module_pqrs(text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.user_has_module_pqrs(text) TO authenticated;
 
 -- ── 3. Lectura de PQRS: por módulo, ya no por la lista de roles ──
+-- ALTER POLICY cambia solo la condición de las policies de 0004/0012 (mismo nombre, comando y rol),
+-- de forma atómica y sin dejar ningún instante la tabla sin policy.
 -- (select ...) para que el planner evalúe la función una sola vez por consulta (patrón de 0009).
-DROP POLICY IF EXISTS "pqrs_select" ON public.pqrs;
-CREATE POLICY "pqrs_select" ON public.pqrs
-  FOR SELECT TO authenticated
+ALTER POLICY "pqrs_select" ON public.pqrs
   USING ((select public.user_has_module_pqrs('pqrs')));
 
-DROP POLICY IF EXISTS "pqrs_adjuntos_select" ON public.pqrs_adjuntos;
-CREATE POLICY "pqrs_adjuntos_select" ON public.pqrs_adjuntos
-  FOR SELECT TO authenticated
+ALTER POLICY "pqrs_adjuntos_select" ON public.pqrs_adjuntos
   USING ((select public.user_has_module_pqrs('pqrs')));
 
-DROP POLICY IF EXISTS "pqrs_bitacora_select" ON public.pqrs_bitacora;
-CREATE POLICY "pqrs_bitacora_select" ON public.pqrs_bitacora
-  FOR SELECT TO authenticated
+ALTER POLICY "pqrs_bitacora_select" ON public.pqrs_bitacora
   USING ((select public.user_has_module_pqrs('pqrs')));
 
 -- Descarga de los adjuntos de gestión (URL firmada). Subir y borrar siguen igual (0006 / 0012).
-DROP POLICY IF EXISTS "pqrs_gestion_adjuntos_select" ON storage.objects;
-CREATE POLICY "pqrs_gestion_adjuntos_select" ON storage.objects
-  FOR SELECT TO authenticated
+ALTER POLICY "pqrs_gestion_adjuntos_select" ON storage.objects
   USING (
     bucket_id = 'pqrs-gestion-adjuntos'
     AND (select public.user_has_module_pqrs('pqrs'))
