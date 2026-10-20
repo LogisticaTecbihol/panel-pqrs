@@ -13,8 +13,10 @@
   var _sortDir = 'desc';
 
   async function cargar() {
+    // Directorio por RPC (migración 0030): usuarios_pqrs solo deja leer la propia fila a quien no es admin,
+    // y leerla directo dejaba en blanco el nombre de los demás responsables.
     var [usuariosRes, pqrsRes] = await Promise.all([
-      _sb.from('usuarios_pqrs').select('id, nombre, email').eq('activo', true),
+      _sb.rpc('list_equipo_pqrs'),
       _sb.from('pqrs').select('*').order('creado_en', { ascending: false }),
     ]);
 
@@ -23,10 +25,11 @@
     _usuarios = usuariosRes.data || [];
     _all = pqrsRes.data || [];
 
+    // El filtro lista a los activos; los inactivos quedan en _usuarios solo para resolver nombres.
     var selResp = document.getElementById('f-responsable');
-    _usuarios.forEach(function (u) {
+    _usuarios.filter(function (u) { return u.activo; }).forEach(function (u) {
       var opt = document.createElement('option');
-      opt.value = u.id; opt.textContent = u.nombre || u.email;
+      opt.value = u.id; opt.textContent = u.nombre;
       selResp.appendChild(opt);
     });
 
@@ -39,7 +42,7 @@
 
   function nombreResponsable(id) {
     var u = _usuarios.filter(function (x) { return x.id === id; })[0];
-    return u ? (u.nombre || u.email) : '';
+    return u ? u.nombre : '';
   }
 
   function filtrar() {

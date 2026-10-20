@@ -107,11 +107,22 @@ módulo `mercadeo`). Los roles `gestor` y `lector` traen PQRS por sí solos y NO
   `pqrs_gestion_adjuntos_select` en `storage.objects`) usan esa función; las de escritura NO cambian.
 - `AUTH.canEdit()` sigue siendo admin/gestor, así que el detalle de un usuario con solo el módulo queda de solo lectura.
 - Al aplicarla nadie tenía `'pqrs'` en `modulos`: no cambió el acceso de nadie hasta que un admin lo marca.
-- Limitación previa (no nueva): `usuarios_pqrs` solo deja leer la propia fila a un no-admin, así que en el dashboard/detalle
-  un usuario sin rol admin ve en blanco el nombre del responsable asignado si no es él mismo. Aplica igual a lector/gestor;
-  arreglarlo pide un RPC tipo `list_equipo_mercadeo()` para PQRS.
 - Probado en SQL en una transacción revertida (sin módulo: 0 filas; con módulo: lee todo y UPDATE/INSERT bloqueados; inactivo:
   0 filas; lector solo lee; gestor sin cambios) y la interfaz en navegador con un Supabase simulado.
+
+### Directorio de responsables (migración 0030)
+
+`usuarios_pqrs` solo deja leer la propia fila a quien no es admin, y el dashboard y el detalle la leían directo: un
+gestor/lector/usuario con el módulo veía en blanco el nombre de todo responsable que no fuera él, un gestor solo podía
+asignarse PQRS a sí mismo, la bitácora guardaba la asignación con el nombre vacío («Asignado a sin asignar») y, si el
+responsable no estaba en la lista (p. ej. inactivo), el selector quedaba vacío y guardar solo un cambio de estado dejaba
+`responsable_id = null` sin que nadie lo pidiera. Ahora ambas pantallas llaman al RPC `list_equipo_pqrs()` (mismo patrón que
+`list_equipo_mercadeo()`): devuelve solo `id`, `nombre` (o el correo si no tiene) y `activo`, vacío si el llamador no tiene
+acceso a PQRS, con las personas que tienen acceso a PQRS (admin, gestor, lector o módulo `pqrs`) más cualquiera que figure
+como responsable de alguna PQRS aunque ya no tenga acceso. Los inactivos vienen para resolver nombres; el filtro y el selector
+listan solo a los activos, y el selector del detalle conserva al responsable actual con la marca «(inactivo)». Cambio visible
+para el admin: su lista de responsables ya no incluye a quien no tiene acceso a PQRS (hoy Mercadeo/SST sin el módulo), que de
+todas formas no podría abrir la PQRS que se le asignara. `anon` no puede ejecutarlo. Sin cambios de policies.
 
 ## Configuración pendiente tras clonar (secretos del Edge Function)
 

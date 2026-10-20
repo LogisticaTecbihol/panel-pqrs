@@ -27,7 +27,7 @@
 
   async function cargar() {
     var [usuariosRes, rowRes, adjRes, bitRes] = await Promise.all([
-      _sb.from('usuarios_pqrs').select('id, nombre, email').eq('activo', true),
+      _sb.rpc('list_equipo_pqrs'), // directorio (migración 0030); usuarios_pqrs solo deja leer la propia fila a un no-admin
       _sb.from('pqrs').select('*').eq('id', pqrsId).single(),
       _sb.from('pqrs_adjuntos').select('*').eq('pqrs_id', pqrsId).order('creado_en'),
       _sb.from('pqrs_bitacora').select('*').eq('pqrs_id', pqrsId).order('creado_en'),
@@ -41,10 +41,13 @@
     _usuarios = usuariosRes.data || [];
     _row = rowRes.data;
 
+    // Lista a los activos, más al responsable actual aunque esté inactivo: sin su opción el selector quedaría
+    // en blanco y al guardar se desasignaría la PQRS sin que nadie lo pida.
     var selResp = document.getElementById('g-responsable');
     _usuarios.forEach(function (u) {
+      if (!u.activo && u.id !== _row.responsable_id) return;
       var opt = document.createElement('option');
-      opt.value = u.id; opt.textContent = u.nombre || u.email;
+      opt.value = u.id; opt.textContent = u.nombre + (u.activo ? '' : ' (inactivo)');
       selResp.appendChild(opt);
     });
 
@@ -159,7 +162,7 @@
 
   function nombreUsuario(id) {
     var u = _usuarios.filter(function (x) { return x.id === id; })[0];
-    return u ? (u.nombre || u.email) : '';
+    return u ? u.nombre : '';
   }
 
   var EVENTO_LABEL = {
