@@ -4,7 +4,8 @@
 // (solo el módulo SST), más usuarios_pqrs.modulos para habilitar un módulo extra sin
 // cambiar de rol. El equipo interno ve todas las empresas (sin empresas por usuario).
 //
-// Módulos: 'pqrs' (por rol admin/gestor/lector); 'mercadeo', 'sst' y 'encuestas'
+// Módulos: 'pqrs' (rol admin/gestor/lector, o la clave en modulos: a un usuario Mercadeo/SST
+// se le puede asignar y entonces solo LEE, migración 0029); 'mercadeo', 'sst' y 'encuestas'
 // (admin o la clave en modulos; Encuestas es de solo lectura y no tiene rol propio,
 // migración 0028). Cada página declara su módulo con
 // <body data-modulo="..."> y los enlaces/tarjetas con data-modulo se ocultan
@@ -317,7 +318,8 @@ var AUTH = (function () {
     _sb.auth.signOut().then(function () { location.replace('login.html'); });
   }
 
-  // canEdit() = escritura sobre PQRS (el rol 'mercadeo' no tiene acceso a PQRS).
+  // canEdit() = escritura sobre PQRS: solo admin y gestor. El módulo 'pqrs' asignado a otro rol
+  // (mercadeo, sst) es solo lectura.
   function canEdit() { return !!_profile && (_profile.rol === 'admin' || _profile.rol === 'gestor'); }
   function isAdmin() { return !!_profile && _profile.rol === 'admin'; }
   function canManageUsers() { return isAdmin(); }
@@ -325,11 +327,12 @@ var AUTH = (function () {
   function getUser() { return _user; }
 
   var ROLES_PQRS = ['admin', 'gestor', 'lector'];
-  // ¿El usuario tiene el módulo? (admin: todos).
+  // ¿El usuario tiene el módulo? (admin: todos). 'pqrs' además lo traen los roles gestor y lector
+  // sin guardarse en modulos; igual que user_has_module_pqrs('pqrs') en la BD.
   function hasModule(key) {
     if (!_profile) return false;
     if (_profile.rol === 'admin') return true;
-    if (key === 'pqrs') return ROLES_PQRS.indexOf(_profile.rol) >= 0;
+    if (key === 'pqrs' && ROLES_PQRS.indexOf(_profile.rol) >= 0) return true;
     return (_profile.modulos || []).indexOf(key) >= 0;
   }
 

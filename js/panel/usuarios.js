@@ -7,7 +7,7 @@
   }
   document.getElementById('content').style.display = '';
 
-  // 'acceso' = lo que da el rol por sí solo (PQRS sale del rol, no de `modulos`; Encuestas es un módulo aparte).
+  // 'acceso' = lo que da el rol por sí solo (PQRS la traen Lector y Gestor; Encuestas es un módulo aparte).
   var ROLES = [
     { v: 'lector', t: 'Lector', acceso: 'PQRS (solo lectura)' },
     { v: 'gestor', t: 'Gestor', acceso: 'PQRS (gestionar)' },
@@ -15,11 +15,14 @@
     { v: 'sst', t: 'SST', acceso: null },
     { v: 'admin', t: 'Admin', acceso: 'Todo: PQRS, Encuestas, Mercadeo, SST y gestión de usuarios' },
   ];
-  // Módulos extra. 'rol' = el rol que siempre lleva ese módulo (null: ninguno; el admin tiene todos).
+  // Módulos extra. 'rol' = el rol que siempre lleva ese módulo y lo guarda en `modulos` (null: ninguno);
+  // 'porRol' = roles que lo traen sin guardarlo en `modulos` (PQRS: Lector y Gestor); el admin tiene todos.
+  // PQRS asignada como módulo (Mercadeo, SST) es de solo lectura: gestionar exige el rol Gestor (migración 0029).
   var MODULOS = [
-    { key: 'mercadeo', rol: 'mercadeo', label: 'Mercadeo', acceso: 'Tablero, CRM e Indicadores de Mercadeo' },
-    { key: 'sst', rol: 'sst', label: 'SST', acceso: 'SST (Seguridad y Salud en el Trabajo)' },
-    { key: 'encuestas', rol: null, label: 'Encuestas', acceso: 'Encuestas de satisfacción (solo lectura)' },
+    { key: 'pqrs', rol: null, porRol: ['lector', 'gestor'], label: 'PQRS', acceso: 'PQRS (solo lectura)' },
+    { key: 'mercadeo', rol: 'mercadeo', porRol: [], label: 'Mercadeo', acceso: 'Tablero, CRM e Indicadores de Mercadeo' },
+    { key: 'sst', rol: 'sst', porRol: [], label: 'SST', acceso: 'SST (Seguridad y Salud en el Trabajo)' },
+    { key: 'encuestas', rol: null, porRol: [], label: 'Encuestas', acceso: 'Encuestas de satisfacción (solo lectura)' },
   ];
   var miId = AUTH.getUser().id;
   var usuarios = [];
@@ -28,8 +31,20 @@
     var r = ROLES.filter(function (x) { return x.v === v; })[0];
     return r ? r.t : v;
   }
+  // ¿Ese rol trae el módulo por sí solo (casilla marcada y bloqueada)?
+  function llevaPorRol(rol, m) {
+    return rol === m.rol || m.porRol.indexOf(rol) >= 0;
+  }
   function tieneModulo(rol, mods, key) {
-    return rol === 'admin' || (mods || []).indexOf(key) >= 0;
+    var m = MODULOS.filter(function (x) { return x.key === key; })[0];
+    return rol === 'admin' || (!!m && llevaPorRol(rol, m)) || (mods || []).indexOf(key) >= 0;
+  }
+  // Texto de la celda de la tabla. PQRS distingue el nivel: Gestor gestiona; Lector o el módulo, solo leen.
+  function textoModulo(u, m) {
+    if (u.rol === 'admin') return '<span class="us-nota">todos</span>';
+    if (!tieneModulo(u.rol, u.modulos, m.key)) return '—';
+    if (m.key === 'pqrs') return u.rol === 'gestor' ? 'Gestiona' : 'Solo lectura';
+    return 'Sí';
   }
 
   // ── Formulario «Nuevo usuario» ──
@@ -38,7 +53,7 @@
     var rol = document.getElementById('n-rol').value;
     MODULOS.forEach(function (m) {
       var chk = document.getElementById('n-mod-' + m.key);
-      if (rol === m.rol) { chk.checked = true; chk.disabled = true; }
+      if (llevaPorRol(rol, m)) { chk.checked = true; chk.disabled = true; }
       else if (rol === 'admin') { chk.checked = false; chk.disabled = true; }
       else { chk.disabled = false; }
     });
@@ -46,25 +61,25 @@
   document.getElementById('n-rol').addEventListener('change', sincronizarFormulario);
   sincronizarFormulario();
 
+  // Lo que se guarda en `modulos`: lo marcado, sin lo que el rol ya trae por sí solo (PQRS en Lector/Gestor).
   function modulosDeFormulario() {
-    return MODULOS.filter(function (m) { return document.getElementById('n-mod-' + m.key).checked; })
-      .map(function (m) { return m.key; });
+    var rol = document.getElementById('n-rol').value;
+    return MODULOS.filter(function (m) {
+      return document.getElementById('n-mod-' + m.key).checked && m.porRol.indexOf(rol) < 0;
+    }).map(function (m) { return m.key; });
   }
 
   // ── Tabla del equipo ──
   function pintar() {
     var cuerpo = document.getElementById('tbody');
     if (!usuarios.length) {
-      cuerpo.innerHTML = '<tr><td colspan="8"style="text-align:center;color:#718096;padding:18px">Sin usuarios.</td></tr>';
+      cuerpo.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#718096;padding:18px">Sin usuarios.</td></tr>';
       return;
     }
     cuerpo.innerHTML = usuarios.map(function (u) {
       var esYo = u.id === miId;
       var id = escHtml(u.id);
-      var celdasMod = MODULOS.map(function (m) {
-        return '<td>' + (u.rol === 'admin' ? '<span class="us-nota">todos</span>'
-          : (tieneModulo(u.rol, u.modulos, m.key) ? 'Sí' : '—')) + '</td>';
-      }).join('');
+      var celdasMod = MODULOS.map(function (m) { return '<td>' + textoModulo(u, m) + '</td>'; }).join('');
       var aviso = ' disabled title="No puedes cambiar tus propios permisos: pídeselo a otro administrador"';
       return '<tr>' +
         '<td>' + escHtml(u.nombre || '') + (esYo ? '<span class="us-yo">(tú)</span>' : '') + '</td>' +
@@ -124,7 +139,7 @@
     MODULOS.forEach(function (m) {
       var chk = chkMod(m.key);
       chk.checked = tieneModulo(u.rol, u.modulos, m.key);
-      chk.disabled = u.rol === 'admin' || u.rol === m.rol;
+      chk.disabled = u.rol === 'admin' || llevaPorRol(u.rol, m);
     });
   }
 
@@ -139,18 +154,19 @@
     MODULOS.forEach(function (m) {
       var chk = chkMod(m.key);
       if (nuevo === 'admin') { chk.checked = true; chk.disabled = true; return; }
-      if (nuevo === m.rol) { chk.checked = true; chk.disabled = true; return; }
+      if (llevaPorRol(nuevo, m)) { chk.checked = true; chk.disabled = true; return; }
       chk.disabled = false;
-      if (previo === 'admin' || previo === m.rol) chk.checked = false;
+      if (previo === 'admin' || llevaPorRol(previo, m)) chk.checked = false;
     });
     resumir();
   }
 
-  // Lo que se guardaría con el formulario tal como está.
+  // Lo que se guardaría con el formulario tal como está. Lo que el rol trae sin guardarse (PQRS en
+  // Lector/Gestor) no entra a `modulos`: si no, al cambiarle el rol después le quedaría el acceso.
   function propuesta() {
     var rol = selRol.value;
     var mods = rol === 'admin' ? [] : MODULOS.filter(function (m) {
-      return m.rol === rol || chkMod(m.key).checked;
+      return m.rol === rol || (m.porRol.indexOf(rol) < 0 && chkMod(m.key).checked);
     }).map(function (m) { return m.key; });
     return { rol: rol, modulos: mods };
   }
@@ -160,7 +176,10 @@
     var r = ROLES.filter(function (x) { return x.v === rol; })[0];
     if (r && r.acceso) lista.push(r.acceso);
     if (rol !== 'admin') {
-      MODULOS.forEach(function (m) { if (tieneModulo(rol, mods, m.key)) lista.push(m.acceso); });
+      // Lo que el rol trae por sí solo ya va en su 'acceso' (PQRS gestionar / solo lectura).
+      MODULOS.forEach(function (m) {
+        if (m.porRol.indexOf(rol) < 0 && tieneModulo(rol, mods, m.key)) lista.push(m.acceso);
+      });
     }
     return lista;
   }

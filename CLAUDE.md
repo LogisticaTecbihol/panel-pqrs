@@ -51,15 +51,15 @@ Panel interno del holding con dos áreas:
   directa a `anon`/`authenticated`.
 - Roles del equipo interno: `admin` (todo, incluida gestión de usuarios),
   `gestor` (gestiona PQRS: estado, asignación, notas, adjuntos), `lector`
-  (solo lectura), `mercadeo` (equipo de Mercadeo: SOLO Tablero y CRM, sin acceso a
-  PQRS; las policies de PQRS enumeran roles, por eso queda excluido).
-- Permisos por módulo: `usuarios_pqrs.modulos` (`'mercadeo'`, `'sst'`, `'encuestas'`); el rol
+  (solo lectura), `mercadeo` (equipo de Mercadeo: Tablero y CRM, sin acceso a PQRS salvo que un admin le
+  asigne el módulo `pqrs`, que es de solo lectura).
+- Permisos por módulo: `usuarios_pqrs.modulos` (`'pqrs'`, `'mercadeo'`, `'sst'`, `'encuestas'`); el rol
   `mercadeo` siempre lleva el suyo (CHECK), igual que `sst`. Un gestor/lector puede recibir un módulo sin
   cambiar de rol. `AUTH.hasModule(key)`; cada página declara su módulo con
   `<body data-modulo="...">` y los enlaces/tarjetas con `data-modulo` se ocultan
   si no lo tiene. En BD: `user_has_module_pqrs('mercadeo')` (admin siempre pasa).
-  La seguridad real es la RLS; el guard de página es solo UX. Única excepción: `pqrs`
-  no es módulo guardado, sale del rol (`admin`/`gestor`/`lector`).
+  La seguridad real es la RLS; el guard de página es solo UX. Única particularidad: `pqrs` además
+  la traen por rol `gestor` y `lector` (no se guarda en `modulos`); ver «PQRS como módulo» más abajo.
 - **Encuestas es un módulo aparte** (migración 0028), de SOLO LECTURA y sin rol propio: el admin lo ve
   siempre; lector, gestor, mercadeo y sst lo ven solo si tienen `'encuestas'` en `modulos` (ya NO por
   su rol). La policy `encuestas_satisfaccion_select` usa `user_has_module_pqrs('encuestas')`; editar,
@@ -72,13 +72,13 @@ Panel interno del holding con dos áreas:
 ## Usuarios: editar rol y módulos (migración 0026)
 
 `panel/usuarios.html` + `js/panel/usuarios.js` (solo admin). El botón **Editar** de cada fila abre un modal con
-rol y módulos (`mercadeo`, `sst`, `encuestas`), un resumen de «Cambios / Tendrá acceso a» y **Guardar cambios** (ya no hay
+rol y módulos (`pqrs`, `mercadeo`, `sst`, `encuestas`), un resumen de «Cambios / Tendrá acceso a» y **Guardar cambios** (ya no hay
 autoguardado por clic). Activar/Desactivar sigue en la fila, con `confirm()`. El modal relee la fila antes de abrir.
 Reglas de la interfaz: el rol que lleva su módulo (`mercadeo`, `sst`) lo fija; el admin ve todos marcados y se
 guarda con `modulos = []`; al salir de un rol con módulo propio (o de admin) ese módulo se desmarca por defecto
 (el admin puede volver a marcarlo); volver al rol original restaura lo guardado. `encuestas` no tiene rol propio
-(se marca aparte, para cualquier rol); PQRS no es módulo guardado, sale del rol. `create-user-pqrs` v7 acepta los
-tres módulos. El cambio se ve al recargar (el perfil se lee en
+(se marca aparte, para cualquier rol); `pqrs` se marca para Mercadeo/SST y la traen sola Lector y Gestor (casilla fija,
+no se guarda). `create-user-pqrs` v8 acepta los cuatro módulos. El cambio se ve al recargar (el perfil se lee en
 cada carga de página, no hace falta volver a iniciar sesión).
 
 La seguridad está en la BD (la policy `usuarios_pqrs_update` sigue siendo «solo admin»); 0026 agrega:
@@ -92,6 +92,26 @@ La seguridad está en la BD (la policy `usuarios_pqrs_update` sigue siendo «sol
 - Sin sesión (`auth.uid() IS NULL`: service_role, SQL del dashboard) se salta auto-edición y columnas fijas, pero NO
   la regla del último admin.
 Probado en SQL dentro de una transacción revertida (`DO` + `SET LOCAL ROLE authenticated` + `request.jwt.claims`).
+
+## PQRS como módulo asignable (migración 0029)
+
+Antes PQRS salía solo del rol (`admin`/`gestor`/`lector`) y un usuario `mercadeo` o `sst` no podía recibirla. Ahora
+`'pqrs'` es un módulo válido de `usuarios_pqrs.modulos`, **de SOLO LECTURA**: da lista, detalle, adjuntos, bitácora y
+descarga de adjuntos de gestión. Gestionar (estado, responsable, fecha límite, notas, adjuntos nuevos) sigue siendo de
+los roles `admin`/`gestor` y borrar de `admin`; quien deba gestionar necesita el rol Gestor (puede llevar además el
+módulo `mercadeo`). Los roles `gestor` y `lector` traen PQRS por sí solos y NO se guarda en `modulos` (la interfaz y
+`create-user-pqrs` lo descartan: si se guardara, un cambio de rol posterior le dejaría el acceso).
+
+- `user_has_module_pqrs('pqrs')` = admin, rol `gestor`/`lector`, o `'pqrs'` en `modulos` (igual que `AUTH.hasModule('pqrs')`).
+- Las 4 policies de lectura (`pqrs_select`, `pqrs_adjuntos_select`, `pqrs_bitacora_select` y
+  `pqrs_gestion_adjuntos_select` en `storage.objects`) usan esa función; las de escritura NO cambian.
+- `AUTH.canEdit()` sigue siendo admin/gestor, así que el detalle de un usuario con solo el módulo queda de solo lectura.
+- Al aplicarla nadie tenía `'pqrs'` en `modulos`: no cambió el acceso de nadie hasta que un admin lo marca.
+- Limitación previa (no nueva): `usuarios_pqrs` solo deja leer la propia fila a un no-admin, así que en el dashboard/detalle
+  un usuario sin rol admin ve en blanco el nombre del responsable asignado si no es él mismo. Aplica igual a lector/gestor;
+  arreglarlo pide un RPC tipo `list_equipo_mercadeo()` para PQRS.
+- Probado en SQL en una transacción revertida (sin módulo: 0 filas; con módulo: lee todo y UPDATE/INSERT bloqueados; inactivo:
+  0 filas; lector solo lee; gestor sin cambios) y la interfaz en navegador con un Supabase simulado.
 
 ## Configuración pendiente tras clonar (secretos del Edge Function)
 

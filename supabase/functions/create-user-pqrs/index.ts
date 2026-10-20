@@ -9,6 +9,10 @@
 //
 // v7 (Encuestas): acepta el módulo 'encuestas' (migración 0028). No tiene rol propio: se marca
 // aparte para cualquier rol, igual que cualquier módulo extra.
+//
+// v8 (PQRS): acepta el módulo 'pqrs' (migración 0029), de solo lectura, para roles que no lo traen
+// (mercadeo, sst). Los roles lector y gestor ya lo traen por sí solos: no se guarda en modulos, para
+// que un cambio de rol posterior no les deje el acceso.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -60,12 +64,14 @@ serve(async (req) => {
     if (password.length < 8) throw new Error('La contraseña debe tener al menos 8 caracteres')
     if (!['admin', 'gestor', 'lector', 'mercadeo', 'sst'].includes(rol)) throw new Error('Rol inválido')
 
-    // Módulos extra habilitados ('mercadeo', 'sst', 'encuestas'). Un rol que lleva su módulo (mercadeo, sst) siempre lo tiene.
-    const MODULOS_VALIDOS = ['mercadeo', 'sst', 'encuestas']
-    const mods: string[] = Array.isArray(modulos) ? modulos : []
+    // Módulos extra habilitados ('pqrs', 'mercadeo', 'sst', 'encuestas'). Un rol que lleva su módulo (mercadeo, sst) siempre lo tiene.
+    const MODULOS_VALIDOS = ['pqrs', 'mercadeo', 'sst', 'encuestas']
+    let mods: string[] = Array.isArray(modulos) ? modulos : []
     if (mods.some((m) => !MODULOS_VALIDOS.includes(m))) throw new Error('Módulo inválido')
     if (rol === 'mercadeo' && !mods.includes('mercadeo')) mods.push('mercadeo')
     if (rol === 'sst' && !mods.includes('sst')) mods.push('sst')
+    // PQRS la traen los roles lector y gestor (y el admin lo tiene todo): no se guarda en modulos.
+    if (['admin', 'gestor', 'lector'].includes(rol)) mods = mods.filter((m) => m !== 'pqrs')
 
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
