@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mercadeo — Eventos</title>
-<link rel="stylesheet" href="../css/panel.css?v=20261025">
+<link rel="stylesheet" href="../css/panel.css?v=20261026">
 </head>
 <body data-modulo="mercadeo">
   <div class="header">
@@ -205,7 +205,25 @@
         </section>
 
         <section class="ev-paso" data-paso="6" style="display:none">
-        <h3 class="ev-sec">6. Aprobación y seguimiento</h3>
+        <h3 class="ev-sec">6. Actividades del evento</h3>
+        <div id="e-chk-nuevo" class="mk-box" style="display:none">
+          <div class="ef-help">El checklist de actividades se arma al gestionar la solicitud: registra el evento y, cuando esté <strong>En revisión</strong> o más adelante, agrégale las actividades para cumplir lo que pidió el solicitante.</div>
+        </div>
+        <div id="e-chk-box">
+          <div class="ef-help" style="margin-bottom:10px">Agrega las actividades con las que Mercadeo cumple los requerimientos del evento y márcalas al terminarlas. Cada una lleva texto libre, responsable, fecha límite y notas. <strong>El solicitante ve solo el avance</strong> (cuántas van) en «Mis solicitudes» de Pedidos; las notas y los responsables son internos. Se gestiona desde «En revisión» hasta «Realizada».</div>
+          <div class="ev-chk-head"><strong id="e-chk-resumen"></strong><div class="ev-chk-bar"><i id="e-chk-bar"></i></div></div>
+          <div class="ev-chk-nueva">
+            <input class="ef" id="e-chk-nueva" maxlength="300" autocomplete="off" placeholder="Describe la actividad (p. ej. «Diseñar el flyer de invitación»)…" aria-label="Nueva actividad">
+            <button type="button" class="btn-confirm" id="e-chk-agregar" data-act="chk-agregar">➕ Agregar</button>
+            <button type="button" class="btn-secondary" id="e-chk-sugerir" data-act="chk-sugerir" title="Crea una actividad por cada canal, material y logística que pidió el solicitante">✨ Sugerir desde lo solicitado</button>
+          </div>
+          <div id="e-chk-lista"></div>
+          <div class="ef-help" id="e-chk-aviso" style="margin-top:6px"></div>
+        </div>
+        </section>
+
+        <section class="ev-paso" data-paso="7" style="display:none">
+        <h3 class="ev-sec">7. Aprobación y seguimiento</h3>
         <div id="e-aprobacion" class="mk-box"></div>
 
         <div id="e-nuevo-files" style="margin-top:14px">
@@ -291,6 +309,6 @@
   <script src="../js/shared/autocomplete.js?v=20261025"></script>
   <script src="../js/shared/colombia-geo.js?v=20261025"></script>
   <script src="../js/panel/auth.js?v=20261021"></script>
-  <script src="../js/panel/eventos.js?v=20261025"></script>
+  <script src="../js/panel/eventos.js?v=20261026"></script>
 </body>
 </html>

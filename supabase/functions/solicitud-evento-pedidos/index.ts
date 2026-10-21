@@ -517,15 +517,25 @@ async function listar(admin: any, body: any) {
   if (!eventos.length) return respuesta(200, { ok: true, eventos: [] })
 
   const ids = eventos.map((x: any) => x.id)
-  const [bit, adj] = await Promise.all([
+  const [bit, adj, chk] = await Promise.all([
     admin.from('mercadeo_evento_bitacora')
       .select('evento_id, tipo_evento, detalle, usuario_nombre, creado_en')
       .in('evento_id', ids).in('tipo_evento', ['respuesta_solicitante', 'cambio_estado', 'observacion_solicitante'])
       .order('id', { ascending: true }),
     admin.from('mercadeo_evento_adjuntos').select('evento_id, nombre_original, tamano_bytes').in('evento_id', ids).order('id', { ascending: true }),
+    // Solo el AVANCE del checklist de actividades (cuántas van); las notas y los responsables son internos de Mercadeo.
+    admin.from('mercadeo_evento_checklist').select('evento_id, hecha').in('evento_id', ids),
   ])
   if (bit.error) throw bit.error
   if (adj.error) throw adj.error
+  if (chk.error) throw chk.error
+  const avance = new Map<number, { total: number; hechas: number }>()
+  for (const c of chk.data || []) {
+    const a = avance.get(c.evento_id) || { total: 0, hechas: 0 }
+    a.total += 1
+    if (c.hecha) a.hechas += 1
+    avance.set(c.evento_id, a)
+  }
 
   const salida = eventos.map((x: any) => ({
     id: x.id,
@@ -554,6 +564,8 @@ async function listar(admin: any, body: any) {
     bd_asistentes_fecha: x.bd_asistentes_fecha,
     bd_no_aplica: x.bd_no_aplica,
     cerrada_en: x.cerrado_en,
+    actividades_total: avance.get(x.id)?.total ?? 0,
+    actividades_hechas: avance.get(x.id)?.hechas ?? 0,
     historial: (bit.data || []).filter((b: any) => b.evento_id === x.id).map((b: any) =>
       b.tipo_evento === 'cambio_estado'
         ? { tipo: 'estado', estado: b.detalle?.a, motivo: b.detalle?.motivo ?? null, en: b.creado_en }

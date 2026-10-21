@@ -526,7 +526,7 @@
   }
 
   // ── Pasos del modal ──
-  // 1 Solicitante · 2 Evento · 3 Objetivos y público · 4 Requerimientos · 5 Presupuesto · 6 Aprobación y seguimiento.
+  // 1 Solicitante · 2 Evento · 3 Objetivos y público · 4 Requerimientos · 5 Presupuesto · 6 Actividades (checklist) · 7 Aprobación y seguimiento.
   // La navegación es libre (también se usa para revisar eventos ya existentes); al guardar se revisan todos los pasos y se lleva al
   // primero con error. En la barra, un paso ya visto muestra ✓ si está completo o ! si le falta algo.
   var PASOS = [
@@ -535,7 +535,8 @@
     { n: 3, t: 'Objetivos y público' },
     { n: 4, t: 'Requerimientos' },
     { n: 5, t: 'Presupuesto' },
-    { n: 6, t: 'Aprobación y seguimiento' },
+    { n: 6, t: 'Actividades' },
+    { n: 7, t: 'Aprobación y seguimiento' },
   ];
 
   // Error (texto) de un paso, o null si está completo.
@@ -677,6 +678,8 @@
     $('e-resp-box').style.display = e && e.origen === 'panel_pedidos' && !final ? '' : 'none';
     $('e-resp-txt').value = '';
     $('e-coment-txt').value = '';
+    $('e-chk-nueva').value = '';
+    cargarChecklist(e ? e.id : null);
     if (e) {
       renderTarea(e);
       $('e-bitacora').innerHTML = '<div class="mk-sin">Cargando…</div>'; $('e-adjuntos').innerHTML = '';
@@ -951,6 +954,156 @@
     $('e-bitacora').innerHTML = rs[1].data.length ? rs[1].data.map(evHtml).join('') : '<div class="mk-sin">Sin actividad registrada.</div>';
   }
 
+  // ══════════════ Checklist de actividades (migración 0036) ══════════════
+  // El gestor agrega varias actividades para cumplir los requerimientos del evento: texto libre, casilla de «hecha», responsable del equipo,
+  // fecha límite y notas. Cada cambio se guarda al instante (no depende del botón Guardar del formulario). Solo se escribe mientras el evento
+  // está En revisión … Realizada (la BD lo exige); después queda de solo lectura. El solicitante ve únicamente el avance, en Pedidos.
+  var CHK_ESTADOS = ['en_revision', 'aprobada', 'en_preparacion', 'realizada'];
+  var checklist = [], equipo = [], chkOcupado = false;
+
+  function chkEditable(e) { return !!e && CHK_ESTADOS.indexOf(e.estado) >= 0; }
+  function etiquetaDe(catalogo, k) { var c = catalogo.filter(function (x) { return x[0] === k; })[0]; return c ? c[1] : k; }
+
+  async function cargarChecklist(id) {
+    checklist = [];
+    renderChecklist();
+    if (!id) return;
+    var rs = await Promise.all([
+      _sb.from('mercadeo_evento_checklist').select('*').eq('evento_id', id).order('id', { ascending: true }),
+      equipo.length ? Promise.resolve({ data: equipo }) : _sb.rpc('list_equipo_mercadeo'),
+    ]);
+    if (editId !== id) return;
+    if (rs[0].error) { $('e-chk-aviso').innerHTML = '<span class="mk-warn">No se pudo cargar el checklist: ' + esc(errMsg(rs[0].error)) + '</span>'; return; }
+    checklist = rs[0].data;
+    if (!rs[1].error && rs[1].data) equipo = rs[1].data;
+    renderChecklist();
+  }
+
+  function filaChk(a, edit) {
+    var dis = edit ? '' : ' disabled';
+    var resp = '<option value="">Sin responsable</option>' + equipo.filter(function (u) { return u.activo || u.id === a.responsable_id; })
+      .map(function (u) { return '<option value="' + esc(u.id) + '"' + (u.id === a.responsable_id ? ' selected' : '') + '>' + esc(u.nombre) + '</option>'; }).join('');
+    var pie = a.hecha
+      ? '✔ Hecha por ' + esc(a.hecha_por_nombre || '—') + (a.hecha_en ? ' el ' + esc(fmtDateTime(a.hecha_en)) : '')
+      : 'Agregada por ' + esc(a.creado_por_nombre || '—') + (a.creado_en ? ' el ' + esc(fmtDateTime(a.creado_en)) : '');
+    return '<div class="ev-chk-item' + (a.hecha ? ' hecha' : '') + '" data-chk="' + esc(a.id) + '">' +
+      '<div class="ev-chk-fila"><input type="checkbox" data-f="hecha"' + (a.hecha ? ' checked' : '') + dis + ' aria-label="Marcar la actividad como hecha">' +
+      '<input class="ef ev-chk-desc" data-f="descripcion" maxlength="300" value="' + esc(a.descripcion) + '"' + dis + ' aria-label="Actividad">' +
+      (edit ? '<button type="button" class="btn-danger" data-act="chk-eliminar" data-id="' + esc(a.id) + '" aria-label="Eliminar actividad">🗑</button>' : '') + '</div>' +
+      '<div class="ev-chk-meta"><select class="ef" data-f="responsable_id"' + dis + ' aria-label="Responsable">' + resp + '</select>' +
+      '<input class="ef" type="date" data-f="fecha_limite" value="' + esc(a.fecha_limite || '') + '"' + dis + ' aria-label="Fecha límite"></div>' +
+      '<textarea class="ef ev-chk-notas" data-f="notas" rows="2" maxlength="1000" placeholder="Notas (texto libre)" aria-label="Notas"' + dis + '>' + esc(a.notas || '') + '</textarea>' +
+      '<div class="ev-chk-pie">' + pie + (a.origen_clave ? ' · sugerida desde lo solicitado' : '') + '</div></div>';
+  }
+
+  function resumenChk() {
+    var hechas = checklist.filter(function (a) { return a.hecha; }).length, total = checklist.length;
+    $('e-chk-resumen').textContent = total ? hechas + ' de ' + total + ' hechas' : 'Sin actividades todavía';
+    $('e-chk-bar').style.width = total ? Math.round(hechas / total * 100) + '%' : '0%';
+  }
+
+  function renderChecklist() {
+    var e = editId ? eventoById[editId] : null, edit = chkEditable(e);
+    $('e-chk-nuevo').style.display = e ? 'none' : '';
+    $('e-chk-box').style.display = e ? '' : 'none';
+    if (!e) return;
+    resumenChk();
+    $('e-chk-lista').innerHTML = checklist.length ? checklist.map(function (a) { return filaChk(a, edit); }).join('')
+      : '<div class="mk-sin">Aún no hay actividades. Agrégalas arriba o usa «Sugerir desde lo solicitado».</div>';
+    $('e-chk-nueva').disabled = $('e-chk-agregar').disabled = $('e-chk-sugerir').disabled = !edit;
+    $('e-chk-aviso').textContent = edit ? '' : (e.estado === 'radicada'
+      ? 'Pasa el evento a «En revisión» para armar el checklist de actividades.'
+      : 'El evento está «' + (ESTADO_T[e.estado] || e.estado) + '»: el checklist queda de solo lectura.');
+  }
+
+  async function agregarActividad() {
+    var e = editId ? eventoById[editId] : null;
+    if (!chkEditable(e) || chkOcupado) return;
+    var txt = $('e-chk-nueva').value.trim().replace(/\s+/g, ' ');
+    if (txt.length < 3) { showToast('Describe la actividad (mínimo 3 caracteres)', '#e74c3c'); $('e-chk-nueva').focus(); return; }
+    chkOcupado = true;
+    var res = await _sb.from('mercadeo_evento_checklist').insert({ evento_id: e.id, descripcion: txt }).select('*').single();
+    chkOcupado = false;
+    if (res.error) { fail('agregar la actividad', res.error); return; }
+    if (editId !== e.id) return;
+    checklist.push(res.data);
+    $('e-chk-nueva').value = '';
+    renderChecklist();
+    $('e-chk-nueva').focus();
+  }
+
+  // Una actividad por cada canal, material y logística que pidió el solicitante (y sus «Otros»); solo las que aún no están.
+  function sugerenciasChk(e) {
+    var out = [];
+    var add = function (clave, prefijo, texto) { out.push({ clave: clave, texto: (prefijo + texto).slice(0, 300) }); };
+    (e.canales || []).forEach(function (k) { add('canal:' + k, 'Canal de promoción: ', etiquetaDe(CANALES, k)); });
+    if (e.canales_otro) add('canal_otro', 'Canal de promoción (otro): ', e.canales_otro);
+    (e.materiales || []).forEach(function (k) { add('material:' + k, 'Material: ', etiquetaDe(MATERIALES, k)); });
+    if (e.materiales_otro) add('material_otro', 'Material (otro): ', e.materiales_otro);
+    (e.logistica || []).forEach(function (k) { add('logistica:' + k, 'Logística: ', etiquetaDe(LOGISTICA, k)); });
+    if (e.logistica_otro) add('logistica_otro', 'Logística (otra): ', e.logistica_otro);
+    return out;
+  }
+
+  async function sugerirActividades() {
+    var e = editId ? eventoById[editId] : null;
+    if (!chkEditable(e) || chkOcupado) return;
+    var todas = sugerenciasChk(e);
+    if (!todas.length) { showToast('El solicitante no marcó canales, materiales ni logística'); return; }
+    var existentes = {}; checklist.forEach(function (a) { if (a.origen_clave) existentes[a.origen_clave] = true; });
+    var nuevas = todas.filter(function (s) { return !existentes[s.clave]; });
+    if (!nuevas.length) { showToast('Ya están todas las actividades sugeridas'); return; }
+    chkOcupado = true;
+    var res = await _sb.from('mercadeo_evento_checklist')
+      .insert(nuevas.map(function (s) { return { evento_id: e.id, descripcion: s.texto, origen_clave: s.clave }; })).select('*');
+    chkOcupado = false;
+    if (res.error) { fail('crear las actividades sugeridas', res.error); return; }
+    if (editId !== e.id) return;
+    checklist = checklist.concat(res.data).sort(function (a, b) { return a.id - b.id; });
+    renderChecklist();
+    showToast('✅ Se agregaron ' + res.data.length + ' actividad' + (res.data.length === 1 ? '' : 'es') + ' sugerida' + (res.data.length === 1 ? '' : 's'));
+  }
+
+  async function guardarActividad(id, campo, el) {
+    var a = checklist.filter(function (x) { return x.id === id; })[0];
+    if (!a) return;
+    if (chkOcupado) { renderChecklist(); showToast('Se está guardando otro cambio; vuelve a intentarlo'); return; }
+    var val;
+    if (campo === 'hecha') val = el.checked;
+    else if (campo === 'descripcion') {
+      val = el.value.trim().replace(/\s+/g, ' ');
+      if (val.length < 3) { showToast('La actividad necesita al menos 3 caracteres', '#e74c3c'); el.value = a.descripcion; return; }
+    } else if (campo === 'responsable_id' || campo === 'fecha_limite') val = el.value || null;
+    else val = el.value.trim();   // notas
+    if (val === (a[campo] === undefined ? null : a[campo]) || (campo === 'notas' && val === (a.notas || ''))) return;
+    var upd = {}; upd[campo] = val;
+    chkOcupado = true;
+    var res = await _sb.from('mercadeo_evento_checklist').update(upd).eq('id', id).select('*').maybeSingle();
+    chkOcupado = false;
+    if (res.error || !res.data) {
+      if (res.error) fail('guardar la actividad', res.error); else showToast('No se guardó: no tienes permiso o la actividad ya no existe', '#e74c3c');
+      renderChecklist();
+      return;
+    }
+    checklist = checklist.map(function (x) { return x.id === id ? res.data : x; });
+    // «Hecha» cambia el aspecto de la fila y el avance; lo demás se guarda sin redibujar (para no quitarle el foco a quien sigue escribiendo).
+    if (campo === 'hecha') renderChecklist(); else resumenChk();
+  }
+
+  async function eliminarActividad(id) {
+    var a = checklist.filter(function (x) { return x.id === id; })[0];
+    if (!a || chkOcupado || !confirm('¿Eliminar la actividad «' + a.descripcion + '»?')) return;
+    chkOcupado = true;
+    var res = await _sb.from('mercadeo_evento_checklist').delete().eq('id', id).select('id');
+    chkOcupado = false;
+    if (res.error || !res.data || !res.data.length) {
+      if (res.error) fail('eliminar la actividad', res.error); else showToast('No se eliminó: no tienes permiso o ya no existe', '#e74c3c');
+      return;
+    }
+    checklist = checklist.filter(function (x) { return x.id !== id; });
+    renderChecklist();
+  }
+
   function listaTxt(arr) { return (arr && arr.length) ? arr.map(esc).join(', ') : '—'; }
   function valorCampo(k, v) {
     if (v === null || v === undefined || v === '') return '—';
@@ -985,6 +1138,7 @@
       case 'respuesta_solicitante': return '📣 Respuesta al solicitante: ' + esc(d.texto);
       case 'observacion_solicitante':
         return '💬 <strong>Observación ' + (d.como === 'aprobador' ? 'del aprobador' : 'del solicitante') + ':</strong> <span style="white-space:pre-wrap">' + esc(d.texto) + '</span>';
+      case 'actividad': return '☑️ Actividad ' + ({ agregada: 'agregada', completada: 'completada ✔', reabierta: 'reabierta', eliminada: 'eliminada' }[d.accion] || esc(d.accion)) + ': ' + esc(d.texto);
       case 'adjunto_agregado': return 'Adjuntó el archivo <strong>' + esc(d.nombre) + '</strong>';
       case 'adjunto_eliminado': return 'Eliminó el adjunto <strong>' + esc(d.nombre) + '</strong>';
       case 'tarea_creada': return '🗂️ Se creó la tarea <a href="mercadeo.html?tarea=' + encodeURIComponent(d.tarea_id) + '"><strong>#' + esc(d.tarea_id) + '</strong></a> en el Tablero';
@@ -1043,6 +1197,9 @@
     'paso-ant': function () { mostrarPaso(paso - 1, true); },
     'paso-sig': function () { mostrarPaso(paso + 1, true); },
     'evento-abrir': function (id) { abrirEvento(Number(id)); },
+    'chk-agregar': function () { agregarActividad(); },
+    'chk-sugerir': function () { sugerirActividades(); },
+    'chk-eliminar': function (id) { eliminarActividad(Number(id)); },
     'evento-guardar': guardarEvento,
     'evento-eliminar': eliminarEvento,
     'cerrar-modal': function () { MODAL.close('evento-overlay'); },
@@ -1092,6 +1249,12 @@
   ['e-fecha', 'e-radicacion'].forEach(function (id) { $(id).addEventListener('change', actualizarAnticipacion); });
   ['e-presupuesto', 'e-solicitado'].forEach(function (id) { $(id).addEventListener('input', actualizarPresupuesto); });
   $('e-desglose').addEventListener('input', actualizarPresupuesto);
+  // Checklist: cada campo se guarda al cambiarlo; Enter en el cuadro de «nueva actividad» la agrega.
+  $('e-chk-lista').addEventListener('change', function (ev) {
+    var el = ev.target, campo = el.getAttribute('data-f'), item = el.closest ? el.closest('.ev-chk-item') : null;
+    if (campo && item) guardarActividad(Number(item.getAttribute('data-chk')), campo, el);
+  });
+  $('e-chk-nueva').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); agregarActividad(); } });
   $('e-bd-na').addEventListener('change', function () { $('e-bd-fecha').disabled = this.checked; if (this.checked) $('e-bd-fecha').value = ''; });
   $('e-files').addEventListener('change', async function () {
     if (!editId || !this.files.length) return;

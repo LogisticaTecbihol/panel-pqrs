@@ -449,3 +449,20 @@ textarea.ef { resize: vertical; min-height: 80px; }
 .ac-item:hover,.ac-item.active{background:#ebf5fb}
 .ac-item strong{color:#1a5276}
 .ac-sub{font-size:.72rem;color:#718096;margin-top:2px}
+
+/* Checklist de actividades del evento */
+.ev-chk-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; font-size: 0.86rem; }
+.ev-chk-bar { flex: 1; height: 8px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
+.ev-chk-bar i { display: block; height: 100%; width: 0; background: #27ae60; transition: width 0.3s; }
+.ev-chk-nueva { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.ev-chk-nueva .ef { flex: 1; min-width: 220px; }
+.ev-chk-item { border: 1px solid #e2e8f0; border-radius: 9px; padding: 10px 12px; margin-bottom: 8px; background: #fff; }
+.ev-chk-item.hecha { background: #f0fff4; border-color: #c6f6d5; }
+.ev-chk-item.hecha .ev-chk-desc { text-decoration: line-through; color: #718096; }
+.ev-chk-fila { display: flex; gap: 10px; align-items: center; }
+.ev-chk-fila > input[type=checkbox] { width: 18px; height: 18px; flex: none; cursor: pointer; }
+.ev-chk-fila .ev-chk-desc { flex: 1; }
+.ev-chk-meta { display: grid; grid-template-columns: 1fr 170px; gap: 8px; margin: 8px 0 0 28px; }
+.ev-chk-notas { display: block; width: calc(100% - 28px); margin: 8px 0 0 28px; }
+.ev-chk-pie { margin: 6px 0 0 28px; font-size: 0.72rem; color: #718096; }
+@media (max-width: 700px) { .ev-chk-meta { grid-template-columns: 1fr; } }

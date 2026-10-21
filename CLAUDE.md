@@ -279,6 +279,13 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
   `lugar` libre pide completarlos al guardar o cambiar de estado (se le muestra el texto anterior). La Segmentación reemplaza a segmento demográfico, segmentación
   profesional y nivel de conocimiento: se guarda en `segmento_profesional`; las otras dos columnas se conservan en BD y se muestran de solo lectura si traen datos.
   Las opciones de Logística (incl. `presencia_mercadeo`, migración 0034) deben coincidir con las de Pedidos.
+- **Checklist de actividades** (migración 0036; paso 6 «Actividades» del modal, «Aprobación y seguimiento» pasó al 7): tabla `mercadeo_evento_checklist`
+  (NO es `mercadeo_actividades`, que es el calendario del CRM). Cada actividad lleva texto libre (3–300), casilla «hecha», responsable (`list_equipo_mercadeo()`),
+  fecha límite opcional y notas (≤ 1000). Se guarda al instante, sin el botón Guardar del formulario. «Sugerir desde lo solicitado» crea una actividad por cada
+  canal, material y logística pedidos (y sus «Otros»), con `origen_clave` para no repetirlas. El trigger `mercadeo_evento_checklist_reglas` solo deja escribir con el
+  evento En revisión / Aprobada / En preparación / Realizada y sella quién creó y quién/cuándo marcó «hecha»; la bitácora del evento registra el tipo `actividad`
+  (agregada a mano, completada, reabierta, eliminada). La función puente `listar` entrega solo el AVANCE (`actividades_total` / `actividades_hechas`) para
+  mostrárselo al solicitante en Pedidos; las notas y los responsables no salen de aquí.
 - **KPI del encabezado** (cliente, sin festivos): Por atender (y cuántas pasan de 48 h hábiles sin respuesta), eventos de los
   próximos 30 días, Oportunidad del mes (≥ 15 días) y Retorno de la base de datos (entregada en ≤ 3 días hábiles tras el evento,
   últimos 90 días; «no aplica» no cuenta). Cada evento realizado sin base de datos y con plazo vencido se marca en la lista.
