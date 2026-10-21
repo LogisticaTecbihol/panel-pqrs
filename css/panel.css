@@ -413,3 +413,14 @@ textarea.ef { resize: vertical; min-height: 80px; }
 .us-resumen ul { margin: 4px 0 0 18px; }
 .us-res-tit { font-size: 0.72rem; font-weight: 700; color: #4a5568; text-transform: uppercase; letter-spacing: 0.3px; }
 .us-alerta { margin-top: 10px; background: #fef5e7; border: 1px solid #f5cba7; color: #935116; border-radius: 6px; padding: 7px 10px; font-size: 0.8rem; font-weight: 600; }
+
+/* ── Eventos de Mercadeo ── */
+.ev-sec { font-size: 0.92rem; color: #1a5276; margin: 22px 0 10px; padding-bottom: 5px; border-bottom: 2px solid #aed6f1; }
+.mbody > .ev-sec:first-of-type { margin-top: 4px; }
+.ev-ayuda { text-transform: none; font-weight: 400; color: #718096; letter-spacing: 0; }
+.ev-horas { display: flex; align-items: center; gap: 8px; }
+.ev-horas .ef { flex: 1; min-width: 0; }
+.ev-checks { flex-direction: column; gap: 6px; }
+.ev-gasto { display: grid; grid-template-columns: 1fr 160px auto; gap: 8px; margin-bottom: 6px; align-items: center; }
+@media (max-width: 700px) { .ev-gasto { grid-template-columns: 1fr 110px auto; } }
+.mk-badge { white-space: nowrap; }

@@ -20,7 +20,7 @@
   // PQRS asignada como módulo (Mercadeo, SST) es de solo lectura: gestionar exige el rol Gestor (migración 0029).
   var MODULOS = [
     { key: 'pqrs', rol: null, porRol: ['lector', 'gestor'], label: 'PQRS', acceso: 'PQRS (solo lectura)' },
-    { key: 'mercadeo', rol: 'mercadeo', porRol: [], label: 'Mercadeo', acceso: 'Tablero, CRM e Indicadores de Mercadeo' },
+    { key: 'mercadeo', rol: 'mercadeo', porRol: [], label: 'Mercadeo', acceso: 'Tablero, CRM, Eventos e Indicadores de Mercadeo' },
     { key: 'sst', rol: 'sst', porRol: [], label: 'SST', acceso: 'SST (Seguridad y Salud en el Trabajo)' },
     { key: 'encuestas', rol: null, porRol: [], label: 'Encuestas', acceso: 'Encuestas de satisfacción (solo lectura)' },
   ];

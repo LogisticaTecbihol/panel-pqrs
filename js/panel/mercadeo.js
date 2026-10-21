@@ -189,10 +189,11 @@
     var esPed = t.origen === 'panel_pedidos';
     var ped = esPed ? '<span class="kb-chip" title="Solicitud enviada desde panel-pedidos">📥 Pedidos</span>' : '';
     var prueba = t.excluir_indicadores ? '<span class="kb-chip" title="Marcada como prueba: no cuenta en los indicadores">🧪 Prueba</span>' : '';
+    var evento = t.evento_id ? '<span class="kb-chip" title="Tarea creada al aprobar el evento EV-' + esc(t.evento_id) + '">🎪 EV-' + esc(t.evento_id) + '</span>' : '';
     var quien = esPed ? '<div class="kb-act">👤 ' + esc(t.a_nombre_de_nombre || t.solicitante_nombre || '—') +
       (t.fecha_tentativa ? ' · lo necesita para ' + esc(fmtDateOnly(t.fecha_tentativa)) : '') + '</div>' : '';
     return '<div class="kb-card p-' + esc(t.prioridad) + (t.urgente ? ' urg' : '') + (sinAval ? ' sin-aval' : '') + uClase + '"' + uEstilo + ' draggable="true" tabindex="0" role="button" data-act="tarea-abrir" data-id="' + esc(t.id) + '" aria-label="Abrir tarea: ' + esc(t.titulo) + '">' + franja +
-      '<div class="kb-card-top">' + urg + ped + prueba + '<span class="kb-chip">' + esc(TIPOS[t.tipo] || t.tipo) + '</span><span class="kb-chip" title="Clase de prioridad">' + esc(CLASE_CORTA[t.prioridad] || t.prioridad) + '</span>' + edad + '</div>' +
+      '<div class="kb-card-top">' + urg + ped + evento + prueba + '<span class="kb-chip">' + esc(TIPOS[t.tipo] || t.tipo) + '</span><span class="kb-chip" title="Clase de prioridad">' + esc(CLASE_CORTA[t.prioridad] || t.prioridad) + '</span>' + edad + '</div>' +
       '<div class="kb-title">' + esc(t.titulo) + '</div>' +
       '<div class="kb-emp">' + empresaChips(t.empresas) + '</div>' + act + quien +
       '<div class="kb-meta">' + (fechaHtml || '<span></span>') + '<span class="kb-avatars">' + avatars + '</span></div>' +
@@ -444,8 +445,10 @@
     // Mercadeo puede rechazar una solicitud de Pedidos mientras no esté entregada ni cancelada.
     $('t-rechazar').style.display = t && t.origen === 'panel_pedidos' && esAbierta(t) ? '' : 'none';
     $('t-guardar').disabled = false; $('t-guardar').textContent = 'Guardar';
-    $('t-flags').innerHTML = t && t.urgente && t.fuera_calendario && !t.aval_por
-      ? '<div class="mk-flag">⚠️ Esta tarea figura como urgente fuera de calendario sin aval registrado (la actividad pudo dejar de estar aprobada). Registra el aval o quita la urgencia.</div>' : '';
+    $('t-flags').innerHTML = (t && t.urgente && t.fuera_calendario && !t.aval_por
+      ? '<div class="mk-flag">⚠️ Esta tarea figura como urgente fuera de calendario sin aval registrado (la actividad pudo dejar de estar aprobada). Registra el aval o quita la urgencia.</div>' : '') +
+      (t && t.evento_id
+        ? '<div class="mk-flag" style="background:#ebf5fb;color:#1a5276">🎪 Tarea creada al aprobar el evento <a href="eventos.html?evento=' + encodeURIComponent(t.evento_id) + '" style="font-weight:700">EV-' + esc(t.evento_id) + '</a>. Si el evento se cancela, esta tarea se cancela sola.</div>' : '');
     var esPed = !!(t && t.origen === 'panel_pedidos');
     $('t-solicitud').style.display = esPed ? '' : 'none';
     $('t-solicitud').innerHTML = esPed ? solicitudHtml(t) : '';

@@ -8,8 +8,8 @@ Panel interno del holding con dos áreas:
   interno para gestionarlas.
 - **Mercadeo** (módulo `mercadeo`): Tablero kanban de tareas del Departamento de
   Mercadeo y CRM de Mercadeo (leads, actividades = calendario maestro,
-  presupuesto, indicadores), para las 5 empresas. El CRM se migró desde
-  panel-pedidos (donde ya no existe). Detalle más abajo.
+  presupuesto, indicadores) y Eventos (solicitudes de eventos, formato MC-ISO-FO01), para las 5
+  empresas. El CRM se migró desde panel-pedidos (donde ya no existe). Detalle más abajo.
 
 ## Stack
 
@@ -26,7 +26,7 @@ Panel interno del holding con dos áreas:
 
 - `index.html` — redirige a `panel/login.html`.
 - `panel/` — páginas del panel interno: login, **inicio** (tarjetas de módulos), dashboard/detalle (PQRS),
-  encuestas, **mercadeo** (tablero), **crm**, **indicadores** (KPI del tablero), usuarios.
+  encuestas, **mercadeo** (tablero), **crm**, **eventos** (solicitudes de eventos), **indicadores** (KPI del tablero), usuarios.
 - `js/panel/` — lógica de cada página.
 - `js/shared/supabase-client.js` — cliente Supabase + utilidades comunes (`fetchAll`, `parseMonto`,
   fechas sin desfase de zona horaria, `errMsg`, `auditoriaHtml`...).
@@ -35,7 +35,8 @@ Panel interno del holding con dos áreas:
 - `css/panel.css` — estilos (sistema de diseño del holding).
 - `supabase/migrations/` — migraciones SQL, aplicadas con el MCP de Supabase
   (`apply_migration`), igual que en panel-pedidos.
-- `supabase/functions/` — Edge Functions (`ingest-formulario`, `create-user-pqrs`).
+- `supabase/functions/` — Edge Functions (`ingest-formulario`, `create-user-pqrs`, `solicitud-mercadeo-pedidos`,
+  `notificar-solicitante`, `solicitud-evento-pedidos`, `notificar-evento-solicitante`).
 - `google-apps-script/` — plantilla del script puente (se despliega manualmente
   en el editor de Apps Script de cada Form, no vía CI).
 - `scripts/importar_historico_pqrs.mjs` — script de un solo uso para importar
@@ -238,6 +239,49 @@ calculan en el cliente.
   pero Indicadores y CRM > Indicadores la ignoran (filtro en el cliente: `indicadores.js` y `crm.js`). Cada cambio queda en la
   bitácora como `cambio_datos`. Las tarjetas-resumen del propio Tablero NO aplican el filtro. Marcadas el 2026-10-19: #47, #51
   y #55 (pruebas de Diana Marquez / PARCELAR, todas rechazadas), con un UPDATE aparte, no dentro de la migración.
+
+### Eventos (migración 0031)
+
+`panel/eventos.html` + `js/panel/eventos.js`, mismo permiso `mercadeo` (sin clave de módulo nueva; el enlace «Eventos» va en
+el menú de todas las páginas y hay tarjeta en Inicio). Digitaliza el formato **MC-ISO-FO01 «Solicitud de eventos» v1** (6 secciones)
+y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS MERCADEO» del Escritorio).
+
+- **Tablas**: `mercadeo_eventos` (consecutivo visible `EV-<id>`; listas de opciones en códigos ASCII con CHECK `<@`:
+  `objetivos`, `canales`, `materiales`, `logistica`, cada una con su texto «Otros»; `desglose_gastos` jsonb de `{concepto, valor}`),
+  `mercadeo_evento_bitacora` y `mercadeo_evento_adjuntos` (mismo bucket privado `mercadeo-adjuntos`, rutas `evento_<id>/…` y,
+  desde Pedidos, `eventos/<request_id>/…`). `mercadeo_tareas.evento_id` liga la tarea del Tablero (índice único: una por evento).
+- **Flujo**: `radicada → en_revision → aprobada → en_preparacion → realizada → cerrada`; `rechazada` solo antes de aprobar;
+  `cancelada` mientras no esté cerrada. `rechazada`/`cancelada`/`cerrada` son FINALES (el trigger rechaza cualquier edición).
+  No se vuelve a revisión una vez aprobada; entre aprobada/en_preparación/realizada se puede retroceder. `cerrada` exige
+  `realizada` y la fecha de llegada de la base de datos de asistentes (`bd_asistentes_fecha`) o `bd_no_aplica`.
+- **Lo sella el servidor** (triggers `trg_auditoria`, `trg_origen`, `trg_reglas`, `trg_bitacora`): quién y cuándo
+  aprobó/rechazó/canceló/realizó/cerró, `respondida_en` (primera respuesta), origen, bitácora de sistema; motivo obligatorio
+  (3–500) al rechazar y cancelar. El navegador solo inserta comentarios (y respuestas al solicitante en eventos de Pedidos).
+- **Política de 15 días**: NO bloquea (decisión del usuario; el manual dice «rechazo automático»). Columnas generadas
+  `dias_anticipacion = fecha_evento - fecha_radicacion` y `extemporanea (< 15)`; la interfaz la muestra como advertencia ⚠ y
+  alimenta el KPI «Oportunidad». `fecha_radicacion` = fecha en que LLEGÓ la solicitud: por defecto hoy, editable al digitar
+  (queda en la bitácora) y fija el puente cuando viene de Pedidos (la del envío del solicitante, no la de la aprobación previa).
+- **Tarea automática**: al pasar a `aprobada` el trigger `trg_tarea` crea en el Tablero una tarea tipo `evento`, clase
+  `soporte_ventas`, `fecha_limite = fecha_evento - 1`, empresa del evento y un brief armado con `mercadeo_evento_brief()`
+  (materiales, canales, logística y objetivos pedidos); la bitácora del evento registra `tarea_creada`. Al `cancelada` se cancela
+  su tarea si sigue abierta. `evento_id` solo lo puede fijar ese trigger (GUC `mercadeo.creando_tarea_evento`). La tarjeta del
+  Tablero muestra el chip 🎪 EV-n y su detalle enlaza al evento. Borrar un evento (solo admin) deja viva la tarea (`ON DELETE SET NULL`).
+- **KPI del encabezado** (cliente, sin festivos): Por atender (y cuántas pasan de 48 h hábiles sin respuesta), eventos de los
+  próximos 30 días, Oportunidad del mes (≥ 15 días) y Retorno de la base de datos (entregada en ≤ 3 días hábiles tras el evento,
+  últimos 90 días; «no aplica» no cuenta). Cada evento realizado sin base de datos y con plazo vencido se marca en la lista.
+- **Desde panel-pedidos** (mismo patrón que «Solicitudes desde panel-pedidos»): Edge Function `solicitud-evento-pedidos`
+  (`verify_jwt=false`, secreto `PEDIDOS_BRIDGE_SECRET`; acciones `preparar`, `crear`, `firmar`, `listar`, `observar`, `retirar`),
+  llamada SOLO por la función `solicitud-evento` de panel-pedidos tras la aprobación previa allá; `crear` es idempotente por
+  `origen_ref` (índice único parcial que no cuenta rechazadas ni canceladas: el solicitante corrige y reenvía → evento NUEVO).
+  Un evento de Pedidos solo se puede `retirar` mientras sea `radicada`/`en_revision` (pasa a `cancelada` con el motivo y el nombre del
+  solicitante; `trg_notificar_retiro` avisa a la campanita); ya aprobado, los cambios se piden con `observar`. Campanita del equipo:
+  `mercadeo_notificaciones.evento_id` + tipos `evento_recibido`, `evento_retirado`, `evento_observacion` (abren `eventos.html?evento=<id>`).
+  Aviso al solicitante: tras cada cambio de estado / rechazo / respuesta la interfaz llama a `notificar-evento-solicitante`
+  (`verify_jwt=true`, exige módulo `mercadeo`), que arma el aviso desde la BD y lo reenvía a `solicitud-evento-aviso` de pedidos
+  (`PEDIDOS_EVENTO_AVISO_URL` opcional). Si falla, el cambio ya quedó guardado y solo se informa.
+- Probado en SQL con transacciones revertidas (`DO` + `SET LOCAL ROLE authenticated` + `request.jwt.claims`): insert y rechazos,
+  sellos no falsificables, creación/cancelación de la tarea, ciclo hasta `cerrada`, RLS (usuario `sst` sin acceso, borrar solo admin),
+  puente (origen, avisos, retiro, reenvío con el mismo `origen_ref`). La interfaz se probó con un arnés de navegador y una BD simulada.
 
 ## Encuestas > pestaña Indicadores
 

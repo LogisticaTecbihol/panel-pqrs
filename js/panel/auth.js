@@ -256,7 +256,7 @@ var AUTH = (function () {
 
   async function _campanaCargar() {
     var r = await _sb.from('mercadeo_notificaciones')
-      .select('id, tipo, tarea_id, titulo, mensaje, leida, creado_en')
+      .select('id, tipo, tarea_id, evento_id, titulo, mensaje, leida, creado_en')
       .order('creado_en', { ascending: false }).limit(30);
     if (r.error) return;
     _campana.lista = r.data || [];
@@ -297,7 +297,8 @@ var AUTH = (function () {
       await _sb.from('mercadeo_notificaciones').update({ leida: true, leida_en: new Date().toISOString() }).eq('id', id);
     }
     _campanaAbrir(false);
-    if (n.tarea_id) location.href = 'mercadeo.html?tarea=' + encodeURIComponent(n.tarea_id);
+    if (n.evento_id) location.href = 'eventos.html?evento=' + encodeURIComponent(n.evento_id);
+    else if (n.tarea_id) location.href = 'mercadeo.html?tarea=' + encodeURIComponent(n.tarea_id);
   }
 
   async function _campanaMarcarTodas() {

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gestión PQRS — Usuarios</title>
-<link rel="stylesheet" href="../css/panel.css?v=20261019">
+<link rel="stylesheet" href="../css/panel.css?v=20261021">
 </head>
 <body>
   <div class="header">
@@ -15,6 +15,7 @@
       <a href="encuestas.html" data-modulo="encuestas">Encuestas</a>
       <a href="mercadeo.html" data-modulo="mercadeo">Tablero</a>
       <a href="crm.html" data-modulo="mercadeo">CRM</a>
+      <a href="eventos.html" data-modulo="mercadeo">Eventos</a>
       <a href="indicadores.html" data-modulo="mercadeo">Indicadores</a>
       <a href="sst.html" data-modulo="sst">SST</a>
       <a href="usuarios.html" class="active">Usuarios</a>
@@ -37,7 +38,7 @@
               <select class="ef" id="n-rol">
                 <option value="lector">Lector (PQRS, solo lectura)</option>
                 <option value="gestor">Gestor (PQRS)</option>
-                <option value="mercadeo">Mercadeo (Tablero y CRM)</option>
+                <option value="mercadeo">Mercadeo (Tablero, CRM y Eventos)</option>
                 <option value="sst">SST (módulo SST)</option>
                 <option value="admin">Admin (todo)</option>
               </select>
@@ -47,7 +48,7 @@
                 <input type="checkbox" id="n-mod-pqrs"> PQRS (solo lectura; para gestionar usa el rol Gestor)
               </label>
               <label style="display:flex;align-items:center;gap:6px;font-size:0.84rem;padding:2px 0">
-                <input type="checkbox" id="n-mod-mercadeo"> Tablero y CRM de Mercadeo
+                <input type="checkbox" id="n-mod-mercadeo"> Tablero, CRM y Eventos de Mercadeo
               </label>
               <label style="display:flex;align-items:center;gap:6px;font-size:0.84rem;padding:2px 0">
                 <input type="checkbox" id="n-mod-sst"> SST (Seguridad y Salud en el Trabajo)
@@ -84,7 +85,7 @@
           <select class="ef" id="e-rol">
             <option value="lector">Lector (PQRS, solo lectura)</option>
             <option value="gestor">Gestor (PQRS)</option>
-            <option value="mercadeo">Mercadeo (Tablero y CRM)</option>
+            <option value="mercadeo">Mercadeo (Tablero, CRM y Eventos)</option>
             <option value="sst">SST (módulo SST)</option>
             <option value="admin">Admin (todo)</option>
           </select>
@@ -92,7 +93,7 @@
         <div class="us-campo">
           <span class="ef-label">Módulos adicionales</span>
           <label class="us-chk"><input type="checkbox" id="e-mod-pqrs"> PQRS (solo lectura; para gestionar usa el rol Gestor)</label>
-          <label class="us-chk"><input type="checkbox" id="e-mod-mercadeo"> Tablero y CRM de Mercadeo</label>
+          <label class="us-chk"><input type="checkbox" id="e-mod-mercadeo"> Tablero, CRM y Eventos de Mercadeo</label>
           <label class="us-chk"><input type="checkbox" id="e-mod-sst"> SST (Seguridad y Salud en el Trabajo)</label>
           <label class="us-chk"><input type="checkbox" id="e-mod-encuestas"> Encuestas de satisfacción (solo lectura)</label>
           <div class="ef-help">Los roles Lector y Gestor llevan PQRS (el Lector solo lee, el Gestor gestiona); marcarlo a un rol Mercadeo o SST le da acceso de solo lectura. El rol Mercadeo y el rol SST llevan su módulo siempre; el Admin tiene todos. Encuestas se marca aparte, para cualquier rol.</div>
@@ -111,7 +112,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="../js/shared/supabase-client.js?v=20261006"></script>
   <script src="../js/shared/modal.js?v=20261006"></script>
-  <script src="../js/panel/auth.js?v=20261020"></script>
-  <script src="../js/panel/usuarios.js?v=20261020"></script>
+  <script src="../js/panel/auth.js?v=20261021"></script>
+  <script src="../js/panel/usuarios.js?v=20261021"></script>
 </body>
 </html>
