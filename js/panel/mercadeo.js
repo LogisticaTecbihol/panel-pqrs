@@ -46,6 +46,8 @@
   var CLASE_RANK = { calendario: 1, soporte_ventas: 2, mejora: 3, exploratorio: 4 };
   var AVAL = { comite: 'Comité de Mercadeo', gerencia_general: 'Gerencia General' };
   var SIGLAS = EMPRESAS.map(function (e) { return e.sigla; });
+  // Las tareas que nacen de un evento pueden ser de empresas adicionales (Chía Abagó, Tecbihol, Otros; migración 0032).
+  var TODAS = SIGLAS.concat(EMPRESAS_EXTRA.map(function (x) { return x.sigla; }));
   var MAX_ARCHIVO = 25 * 1024 * 1024;
 
   // ── Estado ──
@@ -71,7 +73,7 @@
   function empresaChips(arr) {
     arr = arr || [];
     if (SIGLAS.every(function (s) { return arr.indexOf(s) >= 0; })) return '<span class="sigla-badge" style="background:#1a5276;color:#fff">TODO EL HOLDING</span>';
-    return arr.filter(function (s) { return SIGLAS.indexOf(s) >= 0; }).map(function (s) { return '<span class="sigla-badge sigla-' + s + '">' + s + '</span>'; }).join(' ');
+    return arr.filter(function (s) { return TODAS.indexOf(s) >= 0; }).map(function (s) { return '<span class="sigla-badge sigla-' + s + '">' + esc(etiquetaEmpresa(s)) + '</span>'; }).join(' ');
   }
   function actAprobada(id) { var a = id ? actById[id] : null; return !!(a && a.en_calendario); }
   function esAbierta(t) { return ABIERTOS.indexOf(t.estado) >= 0; }
@@ -114,7 +116,8 @@
 
   function rellenarFiltros() {
     var fe = $('f-empresa'), vE = fe.value;
-    fe.innerHTML = '<option value="">Todas</option>' + optsHtml(SIGLAS.map(function (s) { return [s, s]; }), vE);
+    fe.innerHTML = '<option value="">Todas</option>' + optsHtml(SIGLAS.map(function (s) { return [s, s]; })
+      .concat(EMPRESAS_EXTRA.map(function (x) { return [x.sigla, x.nombre]; })), vE);
     var fr = $('f-resp'), vR = fr.value;
     fr.innerHTML = '<option value="">Todos</option><option value="mias">Mis tareas</option><option value="sin">Sin asignar</option>' +
       optsHtml(equipo.filter(function (u) { return u.activo; }).map(function (u) { return [u.id, u.nombre]; }), vR);
@@ -297,8 +300,8 @@
 
   // ══════════════ Modal de tarea ══════════════
   function checksEmpresas(sel) {
-    $('t-empresas').innerHTML = SIGLAS.map(function (s) {
-      return '<label><input type="checkbox" class="t-emp-chk" value="' + s + '"' + (sel.indexOf(s) >= 0 ? ' checked' : '') + '> ' + s + '</label>';
+    $('t-empresas').innerHTML = TODAS.map(function (s) {
+      return '<label><input type="checkbox" class="t-emp-chk" value="' + s + '"' + (sel.indexOf(s) >= 0 ? ' checked' : '') + '> ' + esc(etiquetaEmpresa(s)) + '</label>';
     }).join('') + '<button class="btn-secondary" type="button" data-act="emp-todas">Todo el holding</button>';
   }
 
@@ -676,7 +679,7 @@
     'cerrar-modal': function () { MODAL.close('tarea-overlay'); },
     'mover': function (id, el) { mover(Number(id), Number(el.getAttribute('data-dir'))); },
     'reabrir': function (id) { moverA(Number(id), 'solicitada'); },
-    'emp-todas': function () { [].slice.call(document.querySelectorAll('.t-emp-chk')).forEach(function (c) { c.checked = true; }); },
+    'emp-todas': function () { [].slice.call(document.querySelectorAll('.t-emp-chk')).forEach(function (c) { c.checked = SIGLAS.indexOf(c.value) >= 0; }); },
     'comentar': comentar,
     'responder': responder,
     'rechazo-abrir': abrirRechazo,

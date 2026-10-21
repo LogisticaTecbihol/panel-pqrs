@@ -31,7 +31,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const BUCKET = 'mercadeo-adjuntos'
-const EMPRESAS_VALIDAS = ['PARCELAR', 'GREEN', 'RESO', 'IASO', 'IAS']
+// Las 5 del holding + 3 adicionales de los eventos (migración 0032): OTROS exige el nombre escrito (empresa_otra).
+const EMPRESAS_VALIDAS = ['PARCELAR', 'GREEN', 'RESO', 'IASO', 'IAS', 'CHIA_ABAGO', 'TECBIHOL', 'OTROS']
 const MODALIDADES = ['fisico', 'virtual', 'hibrido']
 const OBJETIVOS = ['leads', 'relacion_clientes', 'lanzamiento', 'posicionamiento', 'capacitacion', 'trafico_digital', 'retencion']
 const CANALES = ['email', 'redes', 'web', 'relaciones_publicas', 'publicidad_digital', 'video']
@@ -254,6 +255,7 @@ async function crear(admin: any, body: any) {
 
   const empresa = d.empresa
   if (!EMPRESAS_VALIDAS.includes(empresa)) throw new Rechazo(`empresa inválida: ${empresa}`)
+  const empresaOtra = empresa === 'OTROS' ? texto(d.empresa_otra, 'El nombre de la empresa', 3, 100).replace(/\s+/g, ' ') : ''
   const modalidad = d.modalidad
   if (!MODALIDADES.includes(modalidad)) throw new Rechazo(`modalidad inválida: ${modalidad}`)
 
@@ -265,6 +267,7 @@ async function crear(admin: any, body: any) {
   const fila = {
     estado: 'radicada',
     empresa,
+    empresa_otra: empresaOtra,
     origen: 'panel_pedidos',
     origen_ref: requestId,
     origen_numero: numeroOrigen,
@@ -491,7 +494,7 @@ async function firmar(admin: any, body: any) {
 // de una lista de solicitudes (`request_ids`, la vista de aprobadores de Pedidos).
 async function listar(admin: any, body: any) {
   let q = admin.from('mercadeo_eventos')
-    .select('id, origen_ref, estado, nombre, empresa, fecha_evento, hora_inicio, modalidad, extemporanea, dias_anticipacion, fecha_radicacion, ' +
+    .select('id, origen_ref, estado, nombre, empresa, empresa_otra, fecha_evento, hora_inicio, modalidad, extemporanea, dias_anticipacion, fecha_radicacion, ' +
       'respondida_en, aprobado_por_nombre, aprobado_en, motivo_rechazo, rechazado_por_nombre, rechazado_en, motivo_cancelacion, cancelado_por_nombre, ' +
       'cancelado_en, realizado_en, bd_asistentes_fecha, bd_no_aplica, cerrado_en, creado_en')
     .eq('origen', 'panel_pedidos')
@@ -525,6 +528,7 @@ async function listar(admin: any, body: any) {
     estado: x.estado,
     nombre: x.nombre,
     empresa: x.empresa,
+    empresa_otra: x.empresa_otra,
     fecha_evento: x.fecha_evento,
     hora_inicio: x.hora_inicio,
     modalidad: x.modalidad,

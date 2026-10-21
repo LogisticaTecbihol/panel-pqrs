@@ -60,6 +60,20 @@ function nombreEmpresa(sigla) {
   return e ? e.nombre : sigla;
 }
 
+// Empresas ADICIONALES de los Eventos (migración 0032): no son del holding (no tienen usuarios, PQRS, CRM ni presupuesto);
+// solo etiquetan el evento y la tarea del Tablero que nace al aprobarlo. «OTROS» lleva el nombre escrito (empresa_otra).
+var EMPRESAS_EXTRA = [
+  { sigla: 'CHIA_ABAGO', nombre: 'Chía Abagó', etiqueta: 'CHÍA ABAGÓ' },
+  { sigla: 'TECBIHOL', nombre: 'Tecbihol', etiqueta: 'TECBIHOL' },
+  { sigla: 'OTROS', nombre: 'Otros', etiqueta: 'OTROS' },
+];
+
+// Texto corto de una empresa para chips y filtros: la sigla del holding o la etiqueta de las adicionales.
+function etiquetaEmpresa(sigla) {
+  var e = EMPRESAS_EXTRA.filter(function (x) { return x.sigla === sigla; })[0];
+  return e ? e.etiqueta : sigla;
+}
+
 // ── Utilidades del área de Mercadeo ───────────────────────────
 
 // Hoy en hora LOCAL como 'YYYY-MM-DD' (toISOString() usa UTC y adelanta el día en Colombia por la noche).

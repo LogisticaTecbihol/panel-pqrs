@@ -47,8 +47,9 @@
   function empresaChips(arr) {
     arr = arr || [];
     if (SIGLAS.every(function (s) { return arr.indexOf(s) >= 0; })) return '<span class="sigla-badge" style="background:#1a5276;color:#fff">TODO EL HOLDING</span>';
-    return arr.filter(function (s) { return SIGLAS.indexOf(s) >= 0; })
-      .map(function (s) { return '<span class="sigla-badge sigla-' + s + '">' + s + '</span>'; }).join(' ') || '—';
+    // Las tareas del Tablero que nacen de un evento pueden ser de empresas adicionales (Chía Abagó, Tecbihol, Otros).
+    return arr.filter(function (s) { return SIGLAS.indexOf(s) >= 0 || etiquetaEmpresa(s) !== s; })
+      .map(function (s) { return '<span class="sigla-badge sigla-' + s + '">' + etiquetaEmpresa(s) + '</span>'; }).join(' ') || '—';
   }
   function nombreEquipo(id) {
     if (!id) return null;

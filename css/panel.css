@@ -101,6 +101,9 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
 .sigla-RESO     { background: #fdebd0; color: #a04000; }
 .sigla-IASO     { background: #e8daef; color: #6c3483; }
 .sigla-IAS      { background: #fde8e8; color: #922b21; }
+.sigla-CHIA_ABAGO { background: #e3f2e1; color: #276749; }
+.sigla-TECBIHOL   { background: #e2e8f0; color: #2d3748; }
+.sigla-OTROS      { background: #f5ebd2; color: #7a5c1e; }
 
 /* Botones */
 .btn-primary { background: #1a5276; color: white; border: none; padding: 9px 22px; border-radius: 7px; cursor: pointer; font-size: 0.87rem; font-weight: 600; transition: background 0.2s; }

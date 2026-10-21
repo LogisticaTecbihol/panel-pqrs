@@ -34,7 +34,7 @@
   var LOGISTICA = [['registros', 'Apoyo en la gestión de registros (plataforma, base de datos)'], ['coordinacion_logistica', 'Coordinación con el área de logística para el evento'], ['plataforma_virtual', 'Apoyo en la configuración de la plataforma de evento virtual']];
   // Etiquetas de campos para el historial de cambios.
   var CAMPO_T = {
-    empresa: 'empresa', nombre: 'nombre del evento', solicitante_nombre: 'solicitante', solicitante_area: 'área', solicitante_correo: 'correo', solicitante_telefono: 'teléfono',
+    empresa: 'empresa', empresa_otra: 'nombre de la empresa', nombre: 'nombre del evento', solicitante_nombre: 'solicitante', solicitante_area: 'área', solicitante_correo: 'correo', solicitante_telefono: 'teléfono',
     fecha_limite_aprobacion: 'fecha límite de aprobación', fecha_radicacion: 'fecha de radicación', fecha_evento: 'fecha del evento', hora_inicio: 'hora de inicio', hora_fin: 'hora de fin',
     modalidad: 'modalidad', lugar: 'lugar', plataforma: 'plataforma', presupuesto_estimado: 'presupuesto estimado', total_solicitado: 'total solicitado a Mercadeo',
     total_invitados: 'total de invitados', asistentes_presencial: 'asistentes presenciales', asistentes_virtual: 'asistentes virtuales',
@@ -57,8 +57,14 @@
   function optsHtml(pares, sel) {
     return pares.map(function (p) { return '<option value="' + esc(p[0]) + '"' + (String(p[0]) === String(sel) ? ' selected' : '') + '>' + esc(p[1]) + '</option>'; }).join('');
   }
+  // Las 5 del holding + las adicionales de los eventos (Chía Abagó, Tecbihol, Otros).
+  var TODAS = SIGLAS.concat(EMPRESAS_EXTRA.map(function (x) { return x.sigla; }));
   function empresaChips(arr) {
-    return (arr || []).filter(function (s) { return SIGLAS.indexOf(s) >= 0; }).map(function (s) { return '<span class="sigla-badge sigla-' + s + '">' + s + '</span>'; }).join(' ');
+    return (arr || []).filter(function (s) { return TODAS.indexOf(s) >= 0; }).map(function (s) { return '<span class="sigla-badge sigla-' + s + '">' + esc(etiquetaEmpresa(s)) + '</span>'; }).join(' ');
+  }
+  // Chip de la empresa de un evento; con «Otros», el nombre escrito va debajo.
+  function empresaDeEvento(e) {
+    return empresaChips([e.empresa]) + (e.empresa === 'OTROS' && e.empresa_otra ? '<div class="ef-help">' + esc(e.empresa_otra) + '</div>' : '');
   }
   function badge(txt, color) { return '<span class="mk-badge" style="background:' + esc(color) + '">' + esc(txt) + '</span>'; }
   function pad2(n) { return String(n).padStart(2, '0'); }
@@ -140,7 +146,8 @@
 
   function rellenarFiltros() {
     var fe = $('f-empresa'), vE = fe.value;
-    fe.innerHTML = '<option value="">Todas</option>' + optsHtml(SIGLAS.map(function (s) { return [s, s]; }), vE);
+    fe.innerHTML = '<option value="">Todas</option>' + optsHtml(SIGLAS.map(function (s) { return [s, s]; })
+      .concat(EMPRESAS_EXTRA.map(function (x) { return [x.sigla, x.nombre]; })), vE);
     var fs = $('f-estado'), vS = fs.value || 'abiertos';
     fs.innerHTML = optsHtml([['abiertos', 'Abiertos (sin cerrar)'], ['finalizados', 'Cerrados, rechazados y cancelados'], ['', 'Todos']].concat(
       Object.keys(ESTADO_T).map(function (k) { return [k, ESTADO_T[k]]; })), vS);
@@ -160,7 +167,7 @@
       if (desde && e.fecha_evento < desde) return false;
       if (hasta && e.fecha_evento > hasta) return false;
       if (soloExt && !e.extemporanea) return false;
-      if (q && norm(e.nombre + ' ' + e.solicitante_nombre + ' ' + e.solicitante_area + ' ' + e.lugar + ' ' + e.plataforma + ' ' + refEv(e)).indexOf(q) < 0) return false;
+      if (q && norm(e.nombre + ' ' + e.solicitante_nombre + ' ' + e.solicitante_area + ' ' + e.lugar + ' ' + e.plataforma + ' ' + e.empresa_otra + ' ' + refEv(e)).indexOf(q) < 0) return false;
       return true;
     });
   }
@@ -216,7 +223,7 @@
       return '<tr class="mk-click" data-act="evento-abrir" data-id="' + esc(e.id) + '">' +
         '<td><strong>' + esc(refEv(e)) + '</strong>' + ped + '</td>' +
         '<td><strong>' + esc(e.nombre) + '</strong><div class="ef-help">' + esc(e.solicitante_nombre) + (e.solicitante_area ? ' · ' + esc(e.solicitante_area) : '') + '</div></td>' +
-        '<td>' + empresaChips([e.empresa]) + '</td>' +
+        '<td>' + empresaDeEvento(e) + '</td>' +
         '<td>' + esc(fmtDateOnly(e.fecha_evento)) + (e.hora_inicio ? ' · ' + esc(hhmm(e.hora_inicio)) : '') +
           '<div class="ef-help">' + esc(MODALIDAD[e.modalidad] || e.modalidad) + (e.lugar ? ' · ' + esc(e.lugar) : '') + '</div></td>' +
         '<td>' + ant + '</td>' +
@@ -269,6 +276,13 @@
   function marcados(id) { return [].slice.call(document.querySelectorAll('.' + id + '-chk:checked')).map(function (c) { return c.value; }); }
 
   function modalidadActual() { var r = document.querySelector('input[name="e-mod"]:checked'); return r ? r.value : ''; }
+  // Con la empresa «Otros» aparece el campo para escribir el nombre.
+  function actualizarEmpresaOtra() {
+    var otros = $('e-empresa').value === 'OTROS';
+    $('e-empresa-otra-box').style.display = otros ? '' : 'none';
+    if (otros && !$('e-empresa-otra').disabled && document.activeElement === $('e-empresa')) $('e-empresa-otra').focus();
+  }
+
   function actualizarModalidad() {
     var m = modalidadActual();
     $('e-lugar-box').style.display = m === 'fisico' || m === 'hibrido' || !m ? '' : 'none';
@@ -339,7 +353,9 @@
     $('e-limite').value = nuevo || !e.fecha_limite_aprobacion ? '' : e.fecha_limite_aprobacion;
     $('e-radicacion').value = nuevo ? today() : e.fecha_radicacion;
     $('e-radicacion').max = today();
-    $('e-empresa').innerHTML = '<option value="">Elegir…</option>' + optsHtml(EMPRESAS.map(function (x) { return [x.sigla, x.sigla + ' — ' + x.nombre]; }), nuevo ? '' : e.empresa);
+    $('e-empresa').innerHTML = '<option value="">Elegir…</option>' + optsHtml(EMPRESAS.map(function (x) { return [x.sigla, x.sigla + ' — ' + x.nombre]; })
+      .concat(EMPRESAS_EXTRA.map(function (x) { return [x.sigla, x.sigla === 'OTROS' ? 'Otros (escribir el nombre)' : x.nombre]; })), nuevo ? '' : e.empresa);
+    $('e-empresa-otra').value = nuevo ? '' : (e.empresa_otra || '');
     $('e-nombre').value = nuevo ? '' : e.nombre;
     $('e-desc').value = nuevo ? '' : e.descripcion;
     $('e-fecha').value = nuevo ? '' : e.fecha_evento;
@@ -372,6 +388,7 @@
     $('e-bd-fecha').value = nuevo || !e.bd_asistentes_fecha ? '' : e.bd_asistentes_fecha;
     $('e-bd-na').checked = !nuevo && !!e.bd_no_aplica;
     actualizarModalidad();
+    actualizarEmpresaOtra();
     actualizarAnticipacion();
   }
 
@@ -385,6 +402,7 @@
     var est = parseMonto($('e-presupuesto').value), sol = parseMonto($('e-solicitado').value);
     var d = {
       empresa: $('e-empresa').value,
+      empresa_otra: $('e-empresa').value === 'OTROS' ? $('e-empresa-otra').value.trim().replace(/\s+/g, ' ') : '',
       solicitante_nombre: $('e-sol-nombre').value.trim(), solicitante_area: $('e-sol-area').value.trim(),
       solicitante_correo: $('e-sol-correo').value.trim(), solicitante_telefono: $('e-sol-tel').value.trim(),
       fecha_limite_aprobacion: $('e-limite').value || null,
@@ -437,6 +455,7 @@
     }
     if (n === 2) {
       if (!d.empresa) return 'Elige la empresa';
+      if (d.empresa === 'OTROS' && (d.empresa_otra.length < 3 || d.empresa_otra.length > 100)) return 'Escribe el nombre de la empresa (entre 3 y 100 caracteres)';
       if (d.nombre.length < 3) return 'El nombre del evento debe tener al menos 3 caracteres';
       if (d.descripcion.length < 10) return 'La descripción del evento debe tener al menos 10 caracteres';
       if (!d.fecha_evento) return 'Indica la fecha del evento';
@@ -526,7 +545,7 @@
     editId = e ? e.id : null;
     orig = e ? JSON.parse(JSON.stringify(e)) : null;
     $('evento-titulo').textContent = e ? refEv(e) + ' · ' + e.nombre : '➕ Nueva solicitud de evento';
-    $('evento-meta').innerHTML = e ? '<span>' + esc(ESTADO_T[e.estado]) + '</span><span>' + esc(e.empresa) + '</span>' : '<span>Estado inicial: Radicada</span>';
+    $('evento-meta').innerHTML = e ? '<span>' + esc(ESTADO_T[e.estado]) + '</span><span>' + esc(etiquetaEmpresa(e.empresa)) + (e.empresa === 'OTROS' && e.empresa_otra ? ' · ' + esc(e.empresa_otra) : '') + '</span>' : '<span>Estado inicial: Radicada</span>';
     llenarForm(e);
     var final = esFinal(e);
     bloquearForm(final);
@@ -833,7 +852,7 @@
   function valorCampo(k, v) {
     if (v === null || v === undefined || v === '') return '—';
     if (k === 'modalidad') return esc(MODALIDAD[v] || v);
-    if (k === 'empresa') return esc(v);
+    if (k === 'empresa') return esc(etiquetaEmpresa(v));
     if (k.indexOf('fecha') === 0 || k === 'bd_asistentes_fecha') return esc(fmtDateOnly(v));
     if (k === 'hora_inicio' || k === 'hora_fin') return esc(hhmm(v));
     if (k === 'presupuesto_estimado' || k === 'total_solicitado') return esc(fmtMoney(v));
@@ -958,6 +977,7 @@
 
   // Formulario: reglas en vivo
   $('e-modalidad').addEventListener('change', actualizarModalidad);
+  $('e-empresa').addEventListener('change', actualizarEmpresaOtra);
   ['e-fecha', 'e-radicacion'].forEach(function (id) { $(id).addEventListener('change', actualizarAnticipacion); });
   ['e-presupuesto', 'e-solicitado'].forEach(function (id) { $(id).addEventListener('input', actualizarPresupuesto); });
   $('e-desglose').addEventListener('input', actualizarPresupuesto);

@@ -283,6 +283,15 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
   Aviso al solicitante: tras cada cambio de estado / rechazo / respuesta la interfaz llama a `notificar-evento-solicitante`
   (`verify_jwt=true`, exige módulo `mercadeo`), que arma el aviso desde la BD y lo reenvía a `solicitud-evento-aviso` de pedidos
   (`PEDIDOS_EVENTO_AVISO_URL` opcional). Si falla, el cambio ya quedó guardado y solo se informa.
+- **Empresas adicionales** (migración 0032): además de las 5 del holding, un evento puede ser de `CHIA_ABAGO` («Chía Abagó»),
+  `TECBIHOL` («Tecbihol») u `OTROS`. Con `OTROS` el nombre escrito va en `mercadeo_eventos.empresa_otra` (3–100 car.; el CHECK
+  `mercadeo_eventos_empresa_otra_check` lo exige solo con `OTROS` y el trigger `mercadeo_eventos_reglas` lo normaliza). La función
+  `mercadeo_empresa_nombre(empresa, otra)` da el nombre legible (`Otros: <nombre>`) y lo usan el brief y el título de la tarea.
+  El Tablero las acepta: `mercadeo_tareas_empresas_check` admite los 8 códigos y la tarea de un evento lleva `empresas = {empresa}`
+  (con `OTROS` el nombre escrito solo sale en el título y el brief, no en el chip). En el JS: `EMPRESAS_EXTRA` y `etiquetaEmpresa()`
+  en `supabase-client.js`; Tablero, Indicadores y CRM las muestran como chips/filtros propios, pero «Todo el holding» sigue marcando solo
+  las 5. Desde Pedidos la función `solicitud-evento` las ofrece (`empresas_extra`) a TODO el que puede enviar, sin depender de sus
+  empresas asignadas, y `solicitud-evento-pedidos` exige `empresa_otra` con `OTROS`.
 - Probado en SQL con transacciones revertidas (`DO` + `SET LOCAL ROLE authenticated` + `request.jwt.claims`): insert y rechazos,
   sellos no falsificables, creación/cancelación de la tarea, ciclo hasta `cerrada`, RLS (usuario `sst` sin acceso, borrar solo admin),
   puente (origen, avisos, retiro, reenvío con el mismo `origen_ref`). La interfaz se probó con un arnés de navegador y una BD simulada.

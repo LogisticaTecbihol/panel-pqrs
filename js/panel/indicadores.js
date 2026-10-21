@@ -26,6 +26,10 @@
   var CLASE_COLOR = { calendario: '#15803d', soporte_ventas: '#2563eb', mejora: '#a0aec0', exploratorio: '#b794f4' };
   var ORIGEN_T = { panel_pedidos: 'Desde Pedidos', panel_mercadeo: 'Creadas en Mercadeo' };
   var SIGLAS = EMPRESAS.map(function (e) { return e.sigla; });
+  // Tareas de eventos de empresas adicionales (Chía Abagó, Tecbihol, Otros; migración 0032).
+  var TODAS = SIGLAS.concat(EMPRESAS_EXTRA.map(function (x) { return x.sigla; }));
+  var EMPRESA_T = {};
+  EMPRESAS_EXTRA.forEach(function (x) { EMPRESA_T[x.sigla] = x.nombre; });
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
   var VERDE = '#15803d', ROJO = '#e74c3c', GRIS = '#a0aec0';
 
@@ -145,7 +149,8 @@
 
   function rellenarFiltros() {
     var fe = $('f-empresa'), vE = fe.value;
-    fe.innerHTML = '<option value="">Todas</option>' + optsHtml(SIGLAS.map(function (s) { return [s, s]; }), vE);
+    fe.innerHTML = '<option value="">Todas</option>' + optsHtml(SIGLAS.map(function (s) { return [s, s]; })
+      .concat(EMPRESAS_EXTRA.map(function (x) { return [x.sigla, x.nombre]; })), vE);
     var fr = $('f-resp'), vR = fr.value;
     fr.innerHTML = '<option value="">Todos</option><option value="sin">Sin asignar</option>' +
       optsHtml(equipo.map(function (u) { return [u.id, u.nombre + (u.activo ? '' : ' (inactivo)')]; }), vR);
@@ -325,7 +330,7 @@
   function renderVolumen(cur, snap) {
     var rec = cur.recibidas, sub = fmtN(rec.length) + ' recibidas en el periodo';
     var porTipo = cardPorClave('Por tipo de tarea', rec, TIPOS, sub, { valores: function (t) { return [t.tipo]; } });
-    var porEmpresa = cardPorClave('Por empresa', rec, {}, sub, { valores: function (t) { return t.empresas.filter(function (s) { return SIGLAS.indexOf(s) >= 0; }); },
+    var porEmpresa = cardPorClave('Por empresa', rec, EMPRESA_T, sub, { valores: function (t) { return t.empresas.filter(function (s) { return TODAS.indexOf(s) >= 0; }); },
       nota: 'Una tarea de varias empresas cuenta en cada una; los porcentajes pueden sumar más de 100%.' });
     var porClase = cardPorClave('Por clase de prioridad', rec, CLASE_T, sub, { valores: function (t) { return [t.prioridad]; }, color: CLASE_COLOR });
     var porOrigen = cardPorClave('Por origen', rec, ORIGEN_T, sub, { valores: function (t) { return [t.origen || 'panel_mercadeo']; } });

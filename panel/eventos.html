@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mercadeo — Eventos</title>
-<link rel="stylesheet" href="../css/panel.css?v=20261022">
+<link rel="stylesheet" href="../css/panel.css?v=20261023">
 </head>
 <body data-modulo="mercadeo">
   <div class="header">
@@ -112,6 +112,9 @@
           <div><label class="ef-label" for="e-empresa">Empresa *</label><select class="ef" id="e-empresa"></select></div>
           <div><label class="ef-label" for="e-nombre">Nombre del evento *</label>
             <input class="ef" id="e-nombre" maxlength="200" autocomplete="off"></div>
+          <div id="e-empresa-otra-box" style="grid-column:1/-1;display:none"><label class="ef-label" for="e-empresa-otra">Nombre de la empresa *</label>
+            <input class="ef" id="e-empresa-otra" maxlength="100" autocomplete="off" placeholder="Escribe el nombre de la empresa">
+            <div class="ef-help">Empresa que no es del holding ni está en la lista (entre 3 y 100 caracteres).</div></div>
           <div style="grid-column:1/-1"><label class="ef-label" for="e-desc">Descripción breve del evento * <span class="ev-ayuda">¿Qué es? ¿Por qué se realiza?</span></label>
             <textarea class="ef" id="e-desc" rows="3" maxlength="2000"></textarea></div>
           <div><label class="ef-label" for="e-fecha">Fecha del evento *</label>
@@ -267,9 +270,9 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="../js/shared/supabase-client.js?v=20261006"></script>
+  <script src="../js/shared/supabase-client.js?v=20261023"></script>
   <script src="../js/shared/modal.js?v=20261006"></script>
   <script src="../js/panel/auth.js?v=20261021"></script>
-  <script src="../js/panel/eventos.js?v=20261022"></script>
+  <script src="../js/panel/eventos.js?v=20261023"></script>
 </body>
 </html>
