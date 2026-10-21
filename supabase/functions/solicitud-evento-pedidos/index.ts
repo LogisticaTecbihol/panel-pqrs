@@ -37,7 +37,7 @@ const MODALIDADES = ['fisico', 'virtual', 'hibrido']
 const OBJETIVOS = ['leads', 'relacion_clientes', 'lanzamiento', 'posicionamiento', 'capacitacion', 'trafico_digital', 'retencion']
 const CANALES = ['email', 'redes', 'web', 'relaciones_publicas', 'publicidad_digital', 'video']
 const MATERIALES = ['banners_redes', 'diseno_email', 'invitaciones', 'presentacion', 'flyers', 'rollups', 'merchandising']
-const LOGISTICA = ['registros', 'coordinacion_logistica', 'plataforma_virtual']
+const LOGISTICA = ['registros', 'coordinacion_logistica', 'plataforma_virtual', 'presencia_mercadeo']
 
 const EXT_PERMITIDAS = [
   'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'txt',
