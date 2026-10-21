@@ -241,7 +241,7 @@
         '<td>' + ant + '</td>' +
         '<td>' + badge(ESTADO_T[e.estado] || e.estado, ESTADO_COLOR[e.estado] || '#718096') + '</td>' +
         '<td>' + atencionHtml(e) + '</td>' +
-        '<td><div class="mk-actions"><button class="btn-ver" data-act="evento-pdf" data-id="' + esc(e.id) + '" title="Ver todas las especificaciones de la solicitud en PDF" aria-label="Ver PDF de ' + esc(refEv(e)) + '">📄 PDF</button>' +
+        '<td><div class="mk-actions"><button class="btn-ver btn-pdf" data-act="evento-pdf" data-id="' + esc(e.id) + '" title="Ver todas las especificaciones de la solicitud en PDF" aria-label="Ver PDF de ' + esc(refEv(e)) + '">📄 PDF</button>' +
         '<button class="btn-ver" data-act="evento-abrir" data-id="' + esc(e.id) + '">' + (esFinal(e) ? 'Ver' : 'Abrir') + '</button></div></td>' +
         '</tr>';
     }).join('');

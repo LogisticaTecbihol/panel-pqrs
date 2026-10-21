@@ -451,7 +451,7 @@
     $('t-guardar').disabled = false; $('t-guardar').textContent = 'Guardar';
     $('t-flags').innerHTML = t && t.evento_id
       ? '<div class="mk-flag" style="background:#ebf5fb;color:#1a5276">🎪 Tarea creada al aprobar el evento <a href="eventos.html?evento=' + encodeURIComponent(t.evento_id) + '" style="font-weight:700">EV-' + esc(t.evento_id) + '</a>. Si el evento se cancela, esta tarea se cancela sola. ' +
-        '<button type="button" class="btn-secondary" data-act="evento-pdf" data-id="' + esc(t.evento_id) + '" style="margin-left:6px" title="Todas las especificaciones de la solicitud del evento, su estado y el checklist">📄 Ver PDF del evento</button></div>' : '';
+        '<button type="button" class="btn-secondary btn-pdf" data-act="evento-pdf" data-id="' + esc(t.evento_id) + '" style="margin-left:6px" title="Todas las especificaciones de la solicitud del evento, su estado y el checklist">📄 Ver PDF del evento</button></div>' : '';
     var esPed = !!(t && t.origen === 'panel_pedidos');
     $('t-solicitud').style.display = esPed ? '' : 'none';
     $('t-solicitud').innerHTML = esPed ? solicitudHtml(t) : '';

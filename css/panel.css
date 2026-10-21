@@ -466,5 +466,8 @@ textarea.ef { resize: vertical; min-height: 80px; }
 .ev-chk-notas { display: block; width: calc(100% - 28px); margin: 8px 0 0 28px; }
 .ev-chk-pie { margin: 6px 0 0 28px; font-size: 0.72rem; color: #718096; }
 @media (max-width: 700px) { .ev-chk-meta { grid-template-columns: 1fr; } }
-.kb-chip-btn { cursor: pointer; background: #ebf5fb; color: #1a5276; }
-.kb-chip-btn:hover { background: #1a5276; color: #fff; }
+.kb-chip-btn { cursor: pointer; background: #c2410c; color: #fff; }
+.kb-chip-btn:hover { background: #9a3412; color: #fff; }
+/* Botones «PDF» de Eventos y del Tablero: naranja intenso para que se vean (no se confunden con azul = acción, rojo = peligro) */
+.btn-pdf { background: #c2410c; color: #fff; border: 1px solid #c2410c; font-weight: 700; }
+.btn-pdf:hover { background: #9a3412; border-color: #9a3412; color: #fff; }
