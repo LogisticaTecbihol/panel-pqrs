@@ -266,6 +266,9 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
   `soporte_ventas`, `fecha_limite = fecha_evento - 1`, empresa del evento y un brief armado con `mercadeo_evento_brief()`
   (materiales, canales, logística y objetivos pedidos); la bitácora del evento registra `tarea_creada`. Al `cancelada` se cancela
   su tarea si sigue abierta. `evento_id` solo lo puede fijar ese trigger (GUC `mercadeo.creando_tarea_evento`). La tarjeta del
+  La tarea nace ASIGNADA por defecto a Laura Sanchez (migración 0037): `mercadeo_responsable_eventos()` devuelve su id solo si sigue activa y con acceso a
+  Mercadeo (si no, la tarea nace sin responsable como antes); para cambiar de persona basta un `CREATE OR REPLACE` de esa función con otro `usuarios_pqrs.id`.
+  Solo aplica a eventos (no a las solicitudes generales a Mercadeo) y el equipo puede cambiar o ampliar el responsable desde la tarjeta. La tarjeta del
   Tablero muestra el chip 🎪 EV-n y su detalle enlaza al evento. Borrar un evento (solo admin) deja viva la tarea (`ON DELETE SET NULL`).
 - **Formulario por pasos**: el modal se divide en 6 pasos (Solicitante · Evento · Objetivos y público · Requerimientos · Presupuesto · Aprobación y
   seguimiento) con barra clicable y Anterior/Siguiente. La navegación es LIBRE (el modal también sirve para revisar eventos ya registrados); un paso ya visto
