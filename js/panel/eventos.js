@@ -49,6 +49,7 @@
   // ── Estado ──
   var eventos = [], eventoById = {}, tareaDeEvento = {};
   var editId = null, orig = null, recargaTimer = null, motivoModo = null;
+  var paso = 1, visitados = {};   // paso visible del modal (1-6) y pasos ya vistos (solo ellos muestran ✓ / !)
 
   function $(id) { return document.getElementById(id); }
   function esc(v) { return escHtml(v === null || v === undefined ? '' : String(v)); }
@@ -412,30 +413,87 @@
     return d;
   }
 
-  function validar(d) {
-    if (d._errGastos) return d._errGastos;
-    if (d.solicitante_nombre.length < 2) return 'Escribe el nombre del solicitante';
-    if (!d.empresa) return 'Elige la empresa';
-    if (d.nombre.length < 3) return 'El nombre del evento debe tener al menos 3 caracteres';
-    if (d.descripcion.length < 10) return 'La descripción del evento debe tener al menos 10 caracteres';
-    if (!d.fecha_evento) return 'Indica la fecha del evento';
-    if (d.fecha_radicacion !== undefined) {
-      if (!d.fecha_radicacion) return 'Indica la fecha en que llegó la solicitud';
-      if (d.fecha_radicacion > today()) return 'La fecha en que llegó la solicitud no puede ser futura';
-      if (d.fecha_evento < d.fecha_radicacion) return 'La fecha del evento no puede ser anterior a la fecha en que llegó la solicitud';
+  // ── Pasos del modal ──
+  // 1 Solicitante · 2 Evento · 3 Objetivos y público · 4 Requerimientos · 5 Presupuesto · 6 Aprobación y seguimiento.
+  // La navegación es libre (también se usa para revisar eventos ya existentes); al guardar se revisan todos los pasos y se lleva al
+  // primero con error. En la barra, un paso ya visto muestra ✓ si está completo o ! si le falta algo.
+  var PASOS = [
+    { n: 1, t: 'Solicitante' },
+    { n: 2, t: 'Evento' },
+    { n: 3, t: 'Objetivos y público' },
+    { n: 4, t: 'Requerimientos' },
+    { n: 5, t: 'Presupuesto' },
+    { n: 6, t: 'Aprobación y seguimiento' },
+  ];
+
+  // Error (texto) de un paso, o null si está completo.
+  function validarPaso(d, n) {
+    if (n === 1) {
+      if (d.solicitante_nombre.length < 2) return 'Escribe el nombre del solicitante';
+      if (d.fecha_radicacion !== undefined) {
+        if (!d.fecha_radicacion) return 'Indica la fecha en que llegó la solicitud';
+        if (d.fecha_radicacion > today()) return 'La fecha en que llegó la solicitud no puede ser futura';
+      }
     }
-    if (d.hora_inicio && d.hora_fin && d.hora_fin <= d.hora_inicio) return 'La hora de fin debe ser posterior a la de inicio';
-    if (d.fecha_limite_aprobacion && d.fecha_limite_aprobacion > d.fecha_evento) return 'La fecha límite de aprobación no puede ser posterior a la fecha del evento';
-    if (!d.modalidad) return 'Elige la modalidad: físico, virtual o híbrido';
-    if ((d.modalidad === 'fisico' || d.modalidad === 'hibrido') && !d.lugar) return 'Indica el lugar o ubicación del evento';
-    if ((d.modalidad === 'virtual' || d.modalidad === 'hibrido') && !d.plataforma) return 'Indica la plataforma del evento virtual';
-    if (isNaN(d.presupuesto_estimado) || isNaN(d.total_solicitado)) return 'El presupuesto y el total solicitado deben ser números';
-    var enteros = [['total_invitados', 'El total de invitados'], ['asistentes_presencial', 'Los asistentes presenciales'], ['asistentes_virtual', 'Los asistentes virtuales']];
-    for (var i = 0; i < enteros.length; i++) {
-      var v = d[enteros[i][0]];
-      if (v !== null && (!Number.isInteger(v) || v < 0 || v > 100000)) return enteros[i][1] + ' debe ser un número entero entre 0 y 100000';
+    if (n === 2) {
+      if (!d.empresa) return 'Elige la empresa';
+      if (d.nombre.length < 3) return 'El nombre del evento debe tener al menos 3 caracteres';
+      if (d.descripcion.length < 10) return 'La descripción del evento debe tener al menos 10 caracteres';
+      if (!d.fecha_evento) return 'Indica la fecha del evento';
+      if (d.fecha_radicacion && d.fecha_evento < d.fecha_radicacion) return 'La fecha del evento no puede ser anterior a la fecha en que llegó la solicitud';
+      if (d.hora_inicio && d.hora_fin && d.hora_fin <= d.hora_inicio) return 'La hora de fin debe ser posterior a la de inicio';
+      if (d.fecha_limite_aprobacion && d.fecha_limite_aprobacion > d.fecha_evento) return 'La fecha límite de aprobación no puede ser posterior a la fecha del evento';
+      if (!d.modalidad) return 'Elige la modalidad: físico, virtual o híbrido';
+      if ((d.modalidad === 'fisico' || d.modalidad === 'hibrido') && !d.lugar) return 'Indica el lugar o ubicación del evento';
+      if ((d.modalidad === 'virtual' || d.modalidad === 'hibrido') && !d.plataforma) return 'Indica la plataforma del evento virtual';
+    }
+    if (n === 3) {
+      var enteros = [['total_invitados', 'El total de invitados'], ['asistentes_presencial', 'Los asistentes presenciales'], ['asistentes_virtual', 'Los asistentes virtuales']];
+      for (var i = 0; i < enteros.length; i++) {
+        var v = d[enteros[i][0]];
+        if (v !== null && (!Number.isInteger(v) || v < 0 || v > 100000)) return enteros[i][1] + ' debe ser un número entero entre 0 y 100000';
+      }
+    }
+    if (n === 5) {
+      if (d._errGastos) return d._errGastos;
+      if (isNaN(d.presupuesto_estimado) || isNaN(d.total_solicitado)) return 'El presupuesto y el total solicitado deben ser números';
     }
     return null;
+  }
+
+  // Revisa todos los pasos: si alguno tiene error, lleva a ese paso, lo avisa y devuelve false.
+  function revisar(d) {
+    for (var n = 1; n <= PASOS.length; n++) {
+      var msg = validarPaso(d, n);
+      if (msg) { marcarTodosVisitados(); mostrarPaso(n); showToast(msg, '#e74c3c'); return false; }
+    }
+    return true;
+  }
+
+  function marcarTodosVisitados() { PASOS.forEach(function (p) { visitados[p.n] = true; }); }
+
+  function renderPasos() {
+    var d = leerForm(), final = esFinal(editId ? eventoById[editId] : null);
+    $('e-pasos').innerHTML = PASOS.map(function (p) {
+      var est = p.n === paso ? 'actual' : (visitados[p.n] ? (!final && validarPaso(d, p.n) ? 'error' : 'ok') : '');
+      var marca = est === 'ok' ? '✓' : est === 'error' ? '!' : String(p.n);
+      return '<li class="' + est + '"><button type="button" data-act="paso-ir" data-id="' + p.n + '"' + (est === 'actual' ? ' aria-current="step"' : '') +
+        ' title="' + esc(p.t) + (est === 'error' ? ' — falta completar algo' : '') + '"><span class="num">' + marca + '</span><span class="txt">' + esc(p.t) + '</span></button></li>';
+    }).join('');
+  }
+
+  function mostrarPaso(n, scroll) {
+    n = Math.max(1, Math.min(PASOS.length, n));
+    paso = n;
+    visitados[n] = true;
+    [].slice.call(document.querySelectorAll('#evento-overlay .ev-paso')).forEach(function (s) {
+      s.style.display = Number(s.getAttribute('data-paso')) === n ? '' : 'none';
+    });
+    $('e-anterior').style.visibility = n === 1 ? 'hidden' : 'visible';
+    $('e-siguiente').style.visibility = n === PASOS.length ? 'hidden' : 'visible';
+    $('e-paso-txt').textContent = 'Paso ' + n + ' de ' + PASOS.length + ' · ' + PASOS[n - 1].t;
+    renderPasos();
+    if (scroll) $('e-pasos').scrollIntoView({ block: 'nearest' });
   }
 
   // Valores de la fila en el mismo formato que leerForm() (para detectar qué cambió).
@@ -503,7 +561,10 @@
       $('e-audit').innerHTML = auditoriaHtml(e);
       cargarDetalle(e.id);
     }
-    MODAL.open('evento-overlay', e ? 'e-sol-nombre' : 'e-sol-nombre');
+    visitados = {};
+    if (e) marcarTodosVisitados();   // un evento ya registrado está completo: todos los pasos como vistos
+    mostrarPaso(1);
+    MODAL.open('evento-overlay', 'e-sol-nombre');
   }
 
   function renderBanderas(e) {
@@ -608,8 +669,7 @@
 
   async function guardarEvento() {
     var d = leerForm();
-    var err = validar(d);
-    if (err) { showToast(err, '#e74c3c'); return; }
+    if (!revisar(d)) return;
     var btn = $('e-guardar');
     btn.disabled = true; btn.textContent = 'Guardando…';
     var res, nuevoId = editId, etiqueta = editId ? 'Guardar cambios' : 'Registrar solicitud';
@@ -636,8 +696,7 @@
     var e = eventoById[editId];
     if (!e) return;
     var d = leerForm();
-    var err = validar(d);
-    if (err) { showToast(err, '#e74c3c'); return; }
+    if (!revisar(d)) return;
     if (nuevo === 'cerrada') {
       if (!d.bd_asistentes_fecha && !d.bd_no_aplica) {
         showToast('Para cerrar el evento registra la fecha en que llegó la base de datos de asistentes, o márcala como «no aplica»', '#e74c3c');
@@ -858,6 +917,9 @@
       $('f-estado').value = 'abiertos'; $('f-ext').checked = false; render();
     },
     'evento-nuevo': function () { abrirEvento(null); },
+    'paso-ir': function (id) { mostrarPaso(Number(id), true); },
+    'paso-ant': function () { mostrarPaso(paso - 1, true); },
+    'paso-sig': function () { mostrarPaso(paso + 1, true); },
     'evento-abrir': function (id) { abrirEvento(Number(id)); },
     'evento-guardar': guardarEvento,
     'evento-eliminar': eliminarEvento,

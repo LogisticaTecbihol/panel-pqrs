@@ -416,7 +416,7 @@ textarea.ef { resize: vertical; min-height: 80px; }
 
 /* ── Eventos de Mercadeo ── */
 .ev-sec { font-size: 0.92rem; color: #1a5276; margin: 22px 0 10px; padding-bottom: 5px; border-bottom: 2px solid #aed6f1; }
-.mbody > .ev-sec:first-of-type { margin-top: 4px; }
+.ev-paso > .ev-sec:first-child { margin-top: 4px; }
 .ev-ayuda { text-transform: none; font-weight: 400; color: #718096; letter-spacing: 0; }
 .ev-horas { display: flex; align-items: center; gap: 8px; }
 .ev-horas .ef { flex: 1; min-width: 0; }
@@ -424,3 +424,18 @@ textarea.ef { resize: vertical; min-height: 80px; }
 .ev-gasto { display: grid; grid-template-columns: 1fr 160px auto; gap: 8px; margin-bottom: 6px; align-items: center; }
 @media (max-width: 700px) { .ev-gasto { grid-template-columns: 1fr 110px auto; } }
 .mk-badge { white-space: nowrap; }
+
+/* Pasos del modal de Eventos */
+.ev-pasos { display: flex; list-style: none; margin: 0 0 22px; padding: 0; }
+.ev-pasos li { flex: 1; position: relative; }
+.ev-pasos li + li::before { content: ''; position: absolute; top: 19px; left: -50%; width: 100%; height: 2px; background: #e2e8f0; }
+.ev-pasos button { position: relative; z-index: 1; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 5px; background: none; border: none; cursor: pointer; padding: 4px; font-family: inherit; font-size: 0.76rem; font-weight: 600; color: #718096; line-height: 1.25; text-align: center; }
+.ev-pasos .num { width: 30px; height: 30px; border-radius: 50%; background: #e2e8f0; color: #4a5568; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; }
+.ev-pasos li.actual button { color: #1a5276; }
+.ev-pasos li.actual .num { background: #1a5276; color: #fff; box-shadow: 0 0 0 4px #d6eaf8; }
+.ev-pasos li.ok .num { background: #27ae60; color: #fff; }
+.ev-pasos li.error .num { background: #e67e22; color: #fff; }
+.ev-pasos button:focus-visible { outline: 2px solid #1a5276; outline-offset: 2px; border-radius: 6px; }
+.ev-nav { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 24px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
+.ev-nav-info { font-size: 0.8rem; color: #718096; text-align: center; flex: 1; }
+@media (max-width: 700px) { .ev-pasos .txt { display: none; } .ev-pasos li.actual .txt { display: block; position: absolute; top: 40px; left: 50%; transform: translateX(-50%); white-space: nowrap; } .ev-pasos { margin-bottom: 40px; } }

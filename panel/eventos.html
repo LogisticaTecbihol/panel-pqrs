@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mercadeo — Eventos</title>
-<link rel="stylesheet" href="../css/panel.css?v=20261021">
+<link rel="stylesheet" href="../css/panel.css?v=20261022">
 </head>
 <body data-modulo="mercadeo">
   <div class="header">
@@ -82,6 +82,10 @@
         <div id="e-flags"></div>
         <div id="e-origen" class="mk-box" style="display:none;margin-bottom:14px"></div>
 
+        <ol class="ev-pasos" id="e-pasos" aria-label="Pasos de la solicitud"></ol>
+
+        <section class="ev-paso" data-paso="1">
+
         <h3 class="ev-sec">1. Información general del solicitante</h3>
         <div class="form-grid cols2">
           <div><label class="ef-label" for="e-sol-nombre">Nombre del solicitante *</label>
@@ -100,6 +104,9 @@
             <div class="ef-help" id="e-radicacion-help">Por defecto hoy; si el correo llegó antes, pon esa fecha (cuenta para la política de 15 días).</div></div>
         </div>
 
+        </section>
+
+        <section class="ev-paso" data-paso="2" style="display:none">
         <h3 class="ev-sec">2. Detalles del evento</h3>
         <div class="form-grid cols2">
           <div><label class="ef-label" for="e-empresa">Empresa *</label><select class="ef" id="e-empresa"></select></div>
@@ -120,6 +127,9 @@
             <input class="ef" id="e-plataforma" maxlength="200" autocomplete="off"></div>
         </div>
 
+        </section>
+
+        <section class="ev-paso" data-paso="3" style="display:none">
         <h3 class="ev-sec">3. Objetivos y público</h3>
         <span class="ef-label">Objetivos del evento</span>
         <div class="mk-checks ev-checks" id="e-objetivos"></div>
@@ -140,6 +150,9 @@
             <div class="ev-horas"><input class="ef" id="e-asis-pres" type="number" min="0" max="100000" inputmode="numeric" aria-label="Asistentes presenciales" placeholder="Presenciales"> <span>/</span> <input class="ef" id="e-asis-virt" type="number" min="0" max="100000" inputmode="numeric" aria-label="Asistentes virtuales" placeholder="Virtuales"></div></div>
         </div>
 
+        </section>
+
+        <section class="ev-paso" data-paso="4" style="display:none">
         <h3 class="ev-sec">4. Requerimientos específicos de Mercadeo</h3>
         <span class="ef-label">Canales de promoción solicitados</span>
         <div class="mk-checks ev-checks" id="e-canales"></div>
@@ -154,6 +167,9 @@
         <div style="margin:8px 0 14px"><label class="ef-label" for="e-logistica-otro">Otros (especifica)</label>
           <input class="ef" id="e-logistica-otro" maxlength="300" autocomplete="off"></div>
 
+        </section>
+
+        <section class="ev-paso" data-paso="5" style="display:none">
         <h3 class="ev-sec">5. Presupuesto</h3>
         <div class="form-grid cols2">
           <div><label class="ef-label" for="e-presupuesto">Presupuesto estimado del evento ($)</label>
@@ -167,7 +183,10 @@
         <div style="margin:6px 0 4px"><button type="button" class="btn-secondary" data-act="gasto-agregar">➕ Agregar línea</button>
           <span class="ef-help" id="e-desglose-total" style="margin-left:10px"></span></div>
 
-        <h3 class="ev-sec">6. Aprobación</h3>
+        </section>
+
+        <section class="ev-paso" data-paso="6" style="display:none">
+        <h3 class="ev-sec">6. Aprobación y seguimiento</h3>
         <div id="e-aprobacion" class="mk-box"></div>
 
         <div id="e-nuevo-files" style="margin-top:14px">
@@ -209,6 +228,13 @@
           </div>
           <div id="e-audit"></div>
         </div>
+        </section>
+
+        <div class="ev-nav">
+          <button type="button" class="btn-cancel" id="e-anterior" data-act="paso-ant">← Anterior</button>
+          <span class="ev-nav-info" id="e-paso-txt"></span>
+          <button type="button" class="btn-confirm" id="e-siguiente" data-act="paso-sig">Siguiente →</button>
+        </div>
       </div>
       <div class="mftr">
         <div class="mk-actions" id="e-acciones"></div>
@@ -244,6 +270,6 @@
   <script src="../js/shared/supabase-client.js?v=20261006"></script>
   <script src="../js/shared/modal.js?v=20261006"></script>
   <script src="../js/panel/auth.js?v=20261021"></script>
-  <script src="../js/panel/eventos.js?v=20261021"></script>
+  <script src="../js/panel/eventos.js?v=20261022"></script>
 </body>
 </html>

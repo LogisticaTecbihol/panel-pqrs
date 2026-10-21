@@ -266,6 +266,10 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
   (materiales, canales, logística y objetivos pedidos); la bitácora del evento registra `tarea_creada`. Al `cancelada` se cancela
   su tarea si sigue abierta. `evento_id` solo lo puede fijar ese trigger (GUC `mercadeo.creando_tarea_evento`). La tarjeta del
   Tablero muestra el chip 🎪 EV-n y su detalle enlaza al evento. Borrar un evento (solo admin) deja viva la tarea (`ON DELETE SET NULL`).
+- **Formulario por pasos**: el modal se divide en 6 pasos (Solicitante · Evento · Objetivos y público · Requerimientos · Presupuesto · Aprobación y
+  seguimiento) con barra clicable y Anterior/Siguiente. La navegación es LIBRE (el modal también sirve para revisar eventos ya registrados); un paso ya visto
+  muestra ✓ o ! según esté completo, y al guardar o cambiar de estado se revisan todos los pasos y se lleva al primero con error (`validarPaso` / `revisar`
+  en `eventos.js`). El pie del modal (acciones de estado y Guardar) se ve en todos los pasos.
 - **KPI del encabezado** (cliente, sin festivos): Por atender (y cuántas pasan de 48 h hábiles sin respuesta), eventos de los
   próximos 30 días, Oportunidad del mes (≥ 15 días) y Retorno de la base de datos (entregada en ≤ 3 días hábiles tras el evento,
   últimos 90 días; «no aplica» no cuenta). Cada evento realizado sin base de datos y con plazo vencido se marca en la lista.
