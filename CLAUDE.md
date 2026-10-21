@@ -289,6 +289,10 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
   evento En revisión / Aprobada / En preparación / Realizada y sella quién creó y quién/cuándo marcó «hecha»; la bitácora del evento registra el tipo `actividad`
   (agregada a mano, completada, reabierta, eliminada). La función puente `listar` entrega solo el AVANCE (`actividades_total` / `actividades_hechas`) para
   mostrárselo al solicitante en Pedidos; las notas y los responsables no salen de aquí.
+- **PDF de la solicitud** (`js/panel/eventos-pdf.js`, `EVENTO_PDF.solicitud`): botón «📄 PDF» en cada fila de la lista y «📄 Ver PDF» en el pie del modal. Abre en una
+  pestaña nueva (si el navegador la bloquea, se descarga) un PDF carta con TODAS las especificaciones guardadas del evento: estado y aprobaciones, las secciones 1–5 del
+  formato MC-ISO-FO01, archivos adjuntos y el checklist de actividades con su avance (sin las notas internas). Refleja lo guardado, no lo que se esté editando en el
+  formulario. jsPDF 2.5.2 + autotable 3.8.4 (CDN, como SST); solo caracteres Latin-1: `L()` limpia emojis y comillas tipográficas de lo que escriben las personas.
 - **KPI del encabezado** (cliente, sin festivos): Por atender (y cuántas pasan de 48 h hábiles sin respuesta), eventos de los
   próximos 30 días, Oportunidad del mes (≥ 15 días) y Retorno de la base de datos (entregada en ≤ 3 días hábiles tras el evento,
   últimos 90 días; «no aplica» no cuenta). Cada evento realizado sin base de datos y con plazo vencido se marca en la lista.

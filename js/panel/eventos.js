@@ -241,7 +241,8 @@
         '<td>' + ant + '</td>' +
         '<td>' + badge(ESTADO_T[e.estado] || e.estado, ESTADO_COLOR[e.estado] || '#718096') + '</td>' +
         '<td>' + atencionHtml(e) + '</td>' +
-        '<td><div class="mk-actions"><button class="btn-ver" data-act="evento-abrir" data-id="' + esc(e.id) + '">' + (esFinal(e) ? 'Ver' : 'Abrir') + '</button></div></td>' +
+        '<td><div class="mk-actions"><button class="btn-ver" data-act="evento-pdf" data-id="' + esc(e.id) + '" title="Ver todas las especificaciones de la solicitud en PDF" aria-label="Ver PDF de ' + esc(refEv(e)) + '">📄 PDF</button>' +
+        '<button class="btn-ver" data-act="evento-abrir" data-id="' + esc(e.id) + '">' + (esFinal(e) ? 'Ver' : 'Abrir') + '</button></div></td>' +
         '</tr>';
     }).join('');
   }
@@ -669,6 +670,7 @@
     $('e-guardar').style.display = final ? 'none' : '';
     $('e-guardar').disabled = false; $('e-guardar').textContent = e ? 'Guardar cambios' : 'Registrar solicitud';
     $('e-eliminar').style.display = e && esAdmin ? '' : 'none';
+    $('e-pdf').style.display = e ? '' : 'none';
     var enBD = !!e && (e.estado === 'realizada' || e.estado === 'cerrada');
     $('e-bd-box').style.display = enBD ? '' : 'none';
     if (enBD) {
@@ -1104,6 +1106,39 @@
     renderChecklist();
   }
 
+  // PDF con todas las especificaciones de la solicitud (lo ya guardado), su estado y el checklist de actividades (js/panel/eventos-pdf.js).
+  async function verPdf(id) {
+    var e = id ? eventoById[id] : null;
+    if (!e) return;
+    // La pestaña se abre ya, dentro del clic, para que el navegador no la bloquee; se llena cuando el PDF está listo.
+    var w = window.open('', '_blank');
+    if (w) { try { w.document.title = 'PDF ' + refEv(e); w.document.body.innerHTML = '<p style="font-family:sans-serif;padding:24px;color:#4a5568">Generando el PDF…</p>'; } catch (_e) { /* sin acceso a la pestaña */ } }
+    try {
+      var rs = await Promise.all([
+        _sb.from('mercadeo_evento_checklist').select('*').eq('evento_id', id).order('id', { ascending: true }),
+        _sb.from('mercadeo_evento_adjuntos').select('nombre_original,tamano_bytes').eq('evento_id', id).order('id', { ascending: true }),
+        equipo.length ? Promise.resolve({ data: equipo }) : _sb.rpc('list_equipo_mercadeo'),
+      ]);
+      if (rs[0].error) throw rs[0].error;
+      if (rs[1].error) throw rs[1].error;
+      if (!rs[2].error && rs[2].data) equipo = rs[2].data;
+      var perfil = AUTH.getProfile() || {};
+      var doc = EVENTO_PDF.solicitud({
+        e: e,
+        cat: { OBJETIVOS: OBJETIVOS, CANALES: CANALES, MATERIALES: MATERIALES, LOGISTICA: LOGISTICA },
+        estado: ESTADO_T[e.estado] || e.estado,
+        empresa: etiquetaEmpresa(e.empresa) + (e.empresa === 'OTROS' && e.empresa_otra ? ': ' + e.empresa_otra : ''),
+        checklist: rs[0].data, adjuntos: rs[1].data, equipo: equipo,
+        generadoPor: perfil.nombre || perfil.email || '', ahora: new Date(),
+      });
+      if (w) w.location.href = doc.output('bloburl');
+      else doc.save(EVENTO_PDF.nombreArchivo(e));   // el navegador bloqueó la pestaña: se descarga
+    } catch (err) {
+      if (w) w.close();
+      fail('generar el PDF', err);
+    }
+  }
+
   function listaTxt(arr) { return (arr && arr.length) ? arr.map(esc).join(', ') : '—'; }
   function valorCampo(k, v) {
     if (v === null || v === undefined || v === '') return '—';
@@ -1197,6 +1232,7 @@
     'paso-ant': function () { mostrarPaso(paso - 1, true); },
     'paso-sig': function () { mostrarPaso(paso + 1, true); },
     'evento-abrir': function (id) { abrirEvento(Number(id)); },
+    'evento-pdf': function (id) { verPdf(Number(id) || editId); },   // desde la fila (con id) o desde el pie del modal (evento abierto)
     'chk-agregar': function () { agregarActividad(); },
     'chk-sugerir': function () { sugerirActividades(); },
     'chk-eliminar': function (id) { eliminarActividad(Number(id)); },

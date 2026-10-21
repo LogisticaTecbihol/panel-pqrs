@@ -276,6 +276,7 @@
       <div class="mftr">
         <div class="mk-actions" id="e-acciones"></div>
         <div class="mftr-btns">
+          <button class="btn-secondary" id="e-pdf" data-act="evento-pdf" style="display:none" title="Genera el PDF con todas las especificaciones de la solicitud (lo guardado), su estado y el checklist">📄 Ver PDF</button>
           <button class="btn-danger" id="e-eliminar" data-act="evento-eliminar" style="display:none">🗑 Eliminar</button>
           <button class="btn-cancel" data-act="cerrar-modal">Cerrar</button>
           <button class="btn-confirm" id="e-guardar" data-act="evento-guardar">Guardar</button>
@@ -308,7 +309,10 @@
   <script src="../js/shared/modal.js?v=20261006"></script>
   <script src="../js/shared/autocomplete.js?v=20261025"></script>
   <script src="../js/shared/colombia-geo.js?v=20261025"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+  <script src="../js/panel/eventos-pdf.js?v=20261027"></script>
   <script src="../js/panel/auth.js?v=20261021"></script>
-  <script src="../js/panel/eventos.js?v=20261026"></script>
+  <script src="../js/panel/eventos.js?v=20261027"></script>
 </body>
 </html>
