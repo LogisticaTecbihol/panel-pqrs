@@ -884,7 +884,7 @@
       '<div class="mbody"><div class="stats" style="margin-bottom:14px">' +
       '<div class="sc info"><div class="num">' + delMes.length + '</div><div class="lbl">Solicitudes del mes</div></div>' +
       '<div class="sc entregado"><div class="num">' + pct(dentro.length, delMes.length) + '</div><div class="lbl">Dentro del calendario aprobado</div><div class="mk-sub">' + dentro.length + ' de ' + delMes.length + '</div></div>' +
-      '<div class="sc alerta"><div class="num">' + pct(excep.length, delMes.length) + '</div><div class="lbl">Urgentes fuera de calendario</div><div class="mk-sub">' + excep.length + ' excepción(es) con aval</div></div>' +
+      '<div class="sc alerta"><div class="num">' + pct(excep.length, delMes.length) + '</div><div class="lbl">Urgentes fuera de calendario</div><div class="mk-sub">' + excep.length + ' excepción(es)</div></div>' +
       '<div class="sc pend"><div class="num">' + pct(aTiempoConf.length, resueltas.length) + '</div><div class="lbl">Confirmadas en ≤ 24 h</div><div class="mk-sub">' + aTiempoConf.length + ' de ' + resueltas.length + '</div></div>' +
       '<div class="sc total"><div class="num">' + pct(aTiempoEnt.length, entregadas.length) + '</div><div class="lbl">Entregadas a tiempo</div><div class="mk-sub">' + aTiempoEnt.length + ' de ' + entregadas.length + '</div></div>' +
       '</div>' +

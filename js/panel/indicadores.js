@@ -395,7 +395,7 @@
       { label: 'Fuera del calendario', v: rec.length - dentro, txt: conPct(rec.length - dentro, rec.length), color: GRIS },
       { label: 'Urgentes fuera de calendario (excepciones)', v: excep, txt: conPct(excep, rec.length), color: ROJO },
       { label: 'Urgentes dentro del calendario', v: urgDentro, txt: conPct(urgDentro, rec.length), color: '#d97706' },
-    ]), { sub: fmtN(rec.length) + ' recibidas', nota: 'Las excepciones (urgente fuera de calendario) exigen aval del Comité o de Gerencia General.' });
+    ]), { sub: fmtN(rec.length) + ' recibidas', nota: 'Las excepciones (urgente fuera de calendario) pueden llevar el aval del Comité o de Gerencia General (opcional).' });
 
     // Por clase de prioridad
     var filasClase = CLASE_ORDEN.map(function (k) {

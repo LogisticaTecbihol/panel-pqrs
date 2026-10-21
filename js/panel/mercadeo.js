@@ -12,7 +12,8 @@
 // migración 0014); aquí solo se anticipan en la interfaz para dar mensajes claros:
 //  - Clase de prioridad: 1 calendario aprobado > 2 soporte a ventas > 3 mejora > 4 exploratorio.
 //    Una tarea vinculada a una actividad APROBADA en el calendario (CRM > Actividades) es clase 1.
-//  - Urgente fuera de calendario exige aval (Comité de Mercadeo / Gerencia General) + referencia + motivo.
+//  - Urgente fuera de calendario es una excepción; el aval (Comité de Mercadeo / Gerencia General) + referencia +
+//    motivo es OPCIONAL, a discreción del equipo de Mercadeo (migración 0033).
 //  - Sin brief no hay fecha comprometida: salir de "Recibido" exige descripción y fecha límite.
 // La cola de cada columna se ordena por regla (urgente, clase, fecha límite, antigüedad), no a mano:
 // arrastrar solo cambia de columna. Para teclado/táctil cada tarjeta tiene botones ◀ ▶.
@@ -177,8 +178,7 @@
       var h = horasDesde(t.creado_en);
       edad = '<span class="kb-chip' + (h > 24 ? ' warn' : '') + '" title="Tiempo sin confirmar (SLA de confirmación: 12–24 h)">⏱ ' + (h < 48 ? Math.floor(h) + ' h' : Math.floor(h / 24) + ' d') + ' sin confirmar</span>';
     }
-    var sinAval = t.urgente && t.fuera_calendario && !t.aval_por;
-    var urg = t.urgente ? '<span class="kb-chip urg" title="' + (t.aval_por ? 'Aval: ' + esc(AVAL[t.aval_por]) : 'Urgente') + '">🔥 Urgente' + (t.fuera_calendario ? (t.aval_por ? ' · aval ' + esc(t.aval_por === 'comite' ? 'Comité' : 'GG') : ' ⚠ sin aval') : '') + '</span>' : '';
+    var urg = t.urgente ? '<span class="kb-chip urg" title="' + (t.aval_por ? 'Aval: ' + esc(AVAL[t.aval_por]) : 'Urgente') + '">🔥 Urgente' + (t.fuera_calendario && t.aval_por ? ' · aval ' + esc(t.aval_por === 'comite' ? 'Comité' : 'GG') : '') + '</span>' : '';
     var avatars = t.responsables.length ? t.responsables.map(function (id) {
       var u = equipo.filter(function (x) { return x.id === id; })[0];
       return '<span class="kb-av' + (u && u.activo ? '' : ' inactivo') + '" style="' + EQUIPO_COLOR.estilo(id) + '" title="' + esc(u ? u.nombre : 'Usuario inactivo') + '">' + esc(iniciales(u ? u.nombre : '?')) + '</span>';
@@ -195,7 +195,7 @@
     var evento = t.evento_id ? '<span class="kb-chip" title="Tarea creada al aprobar el evento EV-' + esc(t.evento_id) + '">🎪 EV-' + esc(t.evento_id) + '</span>' : '';
     var quien = esPed ? '<div class="kb-act">👤 ' + esc(t.a_nombre_de_nombre || t.solicitante_nombre || '—') +
       (t.fecha_tentativa ? ' · lo necesita para ' + esc(fmtDateOnly(t.fecha_tentativa)) : '') + '</div>' : '';
-    return '<div class="kb-card p-' + esc(t.prioridad) + (t.urgente ? ' urg' : '') + (sinAval ? ' sin-aval' : '') + uClase + '"' + uEstilo + ' draggable="true" tabindex="0" role="button" data-act="tarea-abrir" data-id="' + esc(t.id) + '" aria-label="Abrir tarea: ' + esc(t.titulo) + '">' + franja +
+    return '<div class="kb-card p-' + esc(t.prioridad) + (t.urgente ? ' urg' : '') + uClase + '"' + uEstilo + ' draggable="true" tabindex="0" role="button" data-act="tarea-abrir" data-id="' + esc(t.id) + '" aria-label="Abrir tarea: ' + esc(t.titulo) + '">' + franja +
       '<div class="kb-card-top">' + urg + ped + evento + prueba + '<span class="kb-chip">' + esc(TIPOS[t.tipo] || t.tipo) + '</span><span class="kb-chip" title="Clase de prioridad">' + esc(CLASE_CORTA[t.prioridad] || t.prioridad) + '</span>' + edad + '</div>' +
       '<div class="kb-title">' + esc(t.titulo) + '</div>' +
       '<div class="kb-emp">' + empresaChips(t.empresas) + '</div>' + act + quien +
@@ -448,10 +448,8 @@
     // Mercadeo puede rechazar una solicitud de Pedidos mientras no esté entregada ni cancelada.
     $('t-rechazar').style.display = t && t.origen === 'panel_pedidos' && esAbierta(t) ? '' : 'none';
     $('t-guardar').disabled = false; $('t-guardar').textContent = 'Guardar';
-    $('t-flags').innerHTML = (t && t.urgente && t.fuera_calendario && !t.aval_por
-      ? '<div class="mk-flag">⚠️ Esta tarea figura como urgente fuera de calendario sin aval registrado (la actividad pudo dejar de estar aprobada). Registra el aval o quita la urgencia.</div>' : '') +
-      (t && t.evento_id
-        ? '<div class="mk-flag" style="background:#ebf5fb;color:#1a5276">🎪 Tarea creada al aprobar el evento <a href="eventos.html?evento=' + encodeURIComponent(t.evento_id) + '" style="font-weight:700">EV-' + esc(t.evento_id) + '</a>. Si el evento se cancela, esta tarea se cancela sola.</div>' : '');
+    $('t-flags').innerHTML = t && t.evento_id
+      ? '<div class="mk-flag" style="background:#ebf5fb;color:#1a5276">🎪 Tarea creada al aprobar el evento <a href="eventos.html?evento=' + encodeURIComponent(t.evento_id) + '" style="font-weight:700">EV-' + esc(t.evento_id) + '</a>. Si el evento se cancela, esta tarea se cancela sola.</div>' : '';
     var esPed = !!(t && t.origen === 'panel_pedidos');
     $('t-solicitud').style.display = esPed ? '' : 'none';
     $('t-solicitud').innerHTML = esPed ? solicitudHtml(t) : '';
@@ -481,9 +479,6 @@
   function validar(d) {
     if (d.titulo.length < 3) return 'El título debe tener al menos 3 caracteres';
     if (!d.empresas.length) return 'Elige al menos una empresa';
-    if (d.urgente && !actAprobada(d.actividad_id) && (!d.aval_por || !d.aval_referencia || !d.aval_motivo)) {
-      return 'Una tarea urgente fuera de calendario requiere el aval del Comité de Mercadeo o de Gerencia General (quién avala, referencia y motivo)';
-    }
     if (orig && orig.estado === 'solicitada' && d.estado !== 'solicitada' && d.estado !== 'cancelada' && (!d.descripcion || !d.fecha_limite)) {
       return 'Sin brief no hay fecha comprometida: para confirmar la tarea escribe la descripción (brief) y la fecha límite';
     }
@@ -596,7 +591,8 @@
       case 'cambio_estado': return 'Cambió el estado: <strong>' + esc(ESTADO_T[d.de] || d.de) + '</strong> → <strong>' + esc(ESTADO_T[d.a] || d.a) + '</strong>' +
         (d.motivo ? ' · <strong>Motivo:</strong> ' + esc(d.motivo) : '');
       case 'asignacion': return 'Responsables: ' + nomUsuarios(d.de) + ' → <strong>' + nomUsuarios(d.a) + '</strong>';
-      case 'aval_registrado': return 'Registró el aval de excepción (urgente fuera de calendario): <strong>' + esc(AVAL[d.por] || d.por) + '</strong> · ' + esc(d.referencia) + ' · ' + esc(d.motivo);
+      case 'aval_registrado': return 'Registró el aval de excepción (urgente fuera de calendario)' +
+        [d.por ? '<strong>' + esc(AVAL[d.por] || d.por) + '</strong>' : '', d.referencia ? esc(d.referencia) : '', d.motivo ? esc(d.motivo) : ''].filter(Boolean).map(function (p) { return ' · ' + p; }).join('');
       case 'comentario': return '💬 ' + esc(d.texto);
       case 'adjunto_agregado': return 'Adjuntó el archivo <strong>' + esc(d.nombre) + '</strong>';
       case 'adjunto_eliminado': return 'Eliminó el adjunto <strong>' + esc(d.nombre) + '</strong>';

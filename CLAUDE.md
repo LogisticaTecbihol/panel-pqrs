@@ -214,8 +214,9 @@ SOLO por la función `solicitud-mercadeo` de panel-pedidos (server→server, sin
 Reglas de priorización (MKT-DOC-00 §B.5, MKT-P-04), aplicadas en el trigger `mercadeo_tareas_reglas`:
 clase 1 calendario > 2 soporte a ventas > 3 mejora > 4 exploratorio; una tarea vinculada a una
 actividad APROBADA en calendario (`mercadeo_actividades.en_calendario`) es clase 1; **urgente fuera
-de calendario exige aval** (Comité de Mercadeo / Gerencia General + referencia + motivo, se sella
-quién y cuándo y alimenta el KPI de excepciones); sin brief (descripción) y fecha límite no se sale
+de calendario** cuenta como excepción (KPI de excepciones) y su aval (Comité de Mercadeo / Gerencia
+General + referencia + motivo) es **OPCIONAL** desde la migración 0033, a discreción de Mercadeo; si se
+diligencia algún dato se sella quién y cuándo, y si no, no hay sello ni evento `aval_registrado`; sin brief (descripción) y fecha límite no se sale
 de "solicitada". La cola de cada columna se ordena por regla (no a mano): arrastrar solo cambia de
 columna (HTML5 DnD; en táctil/teclado, botones ◀ ▶). Los KPI (pestaña Indicadores del CRM) se
 calculan en el cliente.
