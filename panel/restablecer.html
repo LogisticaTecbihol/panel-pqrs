@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestión PQRS — Nueva contraseña</title>
+<link rel="stylesheet" href="../css/panel.css?v=20261021">
+<style>
+  .login-box .link-btn { display: block; width: 100%; margin-top: 14px; padding: 0; background: none; border: none; color: #1a5276; font-size: 0.82rem; text-align: center; text-decoration: underline; cursor: pointer; }
+  .login-box .link-btn:hover { color: #154360; }
+</style>
+<script>
+  // El enlace del correo trae el token en la URL (#access_token=…&type=recovery, o #error=… si venció).
+  // supabase-js lo consume y limpia al cargar, por eso se guarda antes de cargarlo.
+  var ENLACE_INICIAL = location.hash + location.search;
+</script>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-box">
+      <h1>Gestión PQRS</h1>
+
+      <div id="estado-carga">
+        <div class="sub">Verificando el enlace…</div>
+      </div>
+
+      <div id="estado-invalido" style="display:none">
+        <div class="sub">No se puede cambiar la contraseña</div>
+        <div class="error" id="invalido-msg"></div>
+        <a class="btn-primary" style="display:block;text-align:center;text-decoration:none" href="login.html?olvide=1">Pedir un enlace nuevo</a>
+        <a class="link-btn" href="login.html">Volver a iniciar sesión</a>
+      </div>
+
+      <div id="estado-form" style="display:none">
+        <div class="sub">Crea tu contraseña nueva</div>
+        <div class="error" id="form-error"></div>
+        <label for="password">Contraseña nueva</label>
+        <input type="password" id="password" autocomplete="new-password">
+        <label for="password2">Repite la contraseña</label>
+        <input type="password" id="password2" autocomplete="new-password">
+        <button class="btn-primary" style="width:100%" id="btn-guardar">Guardar contraseña</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../js/shared/supabase-client.js?v=20261006"></script>
+  <script>
+    // Esta página no carga auth.js: el usuario llega con una sesión de recuperación (no de ingreso)
+    // y auth.js lo mandaría al inicio o al login antes de dejarle escribir la clave.
+    var MIN_CLAVE = 8;
+    var mostrado = false;
+
+    function ver(id) {
+      ['estado-carga', 'estado-invalido', 'estado-form'].forEach(function (e) {
+        document.getElementById(e).style.display = e === id ? '' : 'none';
+      });
+    }
+
+    function invalido(msg) {
+      if (mostrado) return;
+      document.getElementById('invalido-msg').textContent = msg;
+      ver('estado-invalido');
+    }
+
+    function mostrarForm() {
+      if (mostrado) return;
+      mostrado = true;
+      ver('estado-form');
+      document.getElementById('password').focus();
+    }
+
+    var VENCIDO = 'El enlace venció o ya se usó. Solicita uno nuevo.';
+
+    if (/[#&?]error=/.test(ENLACE_INICIAL)) {
+      invalido(VENCIDO);
+    } else if (!/type=recovery/.test(ENLACE_INICIAL)) {
+      invalido('Abre esta página desde el enlace que llegó a tu correo.');
+    } else {
+      // supabase-js dispara PASSWORD_RECOVERY al leer el token; getSession cubre que ya haya pasado.
+      _sb.auth.onAuthStateChange(function (event) {
+        if (event === 'PASSWORD_RECOVERY') mostrarForm();
+      });
+      _sb.auth.getSession().then(function (r) {
+        if (r.data && r.data.session) mostrarForm();
+        else invalido(VENCIDO);
+      });
+      setTimeout(function () { invalido(VENCIDO); }, 8000);
+    }
+
+    function traducirError(msg) {
+      if (/different from the old password/i.test(msg)) return 'La contraseña nueva debe ser distinta de la anterior.';
+      if (/weak|at least|too short|characters/i.test(msg)) return 'La contraseña es muy débil. Usa al menos ' + MIN_CLAVE + ' caracteres combinando letras y números.';
+      return 'No se pudo cambiar la contraseña: ' + msg;
+    }
+
+    document.getElementById('btn-guardar').addEventListener('click', async function () {
+      var p1 = document.getElementById('password').value;
+      var p2 = document.getElementById('password2').value;
+      var errEl = document.getElementById('form-error');
+      errEl.textContent = '';
+      if (p1.length < MIN_CLAVE) { errEl.textContent = 'La contraseña debe tener al menos ' + MIN_CLAVE + ' caracteres.'; return; }
+      if (p1 !== p2) { errEl.textContent = 'Las contraseñas no coinciden.'; return; }
+
+      var btn = this;
+      btn.disabled = true; btn.textContent = 'Guardando…';
+      var res = await _sb.auth.updateUser({ password: p1 });
+      btn.disabled = false; btn.textContent = 'Guardar contraseña';
+
+      if (res.error) {
+        if (/session|jwt|expired/i.test(res.error.message || '')) {
+          mostrado = false;
+          invalido(VENCIDO);
+          return;
+        }
+        errEl.textContent = traducirError(res.error.message || '');
+        return;
+      }
+      await _sb.auth.signOut();
+      location.replace('login.html?clave=ok');
+    });
+    document.getElementById('password2').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') document.getElementById('btn-guardar').click();
+    });
+  </script>
+</body>
+</html>
