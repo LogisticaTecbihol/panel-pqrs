@@ -6,6 +6,15 @@
 var EVENTO_PDF = (function () {
   var AZUL = [26, 82, 118];
   var MODALIDAD = { fisico: 'Físico', virtual: 'Virtual', hibrido: 'Híbrido' };
+  // Catálogos del formato (códigos de la BD -> texto). ÚNICA copia en panel-pqrs: eventos.js los toma de aquí. Deben coincidir con los CHECK de
+  // mercadeo_eventos y con los de Pedidos (ver CLAUDE.md).
+  var CAT = {
+    OBJETIVOS: [['leads', 'Generar nuevos leads (oportunidades de venta)'], ['relacion_clientes', 'Fortalecer la relación con clientes existentes'], ['lanzamiento', 'Lanzamiento o promoción de un nuevo producto/servicio'], ['posicionamiento', 'Posicionamiento de la marca/empresa'], ['capacitacion', 'Capacitación o educación'], ['trafico_digital', 'Aumentar el tráfico a nuestro sitio web o redes sociales'], ['retencion', 'Retención de clientes']],
+    CANALES: [['email', 'Email marketing (creación de campañas de invitación)'], ['redes', 'Redes sociales (posts, historias, anuncios)'], ['web', 'Blog o sitio web (creación de contenido, landing page)'], ['relaciones_publicas', 'Relaciones públicas (comunicados de prensa)'], ['publicidad_digital', 'Publicidad digital (Google Ads, LinkedIn Ads, etc.)'], ['video', 'Creación de videos promocionales']],
+    MATERIALES: [['banners_redes', 'Banners para redes sociales'], ['diseno_email', 'Diseño de email'], ['invitaciones', 'Invitaciones digitales o impresas'], ['presentacion', 'Presentación de diapositivas'], ['flyers', 'Flyers o folletos'], ['rollups', 'Roll-ups o pendones'], ['merchandising', 'Diseño para materiales de merchandising']],
+    LOGISTICA: [['registros', 'Apoyo en la gestión de registros (plataforma, base de datos)'], ['coordinacion_logistica', 'Coordinación con el área de logística para el evento'], ['plataforma_virtual', 'Apoyo en la configuración de la plataforma de evento virtual'], ['presencia_mercadeo', 'Se solicita presencia de Mercadeo']],
+  };
+  var ESTADO_T = { radicada: 'Radicada', en_revision: 'En revisión', aprobada: 'Aprobada', en_preparacion: 'En preparación', realizada: 'Realizada', cerrada: 'Cerrada', rechazada: 'Rechazada', cancelada: 'Cancelada' };
 
   // Texto seguro para la fuente estándar: comillas y guiones tipográficos a su equivalente simple; lo que no cabe en Latin-1 se quita.
   function L(v) {
@@ -212,10 +221,49 @@ var EVENTO_PDF = (function () {
     return doc;
   }
 
+  // Abre el PDF de un evento en una pestaña nueva. Lo usan Eventos y el Tablero.
+  // o = { sb (cliente Supabase), id (evento), evento (fila ya cargada, opcional), equipo (opcional, para los nombres de responsables),
+  //       perfil (quien lo genera) }. Devuelve { equipo } para que quien llama lo reutilice; si algo falla, lanza el error.
+  // Hay que llamarla DENTRO del clic: la pestaña se abre ya (así el navegador no la bloquea) y se llena cuando el PDF está listo;
+  // si aun así la bloquea, el PDF se descarga.
+  async function ver(o) {
+    var w = window.open('', '_blank');
+    if (w) {
+      try { w.document.title = 'PDF EV-' + o.id; w.document.body.innerHTML = '<p style="font-family:sans-serif;padding:24px;color:#4a5568">Generando el PDF…</p>'; } catch (_e) { /* sin acceso a la pestaña */ }
+    }
+    try {
+      var sb = o.sb, id = o.id;
+      var rs = await Promise.all([
+        o.evento ? Promise.resolve({ data: o.evento }) : sb.from('mercadeo_eventos').select('*').eq('id', id).maybeSingle(),
+        sb.from('mercadeo_evento_checklist').select('*').eq('evento_id', id).order('id', { ascending: true }),
+        sb.from('mercadeo_evento_adjuntos').select('nombre_original,tamano_bytes').eq('evento_id', id).order('id', { ascending: true }),
+        o.equipo && o.equipo.length ? Promise.resolve({ data: o.equipo }) : sb.rpc('list_equipo_mercadeo'),
+      ]);
+      for (var i = 0; i < 3; i++) if (rs[i].error) throw rs[i].error;
+      var e = rs[0].data;
+      if (!e) throw new Error('El evento ya no existe o no tienes permiso para verlo');
+      var equipo = rs[3].error || !rs[3].data ? (o.equipo || []) : rs[3].data;
+      var perfil = o.perfil || {};
+      var doc = solicitud({
+        e: e, cat: CAT,
+        estado: ESTADO_T[e.estado] || e.estado,
+        empresa: etiquetaEmpresa(e.empresa) + (e.empresa === 'OTROS' && e.empresa_otra ? ': ' + e.empresa_otra : ''),
+        checklist: rs[1].data, adjuntos: rs[2].data, equipo: equipo,
+        generadoPor: perfil.nombre || perfil.email || '', ahora: new Date(),
+      });
+      if (w) w.location.href = doc.output('bloburl');
+      else doc.save(nombreArchivo(e));
+      return { equipo: equipo };
+    } catch (err) {
+      if (w) w.close();
+      throw err;
+    }
+  }
+
   function nombreArchivo(e) {
     var base = L(e.nombre).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
     return 'Evento_EV-' + e.id + (base ? '_' + base : '') + '.pdf';
   }
 
-  return { solicitud: solicitud, nombreArchivo: nombreArchivo };
+  return { solicitud: solicitud, ver: ver, nombreArchivo: nombreArchivo, CAT: CAT, ESTADO_T: ESTADO_T };
 })();

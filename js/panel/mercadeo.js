@@ -192,7 +192,8 @@
     var esPed = t.origen === 'panel_pedidos';
     var ped = esPed ? '<span class="kb-chip" title="Solicitud enviada desde panel-pedidos">📥 Pedidos</span>' : '';
     var prueba = t.excluir_indicadores ? '<span class="kb-chip" title="Marcada como prueba: no cuenta en los indicadores">🧪 Prueba</span>' : '';
-    var evento = t.evento_id ? '<span class="kb-chip" title="Tarea creada al aprobar el evento EV-' + esc(t.evento_id) + '">🎪 EV-' + esc(t.evento_id) + '</span>' : '';
+    var evento = t.evento_id ? '<span class="kb-chip" title="Tarea creada al aprobar el evento EV-' + esc(t.evento_id) + '">🎪 EV-' + esc(t.evento_id) + '</span>' +
+      '<span class="kb-chip kb-chip-btn" role="button" data-act="evento-pdf" data-id="' + esc(t.evento_id) + '" title="Ver todas las especificaciones del evento EV-' + esc(t.evento_id) + ' en PDF">📄 PDF</span>' : '';
     var quien = esPed ? '<div class="kb-act">👤 ' + esc(t.a_nombre_de_nombre || t.solicitante_nombre || '—') +
       (t.fecha_tentativa ? ' · lo necesita para ' + esc(fmtDateOnly(t.fecha_tentativa)) : '') + '</div>' : '';
     return '<div class="kb-card p-' + esc(t.prioridad) + (t.urgente ? ' urg' : '') + uClase + '"' + uEstilo + ' draggable="true" tabindex="0" role="button" data-act="tarea-abrir" data-id="' + esc(t.id) + '" aria-label="Abrir tarea: ' + esc(t.titulo) + '">' + franja +
@@ -449,7 +450,8 @@
     $('t-rechazar').style.display = t && t.origen === 'panel_pedidos' && esAbierta(t) ? '' : 'none';
     $('t-guardar').disabled = false; $('t-guardar').textContent = 'Guardar';
     $('t-flags').innerHTML = t && t.evento_id
-      ? '<div class="mk-flag" style="background:#ebf5fb;color:#1a5276">🎪 Tarea creada al aprobar el evento <a href="eventos.html?evento=' + encodeURIComponent(t.evento_id) + '" style="font-weight:700">EV-' + esc(t.evento_id) + '</a>. Si el evento se cancela, esta tarea se cancela sola.</div>' : '';
+      ? '<div class="mk-flag" style="background:#ebf5fb;color:#1a5276">🎪 Tarea creada al aprobar el evento <a href="eventos.html?evento=' + encodeURIComponent(t.evento_id) + '" style="font-weight:700">EV-' + esc(t.evento_id) + '</a>. Si el evento se cancela, esta tarea se cancela sola. ' +
+        '<button type="button" class="btn-secondary" data-act="evento-pdf" data-id="' + esc(t.evento_id) + '" style="margin-left:6px" title="Todas las especificaciones de la solicitud del evento, su estado y el checklist">📄 Ver PDF del evento</button></div>' : '';
     var esPed = !!(t && t.origen === 'panel_pedidos');
     $('t-solicitud').style.display = esPed ? '' : 'none';
     $('t-solicitud').innerHTML = esPed ? solicitudHtml(t) : '';
@@ -670,6 +672,11 @@
     },
     'tarea-nueva': function () { abrirTarea(null); },
     'tarea-abrir': function (id) { abrirTarea(Number(id)); },
+    // PDF con todas las especificaciones de la solicitud del evento (el mismo del módulo Eventos; js/panel/eventos-pdf.js).
+    'evento-pdf': function (id) {
+      EVENTO_PDF.ver({ sb: _sb, id: Number(id), equipo: equipo, perfil: AUTH.getProfile() })
+        .catch(function (err) { fail('generar el PDF', err); });
+    },
     'tarea-guardar': guardarTarea,
     'tarea-eliminar': eliminarTarea,
     'cerrar-modal': function () { MODAL.close('tarea-overlay'); },

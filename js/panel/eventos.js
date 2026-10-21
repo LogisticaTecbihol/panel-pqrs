@@ -21,17 +21,17 @@
   var esAdmin = AUTH.isAdmin();
 
   // ── Catálogos (valores en BD = códigos ASCII) ──
-  var ESTADO_T = { radicada: 'Radicada', en_revision: 'En revisión', aprobada: 'Aprobada', en_preparacion: 'En preparación', realizada: 'Realizada', cerrada: 'Cerrada', rechazada: 'Rechazada', cancelada: 'Cancelada' };
+  var ESTADO_T = EVENTO_PDF.ESTADO_T;   // catálogos únicos en js/panel/eventos-pdf.js (los usan también el PDF y el Tablero)
   var ESTADO_COLOR = { radicada: '#e67e22', en_revision: '#2980b9', aprobada: '#16a085', en_preparacion: '#8e44ad', realizada: '#27ae60', cerrada: '#718096', rechazada: '#c0392b', cancelada: '#a0aec0' };
   var ESTADO_RANK = { radicada: 1, en_revision: 2, aprobada: 3, en_preparacion: 4, realizada: 5, cerrada: 6, rechazada: 7, cancelada: 8 };
   var ABIERTOS = ['radicada', 'en_revision', 'aprobada', 'en_preparacion', 'realizada'];
   var FINALES = ['cerrada', 'rechazada', 'cancelada'];
   var TAREA_T = { solicitada: 'Recibido', confirmada: 'Confirmada', en_produccion: 'En producción', en_validacion: 'En validación / aprobación', entregada: 'Entregada / Publicada', cancelada: 'Cancelada', rechazada: 'Rechazada' };
   var MODALIDAD = { fisico: 'Físico', virtual: 'Virtual', hibrido: 'Híbrido' };
-  var OBJETIVOS = [['leads', 'Generar nuevos leads (oportunidades de venta)'], ['relacion_clientes', 'Fortalecer la relación con clientes existentes'], ['lanzamiento', 'Lanzamiento o promoción de un nuevo producto/servicio'], ['posicionamiento', 'Posicionamiento de la marca/empresa'], ['capacitacion', 'Capacitación o educación'], ['trafico_digital', 'Aumentar el tráfico a nuestro sitio web o redes sociales'], ['retencion', 'Retención de clientes']];
-  var CANALES = [['email', 'Email marketing (creación de campañas de invitación)'], ['redes', 'Redes sociales (posts, historias, anuncios)'], ['web', 'Blog o sitio web (creación de contenido, landing page)'], ['relaciones_publicas', 'Relaciones públicas (comunicados de prensa)'], ['publicidad_digital', 'Publicidad digital (Google Ads, LinkedIn Ads, etc.)'], ['video', 'Creación de videos promocionales']];
-  var MATERIALES = [['banners_redes', 'Banners para redes sociales'], ['diseno_email', 'Diseño de email'], ['invitaciones', 'Invitaciones digitales o impresas'], ['presentacion', 'Presentación de diapositivas'], ['flyers', 'Flyers o folletos'], ['rollups', 'Roll-ups o pendones'], ['merchandising', 'Diseño para materiales de merchandising']];
-  var LOGISTICA = [['registros', 'Apoyo en la gestión de registros (plataforma, base de datos)'], ['coordinacion_logistica', 'Coordinación con el área de logística para el evento'], ['plataforma_virtual', 'Apoyo en la configuración de la plataforma de evento virtual'], ['presencia_mercadeo', 'Se solicita presencia de Mercadeo']];
+  var OBJETIVOS = EVENTO_PDF.CAT.OBJETIVOS;
+  var CANALES = EVENTO_PDF.CAT.CANALES;
+  var MATERIALES = EVENTO_PDF.CAT.MATERIALES;
+  var LOGISTICA = EVENTO_PDF.CAT.LOGISTICA;
   // Listas con «Otro/a» ALINEADAS con el formulario de Solicitudes de Eventos de panel-pedidos (mismas opciones y misma regla): al elegir
   // «Otros/Otra» aparece un campo obligatorio (3 a `max` caracteres) y lo que se guarda es el texto escrito en lugar de «Otros/Otra».
   // Al abrir un evento, un valor que no está en la lista (p. ej. de antes del cambio) vuelve a mostrarse como «Otros/Otra» + texto.
@@ -1106,37 +1106,13 @@
     renderChecklist();
   }
 
-  // PDF con todas las especificaciones de la solicitud (lo ya guardado), su estado y el checklist de actividades (js/panel/eventos-pdf.js).
-  async function verPdf(id) {
+  // PDF con todas las especificaciones de la solicitud (lo ya guardado), su estado y el checklist (js/panel/eventos-pdf.js, compartido con el Tablero).
+  function verPdf(id) {
     var e = id ? eventoById[id] : null;
     if (!e) return;
-    // La pestaña se abre ya, dentro del clic, para que el navegador no la bloquee; se llena cuando el PDF está listo.
-    var w = window.open('', '_blank');
-    if (w) { try { w.document.title = 'PDF ' + refEv(e); w.document.body.innerHTML = '<p style="font-family:sans-serif;padding:24px;color:#4a5568">Generando el PDF…</p>'; } catch (_e) { /* sin acceso a la pestaña */ } }
-    try {
-      var rs = await Promise.all([
-        _sb.from('mercadeo_evento_checklist').select('*').eq('evento_id', id).order('id', { ascending: true }),
-        _sb.from('mercadeo_evento_adjuntos').select('nombre_original,tamano_bytes').eq('evento_id', id).order('id', { ascending: true }),
-        equipo.length ? Promise.resolve({ data: equipo }) : _sb.rpc('list_equipo_mercadeo'),
-      ]);
-      if (rs[0].error) throw rs[0].error;
-      if (rs[1].error) throw rs[1].error;
-      if (!rs[2].error && rs[2].data) equipo = rs[2].data;
-      var perfil = AUTH.getProfile() || {};
-      var doc = EVENTO_PDF.solicitud({
-        e: e,
-        cat: { OBJETIVOS: OBJETIVOS, CANALES: CANALES, MATERIALES: MATERIALES, LOGISTICA: LOGISTICA },
-        estado: ESTADO_T[e.estado] || e.estado,
-        empresa: etiquetaEmpresa(e.empresa) + (e.empresa === 'OTROS' && e.empresa_otra ? ': ' + e.empresa_otra : ''),
-        checklist: rs[0].data, adjuntos: rs[1].data, equipo: equipo,
-        generadoPor: perfil.nombre || perfil.email || '', ahora: new Date(),
-      });
-      if (w) w.location.href = doc.output('bloburl');
-      else doc.save(EVENTO_PDF.nombreArchivo(e));   // el navegador bloqueó la pestaña: se descarga
-    } catch (err) {
-      if (w) w.close();
-      fail('generar el PDF', err);
-    }
+    EVENTO_PDF.ver({ sb: _sb, id: id, evento: e, equipo: equipo, perfil: AUTH.getProfile() })
+      .then(function (r) { if (r && r.equipo && r.equipo.length) equipo = r.equipo; })
+      .catch(function (err) { fail('generar el PDF', err); });
   }
 
   function listaTxt(arr) { return (arr && arr.length) ? arr.map(esc).join(', ') : '—'; }
