@@ -271,6 +271,14 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
   seguimiento) con barra clicable y Anterior/Siguiente. La navegación es LIBRE (el modal también sirve para revisar eventos ya registrados); un paso ya visto
   muestra ✓ o ! según esté completo, y al guardar o cambiar de estado se revisan todos los pasos y se lleva al primero con error (`validarPaso` / `revisar`
   en `eventos.js`). El pie del modal (acciones de estado y Guardar) se ve en todos los pasos.
+- **Formulario ALINEADO con panel-pedidos** (migración 0035; cuando uno cambie, cambiar el otro): Empresa es el primer campo; `Departamento / Área`, `Plataforma` y
+  `Segmentación` son listas con «Otros/Otra» + campo obligatorio (objeto `LISTAS` en `eventos.js`; se guarda el texto escrito, no «Otros»); el lugar son
+  `lugar_municipio` + `lugar_departamento` (lista oficial `js/shared/colombia-geo.js` con el buscador `js/shared/autocomplete.js`), `lugar_distribuidor` +
+  `lugar_distribuidor_nit` (texto libre: aquí NO hay lista de clientes, vive en Pedidos) y `lugar_finca`. `lugar` sigue siendo el texto armado con esas partes
+  (`lugarTexto`; lo usan el brief, la lista y la búsqueda). Municipio+departamento son obligatorios en físico/híbrido, así que un evento anterior con
+  `lugar` libre pide completarlos al guardar o cambiar de estado (se le muestra el texto anterior). La Segmentación reemplaza a segmento demográfico, segmentación
+  profesional y nivel de conocimiento: se guarda en `segmento_profesional`; las otras dos columnas se conservan en BD y se muestran de solo lectura si traen datos.
+  Las opciones de Logística (incl. `presencia_mercadeo`, migración 0034) deben coincidir con las de Pedidos.
 - **KPI del encabezado** (cliente, sin festivos): Por atender (y cuántas pasan de 48 h hábiles sin respuesta), eventos de los
   próximos 30 días, Oportunidad del mes (≥ 15 días) y Retorno de la base de datos (entregada en ≤ 3 días hábiles tras el evento,
   últimos 90 días; «no aplica» no cuenta). Cada evento realizado sin base de datos y con plazo vencido se marca en la lista.

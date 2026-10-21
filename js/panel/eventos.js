@@ -32,6 +32,18 @@
   var CANALES = [['email', 'Email marketing (creación de campañas de invitación)'], ['redes', 'Redes sociales (posts, historias, anuncios)'], ['web', 'Blog o sitio web (creación de contenido, landing page)'], ['relaciones_publicas', 'Relaciones públicas (comunicados de prensa)'], ['publicidad_digital', 'Publicidad digital (Google Ads, LinkedIn Ads, etc.)'], ['video', 'Creación de videos promocionales']];
   var MATERIALES = [['banners_redes', 'Banners para redes sociales'], ['diseno_email', 'Diseño de email'], ['invitaciones', 'Invitaciones digitales o impresas'], ['presentacion', 'Presentación de diapositivas'], ['flyers', 'Flyers o folletos'], ['rollups', 'Roll-ups o pendones'], ['merchandising', 'Diseño para materiales de merchandising']];
   var LOGISTICA = [['registros', 'Apoyo en la gestión de registros (plataforma, base de datos)'], ['coordinacion_logistica', 'Coordinación con el área de logística para el evento'], ['plataforma_virtual', 'Apoyo en la configuración de la plataforma de evento virtual'], ['presencia_mercadeo', 'Se solicita presencia de Mercadeo']];
+  // Listas con «Otro/a» ALINEADAS con el formulario de Solicitudes de Eventos de panel-pedidos (mismas opciones y misma regla): al elegir
+  // «Otros/Otra» aparece un campo obligatorio (3 a `max` caracteres) y lo que se guarda es el texto escrito en lugar de «Otros/Otra».
+  // Al abrir un evento, un valor que no está en la lista (p. ej. de antes del cambio) vuelve a mostrarse como «Otros/Otra» + texto.
+  var LISTAS = {
+    area: { sel: 'e-sol-area', otra: 'e-sol-area-otra', box: 'e-sol-area-otra-box', otro: 'Otros', max: 120,
+      opciones: ['Comercial', 'Cartera', 'Contabilidad', 'Administrativo'] },
+    plataforma: { sel: 'e-plataforma', otra: 'e-plataforma-otra', box: 'e-plataforma-otra-box', otro: 'Otra', max: 100,
+      opciones: ['Zoom', 'Microsoft Teams', 'Google Meet', 'YouTube Live', 'Facebook Live'],
+      alias: { teams: 'Microsoft Teams', meet: 'Google Meet', youtube: 'YouTube Live', facebook: 'Facebook Live' } },
+    seg: { sel: 'e-seg', otra: 'e-seg-otra', box: 'e-seg-otra-box', otro: 'Otros', max: 100,
+      opciones: ['Agricultor', 'Agrónomos', 'Dueños de almacén', 'Mostrador', 'Distribuidor'] }
+  };
   // Etiquetas de campos para el historial de cambios.
   var CAMPO_T = {
     empresa: 'empresa', empresa_otra: 'nombre de la empresa', nombre: 'nombre del evento', solicitante_nombre: 'solicitante', solicitante_area: 'área', solicitante_correo: 'correo', solicitante_telefono: 'teléfono',
@@ -275,6 +287,67 @@
   }
   function marcados(id) { return [].slice.call(document.querySelectorAll('.' + id + '-chk:checked')).map(function (c) { return c.value; }); }
 
+  function listaLlenar(L) {
+    $(L.sel).innerHTML = '<option value="">— Seleccionar —</option>' + L.opciones.concat([L.otro]).map(function (o) {
+      return '<option value="' + esc(o) + '">' + esc(o) + '</option>';
+    }).join('');
+  }
+  function listaActualizar(L) {
+    var otro = $(L.sel).value === L.otro;
+    $(L.box).style.display = otro ? '' : 'none';
+    if (otro && !$(L.otra).disabled && document.activeElement === $(L.sel)) $(L.otra).focus();
+  }
+  function listaPoner(L, valor) {
+    var v = String(valor || '').trim(), k = v.toLowerCase();
+    var oficial = L.opciones.filter(function (o) { return o.toLowerCase() === k; })[0] || (L.alias && L.alias[k]) || '';
+    if (!v) { $(L.sel).value = ''; $(L.otra).value = ''; }
+    else if (oficial) { $(L.sel).value = oficial; $(L.otra).value = ''; }
+    else { $(L.sel).value = L.otro; $(L.otra).value = v === L.otro ? '' : v; }
+    listaActualizar(L);
+  }
+  function listaValor(L) {
+    var v = $(L.sel).value;
+    return v === L.otro ? $(L.otra).value.trim().replace(/\s+/g, ' ') : v;
+  }
+  function listaEsOtro(L) { return $(L.sel).value === L.otro; }
+
+  // ── Lugar: municipio + departamento (lista oficial, js/shared/colombia-geo.js), distribuidor/cliente + NIT y finca ──
+  // `lugar` se guarda como el texto armado con esas partes (igual que lo arma panel-pedidos).
+  function lugarTexto(d) {
+    var p = [];
+    if (d.lugar_municipio) p.push(d.lugar_municipio + (d.lugar_departamento ? ', ' + d.lugar_departamento : ''));
+    if (d.lugar_distribuidor) p.push('Distribuidor/cliente: ' + d.lugar_distribuidor + (d.lugar_distribuidor_nit ? ' (NIT ' + d.lugar_distribuidor_nit + ')' : ''));
+    if (d.lugar_finca) p.push('Finca: ' + d.lugar_finca);
+    return p.join(' · ').slice(0, 300);
+  }
+  // ¿El municipio pertenece a ese departamento de la lista oficial?
+  function geoValido(muni, depto) {
+    return !!(muni && depto && COLOMBIA_DEPTOS_MUNIS[depto] && COLOMBIA_DEPTOS_MUNIS[depto].indexOf(muni) >= 0);
+  }
+  // Resuelve un municipio escrito a mano (sin tildes, en mayúsculas…) al par oficial; null si no hay un único candidato.
+  function geoPar(muni, depto) {
+    var limpio = function (s) { return _normSearch(s).replace(/\s*d\.?\s*c\.?\s*$/, ''); };
+    var m = limpio(muni), dp = _normSearch(depto), hallados = [];
+    if (!m) return null;
+    Object.keys(COLOMBIA_DEPTOS_MUNIS).forEach(function (dep) {
+      COLOMBIA_DEPTOS_MUNIS[dep].forEach(function (nom) { if (limpio(nom) === m) hallados.push({ municipio: nom, departamento: dep }); });
+    });
+    if (dp) {
+      var enDep = hallados.filter(function (h) { return _normSearch(h.departamento) === dp; });
+      if (enDep.length === 1) return enDep[0];
+    }
+    return hallados.length === 1 ? hallados[0] : null;
+  }
+  // Al salir de los campos: si lo escrito corresponde a un único municipio/departamento oficial, se deja con su ortografía oficial.
+  function canonizarGeo() {
+    var mEl = $('e-municipio'), dEl = $('e-depto');
+    if (dEl.value.trim()) dEl.value = normalizarDepartamento(dEl.value.trim());
+    var m = mEl.value.trim(), d = dEl.value.trim();
+    if (!m || geoValido(m, d)) return;
+    var p = geoPar(m, d);
+    if (p) { mEl.value = p.municipio; dEl.value = p.departamento; }
+  }
+
   function modalidadActual() { var r = document.querySelector('input[name="e-mod"]:checked'); return r ? r.value : ''; }
   // Con la empresa «Otros» aparece el campo para escribir el nombre.
   function actualizarEmpresaOtra() {
@@ -347,7 +420,7 @@
   function llenarForm(e) {
     var nuevo = !e;
     $('e-sol-nombre').value = nuevo ? '' : e.solicitante_nombre;
-    $('e-sol-area').value = nuevo ? '' : e.solicitante_area;
+    listaPoner(LISTAS.area, nuevo ? '' : e.solicitante_area);
     $('e-sol-correo').value = nuevo ? '' : e.solicitante_correo;
     $('e-sol-tel').value = nuevo ? '' : e.solicitante_telefono;
     $('e-limite').value = nuevo || !e.fecha_limite_aprobacion ? '' : e.fecha_limite_aprobacion;
@@ -365,14 +438,24 @@
     $('e-modalidad').innerHTML = Object.keys(MODALIDAD).map(function (k) {
       return '<label><input type="radio" name="e-mod" value="' + k + '"' + (k === mod ? ' checked' : '') + '> ' + MODALIDAD[k] + '</label>';
     }).join('');
-    $('e-lugar').value = nuevo ? '' : e.lugar;
-    $('e-plataforma').value = nuevo ? '' : e.plataforma;
+    $('e-municipio').value = nuevo ? '' : (e.lugar_municipio || '');
+    $('e-depto').value = nuevo ? '' : (e.lugar_departamento || '');
+    $('e-dist').value = nuevo ? '' : (e.lugar_distribuidor || '');
+    $('e-dist-nit').value = nuevo ? '' : (e.lugar_distribuidor_nit || '');
+    $('e-finca').value = nuevo ? '' : (e.lugar_finca || '');
+    // Eventos de antes del cambio traen un lugar en texto libre: se muestra para que se complete municipio y departamento.
+    var previoLugar = !nuevo && e.lugar && !e.lugar_municipio && e.modalidad !== 'virtual';
+    $('e-lugar-previo').style.display = previoLugar ? '' : 'none';
+    $('e-lugar-previo').textContent = previoLugar ? 'Lugar registrado antes: «' + e.lugar + '». Completa los campos de arriba.' : '';
+    listaPoner(LISTAS.plataforma, nuevo ? '' : e.plataforma);
     checksHtml('e-objetivos', OBJETIVOS, nuevo ? [] : e.objetivos);
     $('e-objetivos-otro').value = nuevo ? '' : e.objetivos_otro;
     $('e-publico').value = nuevo ? '' : e.publico_objetivo;
-    $('e-seg-dem').value = nuevo ? '' : e.segmento_demografico;
-    $('e-seg-prof').value = nuevo ? '' : e.segmento_profesional;
-    $('e-nivel').value = nuevo ? '' : e.nivel_conocimiento;
+    listaPoner(LISTAS.seg, nuevo ? '' : e.segmento_profesional);
+    // El segmento demográfico y el nivel de conocimiento ya no se piden; si un evento anterior los trae, se muestran (solo lectura) y se conservan.
+    var segPrevio = nuevo ? [] : [e.segmento_demografico ? 'Segmento demográfico: ' + e.segmento_demografico : '', e.nivel_conocimiento ? 'Nivel de conocimiento: ' + e.nivel_conocimiento : ''].filter(Boolean);
+    $('e-seg-previo').style.display = segPrevio.length ? '' : 'none';
+    $('e-seg-previo').textContent = segPrevio.length ? 'Datos anteriores — ' + segPrevio.join(' · ') : '';
     $('e-invitados').value = nuevo ? '' : numStr(e.total_invitados);
     $('e-asis-pres').value = nuevo ? '' : numStr(e.asistentes_presencial);
     $('e-asis-virt').value = nuevo ? '' : numStr(e.asistentes_virtual);
@@ -400,18 +483,27 @@
   function leerForm() {
     var gastos = leerDesglose();
     var est = parseMonto($('e-presupuesto').value), sol = parseMonto($('e-solicitado').value);
+    // El lugar solo cuenta si el evento es presencial (físico o híbrido); en uno virtual se descarta aunque haya texto en los campos.
+    var mod = modalidadActual(), presencial = mod === 'fisico' || mod === 'hibrido';
+    var campo = function (id) { return presencial ? $(id).value.trim().replace(/\s+/g, ' ') : ''; };
+    var lug = {
+      lugar_municipio: campo('e-municipio'), lugar_departamento: campo('e-depto'),
+      lugar_distribuidor: campo('e-dist'), lugar_distribuidor_nit: campo('e-dist-nit'), lugar_finca: campo('e-finca')
+    };
     var d = {
       empresa: $('e-empresa').value,
       empresa_otra: $('e-empresa').value === 'OTROS' ? $('e-empresa-otra').value.trim().replace(/\s+/g, ' ') : '',
-      solicitante_nombre: $('e-sol-nombre').value.trim(), solicitante_area: $('e-sol-area').value.trim(),
+      solicitante_nombre: $('e-sol-nombre').value.trim(), solicitante_area: listaValor(LISTAS.area),
       solicitante_correo: $('e-sol-correo').value.trim(), solicitante_telefono: $('e-sol-tel').value.trim(),
       fecha_limite_aprobacion: $('e-limite').value || null,
       nombre: $('e-nombre').value.trim(), descripcion: $('e-desc').value.trim(),
       fecha_evento: $('e-fecha').value, hora_inicio: $('e-hora-ini').value || null, hora_fin: $('e-hora-fin').value || null,
-      modalidad: modalidadActual(), lugar: $('e-lugar').value.trim(), plataforma: $('e-plataforma').value.trim(),
+      modalidad: mod, lugar: lugarTexto(lug), lugar_municipio: lug.lugar_municipio, lugar_departamento: lug.lugar_departamento,
+      lugar_distribuidor: lug.lugar_distribuidor, lugar_distribuidor_nit: lug.lugar_distribuidor_nit, lugar_finca: lug.lugar_finca,
+      plataforma: listaValor(LISTAS.plataforma),
       objetivos: marcados('e-objetivos'), objetivos_otro: $('e-objetivos-otro').value.trim(),
-      publico_objetivo: $('e-publico').value.trim(), segmento_demografico: $('e-seg-dem').value.trim(),
-      segmento_profesional: $('e-seg-prof').value.trim(), nivel_conocimiento: $('e-nivel').value.trim(),
+      publico_objetivo: $('e-publico').value.trim(),
+      segmento_profesional: listaValor(LISTAS.seg),   // reemplaza a segmento demográfico, segmentación profesional y nivel de conocimiento
       total_invitados: enteroOpc('e-invitados'), asistentes_presencial: enteroOpc('e-asis-pres'), asistentes_virtual: enteroOpc('e-asis-virt'),
       canales: marcados('e-canales'), canales_otro: $('e-canales-otro').value.trim(),
       materiales: marcados('e-materiales'), materiales_otro: $('e-materiales-otro').value.trim(),
@@ -428,6 +520,8 @@
       d.bd_asistentes_fecha = d.bd_no_aplica ? null : ($('e-bd-fecha').value || null);
     }
     d._errGastos = gastos.error;
+    // Solo para validar (los campos con «_» no se guardan): qué listas están en «Otros/Otra».
+    d._areaOtros = listaEsOtro(LISTAS.area); d._plataformaOtra = listaEsOtro(LISTAS.plataforma); d._segOtros = listaEsOtro(LISTAS.seg);
     return d;
   }
 
@@ -447,15 +541,16 @@
   // Error (texto) de un paso, o null si está completo.
   function validarPaso(d, n) {
     if (n === 1) {
+      if (!d.empresa) return 'Elige la empresa';
+      if (d.empresa === 'OTROS' && (d.empresa_otra.length < 3 || d.empresa_otra.length > 100)) return 'Escribe el nombre de la empresa (entre 3 y 100 caracteres)';
       if (d.solicitante_nombre.length < 2) return 'Escribe el nombre del solicitante';
+      if (d._areaOtros && (d.solicitante_area.length < 3 || d.solicitante_area.length > LISTAS.area.max)) return 'Escribe el departamento o área (entre 3 y ' + LISTAS.area.max + ' caracteres)';
       if (d.fecha_radicacion !== undefined) {
         if (!d.fecha_radicacion) return 'Indica la fecha en que llegó la solicitud';
         if (d.fecha_radicacion > today()) return 'La fecha en que llegó la solicitud no puede ser futura';
       }
     }
     if (n === 2) {
-      if (!d.empresa) return 'Elige la empresa';
-      if (d.empresa === 'OTROS' && (d.empresa_otra.length < 3 || d.empresa_otra.length > 100)) return 'Escribe el nombre de la empresa (entre 3 y 100 caracteres)';
       if (d.nombre.length < 3) return 'El nombre del evento debe tener al menos 3 caracteres';
       if (d.descripcion.length < 10) return 'La descripción del evento debe tener al menos 10 caracteres';
       if (!d.fecha_evento) return 'Indica la fecha del evento';
@@ -463,10 +558,18 @@
       if (d.hora_inicio && d.hora_fin && d.hora_fin <= d.hora_inicio) return 'La hora de fin debe ser posterior a la de inicio';
       if (d.fecha_limite_aprobacion && d.fecha_limite_aprobacion > d.fecha_evento) return 'La fecha límite de aprobación no puede ser posterior a la fecha del evento';
       if (!d.modalidad) return 'Elige la modalidad: físico, virtual o híbrido';
-      if ((d.modalidad === 'fisico' || d.modalidad === 'hibrido') && !d.lugar) return 'Indica el lugar o ubicación del evento';
-      if ((d.modalidad === 'virtual' || d.modalidad === 'hibrido') && !d.plataforma) return 'Indica la plataforma del evento virtual';
+      if (d.modalidad === 'fisico' || d.modalidad === 'hibrido') {
+        if (!d.lugar_municipio || !d.lugar_departamento) return 'Indica el municipio y el departamento del evento';
+        if (!geoValido(d.lugar_municipio, d.lugar_departamento)) return 'Elige el municipio y el departamento de la lista oficial (el municipio debe pertenecer al departamento)';
+        if (d.lugar_distribuidor_nit && !d.lugar_distribuidor) return 'Escribe el nombre del distribuidor o cliente del NIT';
+      }
+      if (d.modalidad === 'virtual' || d.modalidad === 'hibrido') {
+        if (d._plataformaOtra && (d.plataforma.length < 3 || d.plataforma.length > LISTAS.plataforma.max)) return 'Escribe el nombre de la plataforma (entre 3 y ' + LISTAS.plataforma.max + ' caracteres)';
+        if (!d.plataforma) return 'Indica la plataforma del evento virtual';
+      }
     }
     if (n === 3) {
+      if (d._segOtros && (d.segmento_profesional.length < 3 || d.segmento_profesional.length > LISTAS.seg.max)) return 'Escribe la segmentación (entre 3 y ' + LISTAS.seg.max + ' caracteres)';
       var enteros = [['total_invitados', 'El total de invitados'], ['asistentes_presencial', 'Los asistentes presenciales'], ['asistentes_virtual', 'Los asistentes virtuales']];
       for (var i = 0; i < enteros.length; i++) {
         var v = d[enteros[i][0]];
@@ -978,6 +1081,14 @@
   // Formulario: reglas en vivo
   $('e-modalidad').addEventListener('change', actualizarModalidad);
   $('e-empresa').addEventListener('change', actualizarEmpresaOtra);
+  // Listas con «Otro/a» y lugar (alineados con Solicitudes de Eventos de panel-pedidos)
+  Object.keys(LISTAS).forEach(function (k) {
+    listaLlenar(LISTAS[k]);
+    $(LISTAS[k].sel).addEventListener('change', function () { listaActualizar(LISTAS[k]); });
+  });
+  setupGeoAutocomplete($('e-depto'), $('e-municipio'));
+  $('e-municipio').addEventListener('change', canonizarGeo);
+  $('e-depto').addEventListener('change', canonizarGeo);
   ['e-fecha', 'e-radicacion'].forEach(function (id) { $(id).addEventListener('change', actualizarAnticipacion); });
   ['e-presupuesto', 'e-solicitado'].forEach(function (id) { $(id).addEventListener('input', actualizarPresupuesto); });
   $('e-desglose').addEventListener('input', actualizarPresupuesto);

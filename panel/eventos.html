@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mercadeo — Eventos</title>
-<link rel="stylesheet" href="../css/panel.css?v=20261023">
+<link rel="stylesheet" href="../css/panel.css?v=20261025">
 </head>
 <body data-modulo="mercadeo">
   <div class="header">
@@ -88,10 +88,16 @@
 
         <h3 class="ev-sec">1. Información general del solicitante</h3>
         <div class="form-grid cols2">
+          <div><label class="ef-label" for="e-empresa">Empresa *</label><select class="ef" id="e-empresa"></select></div>
+          <div id="e-empresa-otra-box" style="display:none"><label class="ef-label" for="e-empresa-otra">Nombre de la empresa *</label>
+            <input class="ef" id="e-empresa-otra" maxlength="100" autocomplete="off" placeholder="Escribe el nombre de la empresa">
+            <div class="ef-help">Empresa que no es del holding ni está en la lista (entre 3 y 100 caracteres).</div></div>
           <div><label class="ef-label" for="e-sol-nombre">Nombre del solicitante *</label>
             <input class="ef" id="e-sol-nombre" maxlength="120" autocomplete="off"></div>
           <div><label class="ef-label" for="e-sol-area">Departamento / Área</label>
-            <input class="ef" id="e-sol-area" maxlength="120" autocomplete="off"></div>
+            <select class="ef" id="e-sol-area"></select>
+            <div id="e-sol-area-otra-box" style="display:none;margin-top:8px"><label class="ef-label" for="e-sol-area-otra">Área *</label>
+              <input class="ef" id="e-sol-area-otra" maxlength="120" autocomplete="off" placeholder="Escribe el departamento o área"></div></div>
           <div><label class="ef-label" for="e-sol-correo">Correo electrónico</label>
             <input class="ef" id="e-sol-correo" type="email" maxlength="160" autocomplete="off"></div>
           <div><label class="ef-label" for="e-sol-tel">Teléfono de contacto</label>
@@ -109,12 +115,8 @@
         <section class="ev-paso" data-paso="2" style="display:none">
         <h3 class="ev-sec">2. Detalles del evento</h3>
         <div class="form-grid cols2">
-          <div><label class="ef-label" for="e-empresa">Empresa *</label><select class="ef" id="e-empresa"></select></div>
-          <div><label class="ef-label" for="e-nombre">Nombre del evento *</label>
+          <div style="grid-column:1/-1"><label class="ef-label" for="e-nombre">Nombre del evento *</label>
             <input class="ef" id="e-nombre" maxlength="200" autocomplete="off"></div>
-          <div id="e-empresa-otra-box" style="grid-column:1/-1;display:none"><label class="ef-label" for="e-empresa-otra">Nombre de la empresa *</label>
-            <input class="ef" id="e-empresa-otra" maxlength="100" autocomplete="off" placeholder="Escribe el nombre de la empresa">
-            <div class="ef-help">Empresa que no es del holding ni está en la lista (entre 3 y 100 caracteres).</div></div>
           <div style="grid-column:1/-1"><label class="ef-label" for="e-desc">Descripción breve del evento * <span class="ev-ayuda">¿Qué es? ¿Por qué se realiza?</span></label>
             <textarea class="ef" id="e-desc" rows="3" maxlength="2000"></textarea></div>
           <div><label class="ef-label" for="e-fecha">Fecha del evento *</label>
@@ -124,10 +126,25 @@
             <div class="ev-horas"><input class="ef" id="e-hora-ini" type="time" aria-label="Hora de inicio"> <span>a</span> <input class="ef" id="e-hora-fin" type="time" aria-label="Hora de fin"></div></div>
           <div style="grid-column:1/-1"><span class="ef-label">Lugar / Ubicación *</span>
             <div class="mk-checks" id="e-modalidad" role="radiogroup" aria-label="Modalidad"></div></div>
-          <div id="e-lugar-box"><label class="ef-label" for="e-lugar">Lugar (finca, distribuidor, municipio…)</label>
-            <input class="ef" id="e-lugar" maxlength="300" autocomplete="off"></div>
-          <div id="e-plataforma-box"><label class="ef-label" for="e-plataforma">Plataforma (Zoom, Teams, Meet…)</label>
-            <input class="ef" id="e-plataforma" maxlength="200" autocomplete="off"></div>
+          <div id="e-lugar-box" style="grid-column:1/-1">
+            <div class="form-grid cols2" style="margin-bottom:0">
+              <div><label class="ef-label" for="e-municipio">Municipio *</label>
+                <input class="ef" id="e-municipio" maxlength="60" autocomplete="off" placeholder="Escribe para buscar el municipio…"></div>
+              <div><label class="ef-label" for="e-depto">Departamento *</label>
+                <input class="ef" id="e-depto" maxlength="40" autocomplete="off" placeholder="Se completa al elegir el municipio"></div>
+              <div><label class="ef-label" for="e-dist">Distribuidor o cliente</label>
+                <input class="ef" id="e-dist" maxlength="120" autocomplete="off" placeholder="Nombre del distribuidor o cliente"></div>
+              <div><label class="ef-label" for="e-dist-nit">NIT del distribuidor o cliente</label>
+                <input class="ef" id="e-dist-nit" maxlength="25" autocomplete="off"></div>
+              <div style="grid-column:1/-1"><label class="ef-label" for="e-finca">Finca <span class="ev-ayuda">si aplica</span></label>
+                <input class="ef" id="e-finca" maxlength="100" autocomplete="off"></div>
+            </div>
+            <div class="ef-help" id="e-lugar-previo" style="display:none"></div>
+          </div>
+          <div id="e-plataforma-box"><label class="ef-label" for="e-plataforma">Plataforma *</label>
+            <select class="ef" id="e-plataforma"></select>
+            <div id="e-plataforma-otra-box" style="display:none;margin-top:8px"><label class="ef-label" for="e-plataforma-otra">Nombre de la plataforma *</label>
+              <input class="ef" id="e-plataforma-otra" maxlength="100" autocomplete="off" placeholder="Escribe cuál plataforma"></div></div>
         </div>
 
         </section>
@@ -141,12 +158,11 @@
         <div class="form-grid cols2">
           <div><label class="ef-label" for="e-publico">Público objetivo (especificar)</label>
             <input class="ef" id="e-publico" maxlength="500" autocomplete="off"></div>
-          <div><label class="ef-label" for="e-seg-dem">Segmento demográfico <span class="ev-ayuda">edad, género, ubicación…</span></label>
-            <input class="ef" id="e-seg-dem" maxlength="500" autocomplete="off"></div>
-          <div><label class="ef-label" for="e-seg-prof">Segmentación profesional <span class="ev-ayuda">cargos, industrias, tamaño de la empresa</span></label>
-            <input class="ef" id="e-seg-prof" maxlength="500" autocomplete="off"></div>
-          <div><label class="ef-label" for="e-nivel">Nivel de conocimiento <span class="ev-ayuda">principiantes, expertos</span></label>
-            <input class="ef" id="e-nivel" maxlength="300" autocomplete="off"></div>
+          <div><label class="ef-label" for="e-seg">Segmentación</label>
+            <select class="ef" id="e-seg"></select>
+            <div id="e-seg-otra-box" style="display:none;margin-top:8px"><label class="ef-label" for="e-seg-otra">Segmentación *</label>
+              <input class="ef" id="e-seg-otra" maxlength="100" autocomplete="off" placeholder="Escribe la segmentación"></div>
+            <div class="ef-help" id="e-seg-previo" style="display:none"></div></div>
           <div><label class="ef-label" for="e-invitados">Total de invitados</label>
             <input class="ef" id="e-invitados" type="number" min="0" max="100000" inputmode="numeric"></div>
           <div><span class="ef-label">Asistentes esperados</span>
@@ -272,7 +288,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="../js/shared/supabase-client.js?v=20261023"></script>
   <script src="../js/shared/modal.js?v=20261006"></script>
+  <script src="../js/shared/autocomplete.js?v=20261025"></script>
+  <script src="../js/shared/colombia-geo.js?v=20261025"></script>
   <script src="../js/panel/auth.js?v=20261021"></script>
-  <script src="../js/panel/eventos.js?v=20261024"></script>
+  <script src="../js/panel/eventos.js?v=20261025"></script>
 </body>
 </html>
