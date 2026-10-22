@@ -214,6 +214,8 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, select:focus-vi
 .mk-tab.active { background: #1a5276; }
 .sc.pend { border-color: #d97706; }
 .sc.pend .num { color: #92400e; }
+.sc.evpend { border-color: #64748b; }
+.sc.evpend .num { color: #334155; }
 .sc .mk-sub { font-size: 0.74rem; color: #718096; margin-top: 2px; min-height: 1em; }
 .mk-box { border: 1px solid #e2e8f0; border-radius: 9px; padding: 12px 14px; background: #fff; }
 .mk-box h4 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.4px; color: #4a5568; margin-bottom: 8px; }
@@ -371,6 +373,11 @@ textarea.ef { resize: vertical; min-height: 80px; }
 .kb-move button:hover:not(:disabled) { background: #e2e8f0; }
 .kb-move button:disabled { opacity: 0.35; cursor: default; }
 .kb-vacio { text-align: center; color: #a0aec0; font-size: 0.78rem; padding: 14px 4px; }
+/* Columna «Por aprobar»: solicitudes de evento aún no aprobadas por Mercadeo. Solo lectura (no se arrastran); el clic abre Eventos. */
+.kb-col[data-estado="por_aprobar"] { border-top-color: #64748b; }
+.kb-ev { display: block; background: #fff; border-radius: 8px; padding: 10px 12px; font-size: 0.84rem; color: inherit; text-decoration: none; cursor: pointer; border: 2px dashed #94a3b8; }
+.kb-ev:hover, .kb-ev:focus-visible { border-color: #475569; box-shadow: 0 3px 10px rgba(0,0,0,0.18); }
+.kb-chip-pend { background: #475569; color: #fff; }
 @media (max-width: 700px) { .kb-col { flex-basis: 84vw; max-height: none; } }
 
 /* Ajustes de usabilidad (móvil y contraste) */

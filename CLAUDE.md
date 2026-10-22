@@ -295,6 +295,12 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
   pestaña nueva (si el navegador la bloquea, se descarga) un PDF carta con TODAS las especificaciones guardadas del evento: estado y aprobaciones, las secciones 1–5 del
   formato MC-ISO-FO01, archivos adjuntos y el checklist de actividades con su avance (sin las notas internas). Refleja lo guardado, no lo que se esté editando en el
   formulario. jsPDF 2.5.2 + autotable 3.8.4 (CDN, como SST); solo caracteres Latin-1: `L()` limpia emojis y comillas tipográficas de lo que escriben las personas.
+- **Columna «Por aprobar» del Tablero** (`mercadeo.js`, sin migración): las solicitudes con estado `radicada` / `en_revision` se ven en el Tablero desde que llegan, en una
+  columna de SOLO LECTURA a la izquierda de «Recibido» (borde punteado, chip «⏳ Pendiente de aprobación»). NO son tareas: no se arrastran (las listas con `data-estado` son
+  las únicas que reciben), no tienen responsable ni color, y no cuentan en Indicadores / CRM > Indicadores ni en «Tareas abiertas»; solo suman a la tarjeta-resumen «Eventos por
+  aprobar» (con cuántas pasan de 48 h hábiles). El clic es un enlace a `eventos.html?evento=<id>`, donde se revisa/aprueba/rechaza (flujo sin cambios). Al aprobarse, el trigger crea
+  la tarea real en «Recibido» y la provisional desaparece (Realtime sobre `mercadeo_eventos`). Los filtros que solo tiene una tarea (responsable, clase, asunto, urgentes) la ocultan;
+  Empresa, Origen, Tipo=Evento y Buscar sí aplican. Si la consulta de eventos falla, el Tablero sigue con sus tareas y avisa. Probado con un arnés de navegador y una BD simulada.
 - **KPI del encabezado** (cliente, sin festivos): Por atender (y cuántas pasan de 48 h hábiles sin respuesta), eventos de los
   próximos 30 días, Oportunidad del mes (≥ 15 días) y Retorno de la base de datos (entregada en ≤ 3 días hábiles tras el evento,
   últimos 90 días; «no aplica» no cuenta). Cada evento realizado sin base de datos y con plazo vencido se marca en la lista.

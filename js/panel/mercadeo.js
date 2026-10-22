@@ -17,6 +17,11 @@
 //  - Sin brief no hay fecha comprometida: salir de "Recibido" exige descripción y fecha límite.
 // La cola de cada columna se ordena por regla (urgente, clase, fecha límite, antigüedad), no a mano:
 // arrastrar solo cambia de columna. Para teclado/táctil cada tarjeta tiene botones ◀ ▶.
+//
+// Columna «Por aprobar» (solo lectura): las solicitudes de evento (mercadeo_eventos) que aún no ha aprobado Mercadeo
+// ('radicada' / 'en_revision') se ven aquí desde que llegan. NO son tareas: no se arrastran, no tienen responsable ni cuentan en
+// Indicadores; el clic abre la solicitud en Eventos, donde se revisa, aprueba o rechaza (ese flujo no cambia). Al aprobarse,
+// el trigger de la BD crea la tarea real en «Recibido» y la tarjeta provisional desaparece sola (Realtime sobre mercadeo_eventos).
 (async function () {
   await AUTH.authReady;
   if (!AUTH.getProfile() || !AUTH.hasModule('mercadeo')) return;
@@ -50,9 +55,13 @@
   // Las tareas que nacen de un evento pueden ser de empresas adicionales (Chía Abagó, Tecbihol, Otros; migración 0032).
   var TODAS = SIGLAS.concat(EMPRESAS_EXTRA.map(function (x) { return x.sigla; }));
   var MAX_ARCHIVO = 25 * 1024 * 1024;
+  // Solicitudes de evento que Mercadeo aún no aprueba (estados de mercadeo_eventos; etiquetas en EVENTO_PDF.ESTADO_T).
+  var EV_PEND = ['radicada', 'en_revision'];
+  var EV_COLS = 'id,estado,empresa,empresa_otra,origen,origen_numero,nombre,solicitante_nombre,solicitante_area,fecha_evento,hora_inicio,' +
+    'fecha_limite_aprobacion,extemporanea,dias_anticipacion,respondida_en,creado_en';
 
   // ── Estado ──
-  var tareas = [], actividades = [], equipo = [];
+  var tareas = [], actividades = [], equipo = [], eventosPend = [], eventosFallo = false;
   var tareaById = {}, actById = {};
   var editId = null, orig = null, dragId = null, recargaTimer = null;
 
@@ -79,6 +88,22 @@
   function actAprobada(id) { var a = id ? actById[id] : null; return !!(a && a.en_calendario); }
   function esAbierta(t) { return ABIERTOS.indexOf(t.estado) >= 0; }
   function horasDesde(ts) { return (Date.now() - new Date(ts).getTime()) / 3600000; }
+  // Horas hábiles (lunes a viernes, sin festivos) entre dos instantes: el Líder de Mercadeo evalúa cada evento en máx. 48 h hábiles.
+  // Misma cuenta que horasHabiles de eventos.js (allá es local a ese archivo).
+  function horasHabiles(desde, hasta) {
+    var a = new Date(desde), b = new Date(hasta);
+    if (isNaN(a) || isNaN(b) || b <= a) return 0;
+    var total = 0, cur = new Date(a);
+    while (cur < b) {
+      var finDia = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
+      var fin = finDia < b ? finDia : b;
+      var dow = cur.getDay();
+      if (dow !== 0 && dow !== 6) total += (fin - cur) / 3600000;
+      cur = fin;
+    }
+    return total;
+  }
+  function fmtHoras(h) { return h < 48 ? Math.floor(h) + ' h' : Math.floor(h / 24) + ' d'; }
 
   // ══════════════ Carga ══════════════
   async function cargar(primera) {
@@ -87,9 +112,14 @@
         fetchAll('mercadeo_tareas', '*', 'id'),
         fetchAll('mercadeo_actividades', 'id,nombre,en_calendario,estado', 'id'),
         _sb.rpc('list_equipo_mercadeo'),
+        fetchAll('mercadeo_eventos', EV_COLS, 'id', function (q) { return q.in('estado', EV_PEND); }),
       ]);
-      for (var i = 0; i < rs.length; i++) if (rs[i].error) throw rs[i].error;
+      for (var i = 0; i < 3; i++) if (rs[i].error) throw rs[i].error;
       tareas = rs[0].data; actividades = rs[1].data; equipo = rs[2].data || [];
+      // Las solicitudes por aprobar son un añadido de solo lectura: si no cargan, el Tablero sigue funcionando con sus tareas.
+      eventosFallo = !!rs[3].error;
+      if (eventosFallo) { eventosPend = []; showToast('No se pudieron cargar las solicitudes de evento por aprobar: ' + errMsg(rs[3].error), '#e67e22'); }
+      else eventosPend = rs[3].data;
     } catch (err) {
       if (primera) {
         $('estado-carga').innerHTML = 'No se pudieron cargar los datos: ' + esc(errMsg(err)) +
@@ -165,6 +195,69 @@
     return String(a.creado_en).localeCompare(String(b.creado_en)) || a.id - b.id;
   }
 
+  // ── Columna «Por aprobar» (solicitudes de evento pendientes; solo lectura) ──
+  // Los filtros que solo existen en una tarea (responsable, clase, asunto, urgente) las ocultan: una solicitud aún no los tiene.
+  function filtrarEventos() {
+    if ($('f-resp').value || $('f-clase').value || $('f-asunto').value || $('f-urg').checked) return [];
+    var tipo = $('f-tipo').value, emp = $('f-empresa').value, origen = $('f-origen').value, q = norm($('f-buscar').value);
+    return eventosPend.filter(function (e) {
+      if (tipo && tipo !== 'evento') return false;
+      if (emp && e.empresa !== emp) return false;
+      if (origen && e.origen !== origen) return false;
+      if (q && norm('EV-' + e.id + ' ' + e.nombre + ' ' + e.solicitante_nombre + ' ' + e.solicitante_area + ' ' + (e.empresa_otra || '') + ' ' +
+        (e.origen_numero ? 'SE-' + e.origen_numero : '')).indexOf(q) < 0) return false;
+      return true;
+    }).sort(compararEventos);
+  }
+
+  // Primero la que antes vence su fecha de aprobación (sin fecha al final) y, a igual fecha, la que más lleva esperando.
+  function compararEventos(a, b) {
+    if (a.fecha_limite_aprobacion !== b.fecha_limite_aprobacion) {
+      if (!a.fecha_limite_aprobacion) return 1;
+      if (!b.fecha_limite_aprobacion) return -1;
+      return a.fecha_limite_aprobacion < b.fecha_limite_aprobacion ? -1 : 1;
+    }
+    return String(a.creado_en).localeCompare(String(b.creado_en)) || a.id - b.id;
+  }
+
+  function eventoPendHtml(e) {
+    var hoy = today();
+    var ped = e.origen === 'panel_pedidos' ? '<span class="kb-chip" title="Solicitud enviada desde panel-pedidos' + (e.origen_numero ? ' (SE-' + esc(e.origen_numero) + ')' : '') + '">📥 Pedidos</span>' : '';
+    var espera = '';
+    if (!e.respondida_en) {
+      var h = horasHabiles(e.creado_en, new Date());
+      espera = '<span class="kb-chip' + (h > 48 ? ' warn' : '') + '" title="El Líder de Mercadeo debe responder en máximo 48 horas hábiles">⏱ ' + fmtHoras(h) + ' hábiles sin respuesta</span>';
+    }
+    var aprobar = '';
+    if (e.fecha_limite_aprobacion) {
+      var venc = e.fecha_limite_aprobacion < hoy;
+      aprobar = '<span class="kb-chip' + (venc ? ' urg' : '') + '" title="Fecha en que el solicitante necesita la respuesta">' + (venc ? '⚠ Aprobación vencida ' : '📅 Aprobar antes del ') + esc(fmtDateOnly(e.fecha_limite_aprobacion)) + '</span>';
+    }
+    var ant = e.extemporanea ? '<span class="kb-chip warn" title="Se pidió con menos de 15 días de anticipación (solo advertencia)">⚠ ' + esc(e.dias_anticipacion) + ' d de anticipación</span>' : '';
+    var quien = '<div class="kb-act">👤 ' + esc(e.solicitante_nombre || '—') + (e.solicitante_area ? ' · ' + esc(e.solicitante_area) : '') +
+      (e.empresa === 'OTROS' && e.empresa_otra ? ' · ' + esc(e.empresa_otra) : '') + '</div>';
+    return '<a class="kb-ev" href="eventos.html?evento=' + encodeURIComponent(e.id) + '" draggable="false" ' +
+      'title="Abrir la solicitud en Eventos para revisarla, aprobarla o rechazarla" ' +
+      'aria-label="Solicitud de evento EV-' + esc(e.id) + ' pendiente de aprobación: ' + esc(e.nombre) + '. Abrir en Eventos">' +
+      '<div class="kb-card-top"><span class="kb-chip kb-chip-pend">⏳ Pendiente de aprobación</span>' +
+      '<span class="kb-chip" title="Solicitud de evento EV-' + esc(e.id) + '">🎪 EV-' + esc(e.id) + '</span>' +
+      '<span class="kb-chip">' + esc(EVENTO_PDF.ESTADO_T[e.estado] || e.estado) + '</span>' + ped + '</div>' +
+      '<div class="kb-title">' + esc(e.nombre) + '</div>' +
+      '<div class="kb-emp">' + empresaChips([e.empresa]) + '</div>' + quien +
+      '<div class="kb-meta"><span class="kb-fecha" title="Fecha del evento">🎪 ' + esc(fmtDateOnly(e.fecha_evento)) + (e.hora_inicio ? ' · ' + esc(String(e.hora_inicio).slice(0, 5)) : '') + '</span></div>' +
+      ((espera || aprobar || ant) ? '<div class="kb-card-top" style="margin:6px 0 0">' + espera + aprobar + ant + '</div>' : '') +
+      '</a>';
+  }
+
+  function columnaPorAprobarHtml() {
+    var evs = filtrarEventos();
+    return '<section class="kb-col" data-estado="por_aprobar" aria-label="Por aprobar: ' + evs.length + ' solicitudes de evento">' +
+      '<div class="kb-col-head"><span title="Solicitudes de evento que Mercadeo aún no aprueba. Solo lectura: se revisan, aprueban o rechazan en Eventos">Por aprobar · eventos</span><span class="kb-count">' + evs.length + '</span></div>' +
+      '<div class="kb-list">' +
+      (evs.length ? evs.map(eventoPendHtml).join('') : '<div class="kb-vacio">' + (eventosFallo ? 'No se pudieron cargar las solicitudes de evento' : 'Sin solicitudes de evento por aprobar') + '</div>') +
+      '</div></section>';
+  }
+
   function tarjetaHtml(t, idxCol) {
     var hoy = today();
     var fechaHtml = '';
@@ -224,7 +317,7 @@
     renderStats();
     renderLeyenda();
     var lista = filtrar();
-    $('kb-board').innerHTML = COLUMNAS.map(function (c, idx) {
+    $('kb-board').innerHTML = columnaPorAprobarHtml() + COLUMNAS.map(function (c, idx) {
       var ts = lista.filter(function (t) { return t.estado === c.k; }).sort(comparar);
       return '<section class="kb-col" data-estado="' + c.k + '" aria-label="' + esc(c.t) + ': ' + ts.length + ' tareas">' +
         '<div class="kb-col-head"><span>' + esc(c.t) + '</span><span class="kb-count">' + ts.length + '</span></div>' +
@@ -243,11 +336,15 @@
     var sinConf = tareas.filter(function (t) { return t.estado === 'solicitada' && horasDesde(t.creado_en) > 24; });
     var delMes = tareas.filter(function (t) { return String(t.creado_en || '').slice(0, 7) === mes; });
     var excep = delMes.filter(function (t) { return t.urgente && t.fuera_calendario; });
+    // Solicitudes de evento por aprobar: tarjeta aparte; no suman a «Tareas abiertas» ni a los demás números (aún no son tareas).
+    var evTarde = eventosPend.filter(function (e) { return !e.respondida_en && horasHabiles(e.creado_en, new Date()) > 48; });
     $('kb-stats').innerHTML =
       '<div class="sc info"><div class="num">' + abiertas.length + '</div><div class="lbl">Tareas abiertas</div></div>' +
       '<div class="sc parcial"><div class="num">' + mias.length + '</div><div class="lbl">Mis tareas</div></div>' +
       '<div class="sc alerta"><div class="num">' + vencidas.length + '</div><div class="lbl">Vencidas</div></div>' +
       '<div class="sc pend"><div class="num">' + sinConf.length + '</div><div class="lbl">Sin confirmar &gt; 24 h</div></div>' +
+      '<div class="sc evpend"><div class="num">' + (eventosFallo ? '—' : eventosPend.length) + '</div><div class="lbl">Eventos por aprobar</div><div class="mk-sub">' +
+      (eventosFallo ? 'no se pudieron cargar' : !eventosPend.length ? 'sin solicitudes pendientes' : evTarde.length ? evTarde.length + ' con &gt; 48 h hábiles sin respuesta' : 'todas dentro del plazo de 48 h hábiles') + '</div></div>' +
       '<div class="sc total"><div class="num">' + excep.length + '</div><div class="lbl">Excepciones del mes</div><div class="mk-sub">' +
       (delMes.length ? Math.round(excep.length / delMes.length * 100) + '% de ' + delMes.length + ' solicitudes' : 'sin solicitudes este mes') + '</div></div>';
   }
@@ -721,19 +818,20 @@
     dragId = null;
     [].slice.call(document.querySelectorAll('.kb-card.dragging, .kb-list.over')).forEach(function (n) { n.classList.remove('dragging', 'over'); });
   });
+  // Solo las listas con data-estado reciben tarjetas: la columna «Por aprobar» (solo lectura) no tiene ese atributo.
   board.addEventListener('dragover', function (e) {
-    var l = e.target.closest ? e.target.closest('.kb-list') : null;
+    var l = e.target.closest ? e.target.closest('.kb-list[data-estado]') : null;
     if (!l || !dragId) return;
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
     l.classList.add('over');
   });
   board.addEventListener('dragleave', function (e) {
-    var l = e.target.closest ? e.target.closest('.kb-list') : null;
+    var l = e.target.closest ? e.target.closest('.kb-list[data-estado]') : null;
     if (l && !l.contains(e.relatedTarget)) l.classList.remove('over');
   });
   board.addEventListener('drop', function (e) {
-    var l = e.target.closest ? e.target.closest('.kb-list') : null;
+    var l = e.target.closest ? e.target.closest('.kb-list[data-estado]') : null;
     if (!l || !dragId) return;
     e.preventDefault();
     l.classList.remove('over');
@@ -759,6 +857,10 @@
   // Actualización en vivo entre las personas del equipo
   try {
     _sb.channel('mercadeo-tareas').on('postgres_changes', { event: '*', schema: 'public', table: 'mercadeo_tareas' }, programarRecarga).subscribe();
+  } catch (e) { /* sin Realtime: queda la recarga al volver a la pestaña */ }
+  // Las solicitudes por aprobar salen de mercadeo_eventos: al llegar, aprobarse o rechazarse en Eventos, el Tablero se actualiza solo.
+  try {
+    _sb.channel('mercadeo-eventos-tablero').on('postgres_changes', { event: '*', schema: 'public', table: 'mercadeo_eventos' }, programarRecarga).subscribe();
   } catch (e) { /* sin Realtime: queda la recarga al volver a la pestaña */ }
   document.addEventListener('visibilitychange', function () { if (!document.hidden) programarRecarga(); });
 
