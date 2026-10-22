@@ -44,7 +44,11 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const BUCKET = 'mercadeo-adjuntos'
-const EMPRESAS_VALIDAS = ['PARCELAR', 'GREEN', 'RESO', 'IASO', 'IAS']
+// Las 5 del holding + 3 adicionales (las mismas de los eventos, migración 0032): OTROS lleva el nombre escrito
+// (`empresa_otra`). La tarea del Tablero solo guarda el código en `empresas`; el nombre de «Otros» y el
+// Departamento / Área viajan en el título y al inicio de la descripción (el brief que lee Mercadeo).
+const EMPRESAS_EXTRA_ETIQUETA: Record<string, string> = { CHIA_ABAGO: 'CHÍA ABAGÓ', TECBIHOL: 'TECBIHOL' }
+const EMPRESAS_VALIDAS = ['PARCELAR', 'GREEN', 'RESO', 'IASO', 'IAS', 'CHIA_ABAGO', 'TECBIHOL', 'OTROS']
 
 // Asunto del formulario -> etiqueta (para el título) y `tipo` del Tablero.
 const ASUNTOS: Record<string, { label: string; tipo: string }> = {
@@ -105,6 +109,15 @@ function texto(v: unknown, campo: string, min: number, max: number): string {
   if (typeof v !== 'string') throw new Rechazo(`${campo} es requerido`)
   const t = v.trim()
   if (t.length < min) throw new Rechazo(`${campo} debe tener al menos ${min} caracteres`)
+  if (t.length > max) throw new Rechazo(`${campo} no puede superar ${max} caracteres`)
+  return t
+}
+
+// Texto opcional: vacío si no viene.
+function textoOpc(v: unknown, campo: string, max: number): string {
+  if (v === null || v === undefined || v === '') return ''
+  if (typeof v !== 'string') throw new Rechazo(`${campo} no es válido`)
+  const t = v.trim()
   if (t.length > max) throw new Rechazo(`${campo} no puede superar ${max} caracteres`)
   return t
 }
@@ -214,6 +227,10 @@ async function crear(admin: any, body: any) {
 
   const empresa = body.empresa
   if (!EMPRESAS_VALIDAS.includes(empresa)) throw new Rechazo(`empresa inválida: ${empresa}`)
+  // Con «Otros» se escribe el nombre de la empresa (obligatorio); con cualquier otra se ignora.
+  const empresaOtra = empresa === 'OTROS' ? texto(body.empresa_otra, 'El nombre de la empresa', 3, 100).replace(/\s+/g, ' ') : ''
+  // Departamento / Área del solicitante (opcional).
+  const departamentoArea = textoOpc(body.departamento_area, 'El departamento/área', 120).replace(/\s+/g, ' ')
   const asunto = ASUNTOS[body.asunto]
   if (!asunto) throw new Rechazo(`asunto inválido: ${body.asunto}`)
   // Con asunto "Otros" el solicitante escribe el asunto (obligatorio); con cualquier otro se ignora.
@@ -285,10 +302,15 @@ async function crear(admin: any, body: any) {
   }
 
   const etiquetaAsunto = asuntoOtro ? `Otros: ${asuntoOtro}` : asunto.label
-  const titulo = `${etiquetaAsunto} · ${empresa} · ${aNombreNombre || solicitanteNombre}`.slice(0, 200)
+  const etiquetaEmpresa = empresa === 'OTROS' ? empresaOtra : (EMPRESAS_EXTRA_ETIQUETA[empresa] || empresa)
+  const titulo = `${etiquetaAsunto} · ${etiquetaEmpresa} · ${aNombreNombre || solicitanteNombre}`.slice(0, 200)
+  // Encabezado del brief con lo que el Tablero no tiene en columnas propias.
+  const encabezado: string[] = []
+  if (empresa === 'OTROS') encabezado.push(`Empresa: ${empresaOtra}`)
+  if (departamentoArea) encabezado.push(`Departamento / Área: ${departamentoArea}`)
   const ins = await admin.from('mercadeo_tareas').insert({
     titulo,
-    descripcion,
+    descripcion: encabezado.length ? `${encabezado.join('\n')}\n\n${descripcion}` : descripcion,
     estado: 'solicitada',
     tipo: asunto.tipo,
     prioridad: 'mejora',
