@@ -433,6 +433,16 @@ textarea.ef { resize: vertical; min-height: 80px; }
 .ev-checks { flex-direction: column; gap: 6px; }
 .ev-gasto { display: grid; grid-template-columns: 1fr 160px auto; gap: 8px; margin-bottom: 6px; align-items: center; }
 @media (max-width: 700px) { .ev-gasto { grid-template-columns: 1fr 110px auto; } }
+/* «Productos relacionados» del evento (migración 0038): etiquetas con ✕ y el cuadro para agregar */
+.ev-prods { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.ev-prods:empty { display: none; }
+.ev-prod { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; padding: 3px 4px 3px 10px; border-radius: 14px; background: #ebf5fb; border: 1px solid #aed6f1; color: #1a5276; font-size: 0.82rem; font-weight: 600; }
+.ev-prod > span { overflow-wrap: anywhere; }
+.ev-prod button { background: none; border: none; color: inherit; cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 2px 7px; border-radius: 50%; }
+.ev-prod button:hover:not(:disabled) { background: rgba(0,0,0,0.1); }
+.ev-prod button:disabled { cursor: default; opacity: 0.4; }
+.ev-prod-fila { display: flex; gap: 8px; align-items: center; }
+.ev-prod-fila .ef { flex: 1; min-width: 0; }
 .mk-badge { white-space: nowrap; }
 
 /* Pasos del modal de Eventos */

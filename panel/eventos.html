@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mercadeo — Eventos</title>
-<link rel="stylesheet" href="../css/panel.css?v=20261029">
+<link rel="stylesheet" href="../css/panel.css?v=20261030">
 </head>
 <body data-modulo="mercadeo">
   <div class="header">
@@ -155,6 +155,11 @@
         <div class="mk-checks ev-checks" id="e-objetivos"></div>
         <div style="margin:8px 0 14px"><label class="ef-label" for="e-objetivos-otro">Otros (especifica)</label>
           <input class="ef" id="e-objetivos-otro" maxlength="300" autocomplete="off"></div>
+        <div style="margin:0 0 14px"><label class="ef-label" for="e-productos-in">Productos relacionados <span class="ev-ayuda">opcional</span></label>
+          <div class="ev-prods" id="e-productos"></div>
+          <div class="ev-prod-fila"><input class="ef" id="e-productos-in" maxlength="100" autocomplete="off" placeholder="Escribe el nombre del producto y presiona Enter">
+            <button type="button" class="btn-ver" id="e-productos-add" data-act="producto-agregar">➕ Agregar</button></div>
+          <div class="ef-help">Escribe el nombre del producto, sin la presentación (p. ej. «CALIMAN»). Desde Pedidos llegan elegidos del maestro de productos.</div></div>
         <div class="form-grid cols2">
           <div><label class="ef-label" for="e-publico">Público objetivo (especificar)</label>
             <input class="ef" id="e-publico" maxlength="500" autocomplete="off"></div>
@@ -311,8 +316,8 @@
   <script src="../js/shared/colombia-geo.js?v=20261025"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
-  <script src="../js/panel/eventos-pdf.js?v=20261027"></script>
+  <script src="../js/panel/eventos-pdf.js?v=20261030"></script>
   <script src="../js/panel/auth.js?v=20261021"></script>
-  <script src="../js/panel/eventos.js?v=20261029"></script>
+  <script src="../js/panel/eventos.js?v=20261030"></script>
 </body>
 </html>

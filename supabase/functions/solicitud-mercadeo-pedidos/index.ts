@@ -45,8 +45,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const BUCKET = 'mercadeo-adjuntos'
 // Las 5 del holding + 3 adicionales (las mismas de los eventos, migración 0032): OTROS lleva el nombre escrito
-// (`empresa_otra`). La tarea del Tablero solo guarda el código en `empresas`; el nombre de «Otros» y el
-// Departamento / Área viajan en el título y al inicio de la descripción (el brief que lee Mercadeo).
+// (`empresa_otra`). La tarea del Tablero solo guarda el código en `empresas`; el nombre de «Otros», el
+// Departamento / Área y los Productos relacionados viajan en el título y al inicio de la descripción (el brief que lee Mercadeo).
 const EMPRESAS_EXTRA_ETIQUETA: Record<string, string> = { CHIA_ABAGO: 'CHÍA ABAGÓ', TECBIHOL: 'TECBIHOL' }
 const EMPRESAS_VALIDAS = ['PARCELAR', 'GREEN', 'RESO', 'IASO', 'IAS', 'CHIA_ABAGO', 'TECBIHOL', 'OTROS']
 
@@ -130,6 +130,30 @@ function uuid(v: unknown, campo: string): string {
 function hoyBogota(): string {
   // en-CA formatea como YYYY-MM-DD.
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date())
+}
+
+// Productos relacionados (opcional): hasta 20 nombres de 2 a 100 caracteres, en una sola línea y sin repetir (sin importar tildes ni
+// mayúsculas). Mismas reglas que Pedidos (solicitud-mercadeo) y que los Eventos (solicitud-evento-pedidos, migración 0038).
+const MAX_PRODUCTOS = 20
+const PRODUCTO_MIN = 2
+const PRODUCTO_MAX = 100
+function productosLista(v: unknown): string[] {
+  if (v === null || v === undefined) return []
+  if (!Array.isArray(v)) throw new Rechazo('Los productos relacionados no son válidos')
+  if (v.length > MAX_PRODUCTOS) throw new Rechazo(`Máximo ${MAX_PRODUCTOS} productos por solicitud`)
+  const out: string[] = []
+  const vistos = new Set<string>()
+  for (const x of v) {
+    if (typeof x !== 'string') throw new Rechazo('Los productos relacionados no son válidos')
+    const n = x.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim()
+    if (n.length < PRODUCTO_MIN) throw new Rechazo(`El nombre de un producto debe tener al menos ${PRODUCTO_MIN} caracteres`)
+    if (n.length > PRODUCTO_MAX) throw new Rechazo(`El nombre de un producto no puede superar ${PRODUCTO_MAX} caracteres`)
+    const k = n.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+    if (vistos.has(k)) continue
+    vistos.add(k)
+    out.push(n)
+  }
+  return out
 }
 
 function extension(nombre: string): string {
@@ -231,6 +255,8 @@ async function crear(admin: any, body: any) {
   const empresaOtra = empresa === 'OTROS' ? texto(body.empresa_otra, 'El nombre de la empresa', 3, 100).replace(/\s+/g, ' ') : ''
   // Departamento / Área del solicitante (opcional).
   const departamentoArea = textoOpc(body.departamento_area, 'El departamento/área', 120).replace(/\s+/g, ' ')
+  // Productos relacionados (opcional): no tienen columna propia en la tarea; viajan en el encabezado del brief.
+  const productos = productosLista(body.productos)
   const asunto = ASUNTOS[body.asunto]
   if (!asunto) throw new Rechazo(`asunto inválido: ${body.asunto}`)
   // Con asunto "Otros" el solicitante escribe el asunto (obligatorio); con cualquier otro se ignora.
@@ -308,6 +334,7 @@ async function crear(admin: any, body: any) {
   const encabezado: string[] = []
   if (empresa === 'OTROS') encabezado.push(`Empresa: ${empresaOtra}`)
   if (departamentoArea) encabezado.push(`Departamento / Área: ${departamentoArea}`)
+  if (productos.length) encabezado.push(`Productos relacionados: ${productos.join(', ')}`)
   const ins = await admin.from('mercadeo_tareas').insert({
     titulo,
     descripcion: encabezado.length ? `${encabezado.join('\n')}\n\n${descripcion}` : descripcion,

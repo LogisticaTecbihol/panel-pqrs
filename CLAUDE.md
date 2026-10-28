@@ -182,6 +182,9 @@ SOLO por la función `solicitud-mercadeo` de panel-pedidos (server→server, sin
 - Asunto "Otros" (migración 0020): el solicitante escribe el asunto → `asunto_otro` (3-100 car.,
   solo con `asunto = 'otros'`, inmutable); lo exigen las dos Edge Functions y el título de la tarea
   pasa a `Otros: <asunto escrito> · <empresa> · <solicitante>`.
+- Productos relacionados (sin migración): el solicitante los elige en Pedidos (del maestro, por nombre sin presentación, o escritos a mano; opcional, hasta 20 de 2–100 car.). La tarea
+  no tiene columna propia: `solicitud-mercadeo-pedidos` (`crear`) los valida (`productosLista`) y los pone en el encabezado del brief, `Productos relacionados: A, B`, junto a
+  «Empresa» y «Departamento / Área». Ver también «Productos relacionados» de Eventos (migración 0038).
 - Rechazo por Mercadeo y avisos (migración 0022):
   - Estado nuevo `rechazada` (fuera de las columnas, como `cancelada`; estado FINAL). Solo para
     tareas de Pedidos y mientras no estén entregadas/canceladas; motivo obligatorio (3–500). Quién y
@@ -282,6 +285,14 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
   `lugar` libre pide completarlos al guardar o cambiar de estado (se le muestra el texto anterior). La Segmentación reemplaza a segmento demográfico, segmentación
   profesional y nivel de conocimiento: se guarda en `segmento_profesional`; las otras dos columnas se conservan en BD y se muestran de solo lectura si traen datos.
   Las opciones de Logística (incl. `presencia_mercadeo`, migración 0034) deben coincidir con las de Pedidos.
+- **Productos relacionados** (migración 0038; paso 3 «Objetivos y público»): columna `mercadeo_eventos.productos text[]` (hasta 20 nombres de 2 a 100 caracteres; el CHECK
+  `mercadeo_eventos_productos_check` usa `mercadeo_productos_validos()` y también cubre las escrituras directas del navegador). Desde Pedidos los eligen del maestro de productos
+  por NOMBRE, sin la presentación («CALIMAN X LITRO» → «CALIMAN»), o los escriben a mano; aquí no hay maestro, así que el formulario (`eventos.js`: `productos`,
+  `pintarProductos`, `agregarProducto`) es de texto libre con chips, alineado con el de Pedidos (si cambias uno, cambia el otro). La migración reescribe `mercadeo_evento_brief()`
+  (agrega «Productos relacionados:» con una línea por producto, solo si hay) y `mercadeo_eventos_bitacora()` (`productos` entra en la lista de campos que se anotan como cambio),
+  ambas desde su definición vigente. El PDF del evento, la búsqueda de la lista y la etiqueta del historial de cambios (`CAMPO_T`) lo incluyen. El brief de la tarea se arma al aprobar:
+  cambiar los productos después no lo reescribe (igual que el resto de campos). Los eventos anteriores quedan con la lista vacía. Aplicar la migración ANTES de redesplegar
+  `solicitud-evento-pedidos` y de publicar el frontend (el formulario ya envía `productos` al guardar).
 - **Checklist de actividades** (migración 0036; paso 6 «Actividades» del modal, «Aprobación y seguimiento» pasó al 7): tabla `mercadeo_evento_checklist`
   (NO es `mercadeo_actividades`, que es el calendario del CRM). Cada actividad lleva texto libre (3–300), casilla «hecha», responsable (`list_equipo_mercadeo()`),
   fecha límite opcional y notas (≤ 1000). Se guarda al instante, sin el botón Guardar del formulario. «Sugerir desde lo solicitado» crea una actividad por cada
