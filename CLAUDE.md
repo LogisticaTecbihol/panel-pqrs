@@ -125,6 +125,26 @@ listan solo a los activos, y el selector del detalle conserva al responsable act
 para el admin: su lista de responsables ya no incluye a quien no tiene acceso a PQRS (hoy Mercadeo/SST sin el módulo), que de
 todas formas no podría abrir la PQRS que se le asignara. `anon` no puede ejecutarlo. Sin cambios de policies.
 
+### Registro de gestión (migración 0039)
+
+Cada PQRS tiene en `panel/detalle.html` (`js/panel/detalle.js`) una sección propia, **Registro de gestión**, entre «Gestión interna» y
+«Adjuntos»: una fila de `pqrs_gestiones` por cada acción hecha con la PQRS. Campos: `fecha_gestion` (cuándo SE HIZO; por defecto hoy, se
+puede anotar una anterior, nunca futura en hora de Colombia), `tipo` (códigos ASCII: `llamada`, `correo`, `whatsapp`, `visita`, `reunion`,
+`revision_interna`, `escalamiento`, `respuesta_cliente`, `solucion`, `otra`; etiquetas en `TIPO_GESTION` del JS), `descripcion` (qué se hizo,
+3–2000) y `resultado` (en qué quedó / qué sigue, opcional, ≤ 1000). Es distinto de las notas de la bitácora, que siguen existiendo para texto libre.
+
+- **Permisos** (RLS): lee quien tiene el módulo `pqrs` (`user_has_module_pqrs('pqrs')`); escribe `admin`/`gestor`; borra solo `admin`. No hay
+  UPDATE (ni policy ni GRANT): es evidencia, como las notas; si algo quedó mal se registra otra gestión o el admin elimina la errónea.
+- **Lo sella el servidor** (`trg_pqrs_gestiones_antes`): `creado_por`, `creado_por_nombre`, `creado_en`; el navegador no los puede falsificar.
+- **Bitácora automática** (`trg_pqrs_gestiones_bitacora`, SECURITY DEFINER): cada gestión registrada o eliminada deja un evento
+  `gestion_registrada` / `gestion_eliminada` en `pqrs_bitacora`; el de eliminación conserva el texto borrado. Esos dos tipos NO están en la policy
+  de INSERT de `pqrs_bitacora`, así que solo los puede escribir el trigger. Al borrar una PQRS entera (cascada) no se intenta anotar el evento.
+- El detalle solo relee gestiones y bitácora tras registrar/eliminar (`recargarGestiones`), no toda la página. Si la consulta falla, la sección lo dice
+  en vez de mostrarse vacía.
+- Probado en SQL en una transacción revertida (gestor inserta y el sello no se falsifica; fecha futura, descripción corta y tipo inválido se rechazan;
+  Mercadeo/SST sin módulo no leen ni escriben; con el módulo `pqrs` solo leen; el gestor no borra ni edita; el admin borra y queda el evento;
+  borrar la PQRS con gestiones no falla) y la interfaz en navegador con un Supabase simulado (gestor, admin, lector, falla de consulta y móvil).
+
 ## Configuración pendiente tras clonar (secretos del Edge Function)
 
 Configurar con `supabase secrets set` (o desde el dashboard del proyecto,

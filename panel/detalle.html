@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gestión PQRS — Detalle</title>
-<link rel="stylesheet" href="../css/panel.css?v=20261029">
+<link rel="stylesheet" href="../css/panel.css?v=20261029b">
 </head>
 <body data-modulo="pqrs">
   <div class="header">
@@ -67,6 +67,37 @@
         </div>
       </div>
 
+      <div class="card" style="margin-bottom:16px" id="card-gestiones">
+        <div class="card-head">
+          <h3>Registro de gestión</h3>
+          <span class="gest-resumen" id="gestiones-resumen"></span>
+        </div>
+        <div class="mbody">
+          <div class="gest-form auth-edit-only" data-display="block" style="display:none">
+            <div class="form-grid cols2">
+              <div>
+                <label class="ef-label" for="gt-fecha">Fecha de la gestión</label>
+                <input type="date" class="ef" id="gt-fecha">
+              </div>
+              <div>
+                <label class="ef-label" for="gt-tipo">Tipo de gestión</label>
+                <select class="ef" id="gt-tipo"><option value="">Seleccionar…</option></select>
+              </div>
+              <div style="grid-column:1/-1">
+                <label class="ef-label" for="gt-descripcion">¿Qué se hizo?</label>
+                <textarea class="ef" id="gt-descripcion" rows="3" maxlength="2000" placeholder="Describe la gestión realizada con esta PQRS (a quién se contactó, qué se revisó, qué se respondió…)"></textarea>
+              </div>
+              <div style="grid-column:1/-1">
+                <label class="ef-label" for="gt-resultado">Resultado o compromiso (opcional)</label>
+                <textarea class="ef" id="gt-resultado" rows="2" maxlength="1000" placeholder="En qué quedó la gestión o qué sigue"></textarea>
+              </div>
+            </div>
+            <button class="btn-primary" id="btn-registrar-gestion">Registrar gestión</button>
+          </div>
+          <div id="gestiones-list"></div>
+        </div>
+      </div>
+
       <div class="card" style="margin-bottom:16px">
         <div class="card-head"><h3>Adjuntos</h3></div>
         <div class="mbody">
@@ -96,6 +127,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="../js/shared/supabase-client.js?v=20261006"></script>
   <script src="../js/panel/auth.js?v=20261021"></script>
-  <script src="../js/panel/detalle.js?v=20261020"></script>
+  <script src="../js/panel/detalle.js?v=20261029"></script>
 </body>
 </html>

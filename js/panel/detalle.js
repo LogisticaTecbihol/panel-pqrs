@@ -9,6 +9,27 @@
   var ESTADO_BADGE = { 'Nuevo': 'b-nuevo', 'En proceso': 'b-proceso', 'Resuelto': 'b-resuelto', 'Cerrado': 'b-cerrado' };
   var URGENCIA_BADGE = { 'ALTO': 'b-alerta', 'MEDIO': 'b-medio', 'BAJA': 'b-baja' };
   var BUCKET = 'pqrs-gestion-adjuntos';
+  // Registro de gestión (migración 0039): códigos ASCII guardados en pqrs_gestiones.tipo.
+  var TIPO_GESTION = {
+    llamada: 'Llamada',
+    correo: 'Correo electrónico',
+    whatsapp: 'WhatsApp / mensaje',
+    visita: 'Visita',
+    reunion: 'Reunión',
+    revision_interna: 'Revisión interna',
+    escalamiento: 'Escalamiento',
+    respuesta_cliente: 'Respuesta al cliente',
+    solucion: 'Solución / acción correctiva',
+    otra: 'Otra',
+  };
+
+  var selTipoGestion = document.getElementById('gt-tipo');
+  Object.keys(TIPO_GESTION).forEach(function (k) {
+    var opt = document.createElement('option');
+    opt.value = k; opt.textContent = TIPO_GESTION[k];
+    selTipoGestion.appendChild(opt);
+  });
+  document.getElementById('gt-fecha').value = today();
 
   document.querySelectorAll('.auth-edit-only').forEach(function (e) {
     e.style.display = AUTH.canEdit() ? (e.dataset.display || 'inline-block') : 'none';
@@ -26,11 +47,12 @@
   }
 
   async function cargar() {
-    var [usuariosRes, rowRes, adjRes, bitRes] = await Promise.all([
+    var [usuariosRes, rowRes, adjRes, bitRes, gesRes] = await Promise.all([
       _sb.rpc('list_equipo_pqrs'), // directorio (migración 0030); usuarios_pqrs solo deja leer la propia fila a un no-admin
       _sb.from('pqrs').select('*').eq('id', pqrsId).single(),
       _sb.from('pqrs_adjuntos').select('*').eq('pqrs_id', pqrsId).order('creado_en'),
       _sb.from('pqrs_bitacora').select('*').eq('pqrs_id', pqrsId).order('creado_en'),
+      consultarGestiones(),
     ]);
 
     if (rowRes.error || !rowRes.data) {
@@ -54,7 +76,24 @@
     render();
     renderAdjuntos(adjRes.data || []);
     renderBitacora(bitRes.data || []);
+    renderGestiones(gesRes);
     document.getElementById('content').style.display = '';
+  }
+
+  function consultarGestiones() {
+    return _sb.from('pqrs_gestiones').select('*').eq('pqrs_id', pqrsId)
+      .order('fecha_gestion', { ascending: false }).order('id', { ascending: false });
+  }
+
+  // Tras registrar o eliminar una gestión solo se releen ella y la bitácora (el trigger anota allí el evento);
+  // no hace falta volver a cargar toda la página.
+  async function recargarGestiones() {
+    var res = await Promise.all([
+      consultarGestiones(),
+      _sb.from('pqrs_bitacora').select('*').eq('pqrs_id', pqrsId).order('creado_en'),
+    ]);
+    renderGestiones(res[0]);
+    renderBitacora(res[1].data || []);
   }
 
   function campo(label, valor) {
@@ -160,6 +199,50 @@
     });
   }
 
+  // res: { data, error } de consultarGestiones(). Si falla (p. ej. migración 0039 sin aplicar) se dice en
+  // la sección en vez de mostrarla vacía como si no hubiera gestiones.
+  function renderGestiones(res) {
+    var list = document.getElementById('gestiones-list');
+    var resumen = document.getElementById('gestiones-resumen');
+    if (res.error) {
+      resumen.textContent = '';
+      list.innerHTML = '<div class="no-lines">No se pudo cargar el registro de gestión: ' + escHtml(errMsg(res.error)) + '</div>';
+      return;
+    }
+    var rows = res.data || [];
+    if (!rows.length) {
+      resumen.textContent = 'Sin gestiones registradas';
+      list.innerHTML = '<div class="no-lines">Aún no se ha registrado ninguna gestión para esta solicitud.</div>';
+      return;
+    }
+    resumen.textContent = rows.length + (rows.length === 1 ? ' gestión' : ' gestiones') + ' · última: ' + fmtDateOnly(rows[0].fecha_gestion);
+    list.innerHTML = rows.map(function (g) {
+      return '<div class="gest-item">' +
+        '<div class="gest-head"><span class="gest-tipo">' + escHtml(TIPO_GESTION[g.tipo] || g.tipo) + '</span>' +
+        '<span class="gest-fecha">' + escHtml(fmtDateOnly(g.fecha_gestion)) + '</span>' +
+        (AUTH.isAdmin() ? '<button class="btn-secondary gest-del" data-id="' + escHtml(g.id) + '">Eliminar</button>' : '') + '</div>' +
+        '<div class="gest-desc">' + escHtml(g.descripcion) + '</div>' +
+        (g.resultado ? '<div class="gest-res"><strong>Resultado:</strong> ' + escHtml(g.resultado) + '</div>' : '') +
+        '<div class="meta">Registrada por ' + escHtml(g.creado_por_nombre || '—') + ' el ' + escHtml(fmtDateTime(g.creado_en)) + '</div></div>';
+    }).join('');
+
+    list.querySelectorAll('.gest-del').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        if (!confirm('¿Eliminar este registro de gestión? Quedará constancia en la bitácora.')) return;
+        btn.disabled = true;
+        var del = await _sb.from('pqrs_gestiones').delete().eq('id', btn.getAttribute('data-id')).select('id');
+        // La RLS no da error al negar un DELETE: simplemente no borra filas.
+        if (del.error || !del.data || !del.data.length) {
+          btn.disabled = false;
+          showToast('No se pudo eliminar la gestión' + (del.error ? ': ' + errMsg(del.error) : ' (sin permiso)'), '#e74c3c');
+          return;
+        }
+        showToast('Gestión eliminada');
+        recargarGestiones();
+      });
+    });
+  }
+
   function nombreUsuario(id) {
     var u = _usuarios.filter(function (x) { return x.id === id; })[0];
     return u ? u.nombre : '';
@@ -173,6 +256,8 @@
     notificacion_enviada: 'Aviso enviado al equipo',
     adjunto_agregado: 'Adjunto agregado',
     edicion_datos: 'Datos de la solicitud corregidos',
+    gestion_registrada: 'Gestión registrada',
+    gestion_eliminada: 'Gestión eliminada',
   };
 
   function renderBitacora(rows) {
@@ -184,6 +269,11 @@
       if (b.tipo_evento === 'cambio_estado' && b.detalle) detalleTxt = escHtml(b.detalle.de || '') + ' &rarr; ' + escHtml(b.detalle.a || '');
       if (b.tipo_evento === 'asignacion' && b.detalle) detalleTxt = 'Asignado a ' + escHtml(b.detalle.a_nombre || 'sin asignar');
       if (b.tipo_evento === 'adjunto_agregado' && b.detalle) detalleTxt = escHtml(b.detalle.nombre || '');
+      if ((b.tipo_evento === 'gestion_registrada' || b.tipo_evento === 'gestion_eliminada') && b.detalle) {
+        detalleTxt = escHtml(TIPO_GESTION[b.detalle.tipo] || b.detalle.tipo || '') +
+          (b.detalle.fecha ? ' del ' + escHtml(fmtDateOnly(b.detalle.fecha)) : '');
+        if (b.tipo_evento === 'gestion_eliminada' && b.detalle.descripcion) detalleTxt += ' — «' + escHtml(b.detalle.descripcion) + '»';
+      }
       return '<div class="bitacora-item"><strong>' + (EVENTO_LABEL[b.tipo_evento] || b.tipo_evento) + '</strong>' +
         (detalleTxt ? ': ' + detalleTxt : '') +
         '<div class="meta">' + fmtDateTime(b.creado_en) + (b.usuario_nombre ? ' · ' + escHtml(b.usuario_nombre) : '') + '</div></div>';
@@ -248,6 +338,33 @@
       cargar();
     });
   }
+
+  document.getElementById('btn-registrar-gestion').addEventListener('click', async function () {
+    var btn = this;
+    var fecha = document.getElementById('gt-fecha').value;
+    var tipo = selTipoGestion.value;
+    var descripcion = document.getElementById('gt-descripcion').value.trim();
+    var resultado = document.getElementById('gt-resultado').value.trim();
+
+    if (!fecha) { showToast('Indica la fecha de la gestión', '#e74c3c'); return; }
+    if (fecha > today()) { showToast('La fecha de la gestión no puede ser futura', '#e74c3c'); return; }
+    if (!tipo) { showToast('Selecciona el tipo de gestión', '#e74c3c'); return; }
+    if (descripcion.length < 3) { showToast('Describe qué se hizo (mínimo 3 caracteres)', '#e74c3c'); return; }
+
+    btn.disabled = true;
+    var res = await _sb.from('pqrs_gestiones').insert({
+      pqrs_id: pqrsId, fecha_gestion: fecha, tipo: tipo, descripcion: descripcion, resultado: resultado,
+    });
+    btn.disabled = false;
+    if (res.error) { showToast('No se pudo registrar la gestión: ' + errMsg(res.error), '#e74c3c'); return; }
+
+    document.getElementById('gt-fecha').value = today();
+    selTipoGestion.value = '';
+    document.getElementById('gt-descripcion').value = '';
+    document.getElementById('gt-resultado').value = '';
+    showToast('Gestión registrada');
+    recargarGestiones();
+  });
 
   document.getElementById('btn-agregar-nota').addEventListener('click', async function () {
     var texto = document.getElementById('nueva-nota').value.trim();
