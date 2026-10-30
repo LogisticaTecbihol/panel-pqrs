@@ -178,6 +178,32 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
 .gest-res strong { color: #2d3748; }
 .gest-item .meta { color: #718096; font-size: 0.76rem; margin-top: 6px; }
 
+/* Análisis y acción correctiva (detalle de PQRS · ISO 9001 10.2) */
+.ac-norma { font-size: 0.68rem; font-weight: 700; color: #718096; background: #edf2f7; padding: 2px 8px; border-radius: 20px; margin-left: 8px; letter-spacing: 0.3px; vertical-align: middle; }
+.ac-intro { font-size: 0.85rem; color: #4a5568; margin-bottom: 14px; }
+.ac-pasos { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+.ac-paso { padding: 4px 11px; border-radius: 20px; font-size: 0.74rem; font-weight: 700; background: #edf2f7; color: #718096; }
+.ac-paso.hecho { background: #c6f6d5; color: #276749; }
+.ac-paso.actual { background: #1a5276; color: #fff; }
+.ac-sec { border-top: 1px solid #e2e8f0; padding-top: 14px; margin-top: 14px; }
+.ac-sec.ac-sec-1 { border-top: none; padding-top: 0; margin-top: 0; }
+.ac-sec h4 { font-size: 0.85rem; color: #2d3748; margin-bottom: 10px; }
+.ac-sec h4 small { font-weight: 600; color: #718096; margin-left: 6px; }
+.ac-sec .form-grid { margin-bottom: 8px; }
+.ac-ro { min-height: 34px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ac-item { padding: 10px 12px; border: 1px solid #e2e8f0; border-left: 4px solid #cbd5e0; border-radius: 8px; margin-bottom: 8px; font-size: 0.85rem; }
+.ac-item.hecha { border-left-color: #38a169; }
+.ac-item .meta { color: #718096; font-size: 0.76rem; margin-top: 3px; }
+.ac-item-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ac-item-head .badge { margin-left: auto; }
+.ac-evid { margin-top: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ac-item-act { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.ac-item-act .ef { flex: 1 1 220px; width: auto; }
+.ac-venc { color: #c53030; font-weight: 700; }
+.ac-add { display: grid; grid-template-columns: 2fr 1.2fr 1fr auto; gap: 8px; align-items: end; margin-top: 12px; }
+@media (max-width: 700px) { .ac-add { grid-template-columns: 1fr; } }
+.ac-acciones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
+
 /* Adjuntos */
 .adjunto-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 8px; font-size: 0.83rem; }
 .adjunto-item .tag { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.3px; color: #718096; }
