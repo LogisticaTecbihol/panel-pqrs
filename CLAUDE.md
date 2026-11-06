@@ -125,6 +125,53 @@ listan solo a los activos, y el selector del detalle conserva al responsable act
 para el admin: su lista de responsables ya no incluye a quien no tiene acceso a PQRS (hoy Mercadeo/SST sin el módulo), que de
 todas formas no podría abrir la PQRS que se le asignara. `anon` no puede ejecutarlo. Sin cambios de policies.
 
+### Registro de gestión (migración 0039)
+
+Cada PQRS tiene en `panel/detalle.html` (`js/panel/detalle.js`) una sección propia, **Registro de gestión**, entre «Gestión interna» y
+«Adjuntos»: una fila de `pqrs_gestiones` por cada acción hecha con la PQRS. Campos: `fecha_gestion` (cuándo SE HIZO; por defecto hoy, se
+puede anotar una anterior, nunca futura en hora de Colombia), `tipo` (códigos ASCII: `llamada`, `correo`, `whatsapp`, `visita`, `reunion`,
+`revision_interna`, `escalamiento`, `respuesta_cliente`, `correccion` (migración 0040), `solucion`, `otra`; etiquetas en `TIPO_GESTION` del JS), `descripcion` (qué se hizo,
+3–2000) y `resultado` (en qué quedó / qué sigue, opcional, ≤ 1000). Es distinto de las notas de la bitácora, que siguen existiendo para texto libre.
+
+- **Permisos** (RLS): lee quien tiene el módulo `pqrs` (`user_has_module_pqrs('pqrs')`); escribe `admin`/`gestor`; borra solo `admin`. No hay
+  UPDATE (ni policy ni GRANT): es evidencia, como las notas; si algo quedó mal se registra otra gestión o el admin elimina la errónea.
+- **Lo sella el servidor** (`trg_pqrs_gestiones_antes`): `creado_por`, `creado_por_nombre`, `creado_en`; el navegador no los puede falsificar.
+- **Bitácora automática** (`trg_pqrs_gestiones_bitacora`, SECURITY DEFINER): cada gestión registrada o eliminada deja un evento
+  `gestion_registrada` / `gestion_eliminada` en `pqrs_bitacora`; el de eliminación conserva el texto borrado. Esos dos tipos NO están en la policy
+  de INSERT de `pqrs_bitacora`, así que solo los puede escribir el trigger. Al borrar una PQRS entera (cascada) no se intenta anotar el evento.
+- El detalle solo relee gestiones y bitácora tras registrar/eliminar (`recargarGestiones`), no toda la página. Si la consulta falla, la sección lo dice
+  en vez de mostrarse vacía.
+- Probado en SQL en una transacción revertida (gestor inserta y el sello no se falsifica; fecha futura, descripción corta y tipo inválido se rechazan;
+  Mercadeo/SST sin módulo no leen ni escriben; con el módulo `pqrs` solo leen; el gestor no borra ni edita; el admin borra y queda el evento;
+  borrar la PQRS con gestiones no falla) y la interfaz en navegador con un Supabase simulado (gestor, admin, lector, falla de consulta y móvil).
+
+### Análisis y acción correctiva (ISO 9001:2015 · 10.2, migración 0040)
+
+Sección propia del detalle de la PQRS («Análisis y acción correctiva», justo debajo del Registro de gestión) que sigue la cláusula 10.2 de ISO 9001:2015.
+No hay un formato interno de la empresa en el repo: se tomaron los literales de 10.2.1 y 10.2.2; si existe un procedimiento propio (con códigos o campos
+distintos) se alinean los nombres. Correspondencia: **a)** reaccionar/corregir y tratar las consecuencias = el Registro de gestión (tipo «Corrección inmediata /
+contención»); **b)** evaluar la necesidad, revisar y analizar, causas y casos similares = evaluación + análisis de causa; **c)** implementar = plan de acción;
+**d)** revisar la eficacia = verificación; **e)** y **f)** riesgos/oportunidades y cambios al sistema de gestión = dos respuestas obligatorias al cerrar; **10.2.2**
+información documentada = todo queda sellado por el servidor y en la bitácora.
+
+- **Tablas**: `pqrs_acciones_correctivas` (UNA por PQRS, visible como `AC-<id>`; sin fila = «Pendiente de evaluar») y `pqrs_accion_plan` (qué, quién, fecha compromiso,
+  hecha + evidencia). Estados: `no_requiere`, `en_analisis`, `en_ejecucion`, `en_verificacion`, `cerrada`.
+- **Flujo y exigencias** (todo en el trigger `pqrs_ac_reglas`, no en el navegador): `en_analisis → en_ejecucion` exige método, análisis, causa raíz, casos similares,
+  ≥ 1 acción en el plan y la fecha de verificación programada DESPUÉS de la última acción; `en_ejecucion → en_verificacion` exige todas las acciones hechas con evidencia;
+  `en_verificacion → cerrada` exige resultado «eficaz», fecha, cómo se verificó, y responder si se actualizan riesgos/oportunidades y si hay cambios al SGC (con detalle si «sí»);
+  «no eficaz» reabre el análisis (`→ en_analisis`) y lo verificado queda en la bitácora; `cerrada` es FINAL y solo un admin la reabre. `no_requiere ↔ en_analisis` permite reevaluar
+  (con plan registrado no se vuelve a «no requiere»). Al cambiar de estado solo viaja el estado: los demás campos se guardan antes (`acGuardar`), y cada bloque de campos
+  solo se edita en el estado que le toca.
+- **Permisos** (RLS): lee quien tiene el módulo `pqrs`; escriben `admin`/`gestor`; la acción correctiva NO se borra desde la aplicación (no hay DELETE; solo se va con la PQRS);
+  las acciones del plan se eliminan solo en análisis/ejecución y mientras no estén hechas. Sellan el servidor: quién evaluó, verificó y cerró, y quién/cuándo marcó cada acción.
+- **Bitácora automática** (`trg_pqrs_ac_bitacora`): tipo `accion_correctiva` (evaluada, cada cambio de estado, y la verificación previa al reabrir). Ese tipo NO está en la policy de
+  INSERT de `pqrs_bitacora`: solo lo escribe el trigger.
+- **Aviso, no bloqueo**: al pasar la PQRS a Resuelto/Cerrado sin haber evaluado la necesidad de acción correctiva, `detalle.js` pide confirmar. No se bloquea porque la verificación
+  de eficacia llega semanas después y la acción puede seguir abierta con la PQRS ya cerrada. Si se quiere un bloqueo duro, es una regla en un trigger de `pqrs`.
+- Sin vista de conjunto todavía: no hay listado de acciones correctivas abiertas/vencidas por empresa (se consulta por PQRS o con SQL).
+- Probado en SQL en una transacción revertida (48 casos: sellos forjados, cada transición válida e inválida, plan, reabrir por no eficaz y por admin, permisos por rol y módulo,
+  bitácora, borrado en cascada) y la interfaz en navegador con un Supabase simulado (pendiente, análisis, ejecución, verificación, cierre, lector, falla de consulta y móvil).
+
 ## Configuración pendiente tras clonar (secretos del Edge Function)
 
 Configurar con `supabase secrets set` (o desde el dashboard del proyecto,
@@ -182,6 +229,9 @@ SOLO por la función `solicitud-mercadeo` de panel-pedidos (server→server, sin
 - Asunto "Otros" (migración 0020): el solicitante escribe el asunto → `asunto_otro` (3-100 car.,
   solo con `asunto = 'otros'`, inmutable); lo exigen las dos Edge Functions y el título de la tarea
   pasa a `Otros: <asunto escrito> · <empresa> · <solicitante>`.
+- Productos relacionados (sin migración): el solicitante los elige en Pedidos (del maestro, por nombre sin presentación, o escritos a mano; opcional, hasta 20 de 2–100 car.). La tarea
+  no tiene columna propia: `solicitud-mercadeo-pedidos` (`crear`) los valida (`productosLista`) y los pone en el encabezado del brief, `Productos relacionados: A, B`, junto a
+  «Empresa» y «Departamento / Área». Ver también «Productos relacionados» de Eventos (migración 0038).
 - Rechazo por Mercadeo y avisos (migración 0022):
   - Estado nuevo `rechazada` (fuera de las columnas, como `cancelada`; estado FINAL). Solo para
     tareas de Pedidos y mientras no estén entregadas/canceladas; motivo obligatorio (3–500). Quién y
@@ -282,6 +332,14 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
   `lugar` libre pide completarlos al guardar o cambiar de estado (se le muestra el texto anterior). La Segmentación reemplaza a segmento demográfico, segmentación
   profesional y nivel de conocimiento: se guarda en `segmento_profesional`; las otras dos columnas se conservan en BD y se muestran de solo lectura si traen datos.
   Las opciones de Logística (incl. `presencia_mercadeo`, migración 0034) deben coincidir con las de Pedidos.
+- **Productos relacionados** (migración 0038; paso 3 «Objetivos y público»): columna `mercadeo_eventos.productos text[]` (hasta 20 nombres de 2 a 100 caracteres; el CHECK
+  `mercadeo_eventos_productos_check` usa `mercadeo_productos_validos()` y también cubre las escrituras directas del navegador). Desde Pedidos los eligen del maestro de productos
+  por NOMBRE, sin la presentación («CALIMAN X LITRO» → «CALIMAN»), o los escriben a mano; aquí no hay maestro, así que el formulario (`eventos.js`: `productos`,
+  `pintarProductos`, `agregarProducto`) es de texto libre con chips, alineado con el de Pedidos (si cambias uno, cambia el otro). La migración reescribe `mercadeo_evento_brief()`
+  (agrega «Productos relacionados:» con una línea por producto, solo si hay) y `mercadeo_eventos_bitacora()` (`productos` entra en la lista de campos que se anotan como cambio),
+  ambas desde su definición vigente. El PDF del evento, la búsqueda de la lista y la etiqueta del historial de cambios (`CAMPO_T`) lo incluyen. El brief de la tarea se arma al aprobar:
+  cambiar los productos después no lo reescribe (igual que el resto de campos). Los eventos anteriores quedan con la lista vacía. Aplicar la migración ANTES de redesplegar
+  `solicitud-evento-pedidos` y de publicar el frontend (el formulario ya envía `productos` al guardar).
 - **Checklist de actividades** (migración 0036; paso 6 «Actividades» del modal, «Aprobación y seguimiento» pasó al 7): tabla `mercadeo_evento_checklist`
   (NO es `mercadeo_actividades`, que es el calendario del CRM). Cada actividad lleva texto libre (3–300), casilla «hecha», responsable (`list_equipo_mercadeo()`),
   fecha límite opcional y notas (≤ 1000). Se guarda al instante, sin el botón Guardar del formulario. «Sugerir desde lo solicitado» crea una actividad por cada

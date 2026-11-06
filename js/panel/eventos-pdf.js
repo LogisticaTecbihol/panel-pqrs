@@ -147,6 +147,7 @@ var EVENTO_PDF = (function () {
     if (e.asistentes_virtual !== null && e.asistentes_virtual !== undefined) asist.push(e.asistentes_virtual + ' virtuales');
     var filasPublico = [
       ['Objetivos del evento', marcados(e.objetivos, cat.OBJETIVOS, e.objetivos_otro)],
+      ['Productos relacionados', (e.productos || []).join(', ')],
       ['Público objetivo', e.publico_objetivo],
       ['Segmentación', e.segmento_profesional],
     ];

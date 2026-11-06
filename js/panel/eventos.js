@@ -50,7 +50,7 @@
     fecha_limite_aprobacion: 'fecha límite de aprobación', fecha_radicacion: 'fecha de radicación', fecha_evento: 'fecha del evento', hora_inicio: 'hora de inicio', hora_fin: 'hora de fin',
     modalidad: 'modalidad', lugar: 'lugar', plataforma: 'plataforma', presupuesto_estimado: 'presupuesto estimado', total_solicitado: 'total solicitado a Mercadeo',
     total_invitados: 'total de invitados', asistentes_presencial: 'asistentes presenciales', asistentes_virtual: 'asistentes virtuales',
-    bd_asistentes_fecha: 'fecha de la base de datos de asistentes', bd_no_aplica: 'base de datos «no aplica»', descripcion: 'descripción', objetivos: 'objetivos', objetivos_otro: 'otros objetivos',
+    bd_asistentes_fecha: 'fecha de la base de datos de asistentes', bd_no_aplica: 'base de datos «no aplica»', descripcion: 'descripción', objetivos: 'objetivos', objetivos_otro: 'otros objetivos', productos: 'productos relacionados',
     publico_objetivo: 'público objetivo', segmento_demografico: 'segmento demográfico', segmento_profesional: 'segmentación profesional', nivel_conocimiento: 'nivel de conocimiento',
     canales: 'canales de promoción', canales_otro: 'otros canales', materiales: 'materiales', materiales_otro: 'otros materiales', logistica: 'logística', logistica_otro: 'otra logística', desglose_gastos: 'desglose de gastos'
   };
@@ -62,6 +62,7 @@
   var eventos = [], eventoById = {}, tareaDeEvento = {};
   var editId = null, orig = null, recargaTimer = null, motivoModo = null;
   var paso = 1, visitados = {};   // paso visible del modal (1-6) y pasos ya vistos (solo ellos muestran ✓ / !)
+  var productos = [];             // «Productos relacionados» del formulario (migración 0038)
 
   function $(id) { return document.getElementById(id); }
   function esc(v) { return escHtml(v === null || v === undefined ? '' : String(v)); }
@@ -179,7 +180,7 @@
       if (desde && e.fecha_evento < desde) return false;
       if (hasta && e.fecha_evento > hasta) return false;
       if (soloExt && !e.extemporanea) return false;
-      if (q && norm(e.nombre + ' ' + e.solicitante_nombre + ' ' + e.solicitante_area + ' ' + e.lugar + ' ' + e.plataforma + ' ' + e.empresa_otra + ' ' + refEv(e)).indexOf(q) < 0) return false;
+      if (q && norm(e.nombre + ' ' + e.solicitante_nombre + ' ' + e.solicitante_area + ' ' + e.lugar + ' ' + e.plataforma + ' ' + e.empresa_otra + ' ' + (e.productos || []).join(' ') + ' ' + refEv(e)).indexOf(q) < 0) return false;
       return true;
     });
   }
@@ -408,6 +409,35 @@
     $('e-presupuesto-help').innerHTML = avisos.map(function (a) { return '<span class="mk-warn" style="font-weight:600">' + esc(a) + '</span>'; }).join('<br>');
   }
 
+  // «Productos relacionados»: aquí no hay maestro de productos (vive en Pedidos), así que son nombres libres. Mismas reglas que Pedidos y que
+  // la BD (mercadeo_productos_validos): hasta 20 nombres de 2 a 100 caracteres, sin repetir (sin importar tildes ni mayúsculas).
+  var PROD_MAX = 20, PROD_MIN_LEN = 2, PROD_MAX_LEN = 100;
+  function prodLimpio(s) { return String(s === null || s === undefined ? '' : s).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim(); }
+  function prodClave(s) { return prodLimpio(s).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase(); }
+  function pintarProductos() {
+    var bloq = esFinal(editId ? eventoById[editId] : null);
+    $('e-productos').innerHTML = productos.map(function (n, i) {
+      return '<span class="ev-prod"><span>' + esc(n) + '</span><button type="button" data-act="producto-quitar" data-id="' + i + '" aria-label="Quitar ' + esc(n) + '"' + (bloq ? ' disabled' : '') + '>✕</button></span>';
+    }).join('');
+    $('e-productos-add').disabled = bloq;
+  }
+  function agregarProducto() {
+    var n = prodLimpio($('e-productos-in').value);
+    if (!n) return;
+    if (n.length < PROD_MIN_LEN) { showToast('El nombre del producto debe tener al menos ' + PROD_MIN_LEN + ' caracteres', '#e74c3c'); return; }
+    if (n.length > PROD_MAX_LEN) { showToast('El nombre del producto no puede superar ' + PROD_MAX_LEN + ' caracteres', '#e74c3c'); return; }
+    if (productos.some(function (x) { return prodClave(x) === prodClave(n); })) {
+      showToast('«' + n + '» ya está en la lista', '#e67e22');
+      $('e-productos-in').value = '';
+      return;
+    }
+    if (productos.length >= PROD_MAX) { showToast('Máximo ' + PROD_MAX + ' productos por evento', '#e74c3c'); return; }
+    productos.push(n);
+    $('e-productos-in').value = '';
+    pintarProductos();
+    $('e-productos-in').focus();
+  }
+
   function bloquearForm(bloq) {
     [].slice.call($('evento-overlay').querySelectorAll('.mbody .ef, .mbody input[type="radio"], .mbody input[type="checkbox"]')).forEach(function (n) {
       if (n.id === 'e-coment-txt' || n.id === 'e-resp-txt' || n.id === 'e-files' || n.id === 'e-files-nuevo') return;
@@ -451,6 +481,9 @@
     listaPoner(LISTAS.plataforma, nuevo ? '' : e.plataforma);
     checksHtml('e-objetivos', OBJETIVOS, nuevo ? [] : e.objetivos);
     $('e-objetivos-otro').value = nuevo ? '' : e.objetivos_otro;
+    productos = nuevo ? [] : (e.productos || []).slice();
+    $('e-productos-in').value = '';
+    pintarProductos();
     $('e-publico').value = nuevo ? '' : e.publico_objetivo;
     listaPoner(LISTAS.seg, nuevo ? '' : e.segmento_profesional);
     // El segmento demográfico y el nivel de conocimiento ya no se piden; si un evento anterior los trae, se muestran (solo lectura) y se conservan.
@@ -503,6 +536,7 @@
       lugar_distribuidor: lug.lugar_distribuidor, lugar_distribuidor_nit: lug.lugar_distribuidor_nit, lugar_finca: lug.lugar_finca,
       plataforma: listaValor(LISTAS.plataforma),
       objetivos: marcados('e-objetivos'), objetivos_otro: $('e-objetivos-otro').value.trim(),
+      productos: productos.slice(),
       publico_objetivo: $('e-publico').value.trim(),
       segmento_profesional: listaValor(LISTAS.seg),   // reemplaza a segmento demográfico, segmentación profesional y nivel de conocimiento
       total_invitados: enteroOpc('e-invitados'), asistentes_presencial: enteroOpc('e-asis-pres'), asistentes_virtual: enteroOpc('e-asis-virt'),
@@ -523,6 +557,7 @@
     d._errGastos = gastos.error;
     // Solo para validar (los campos con «_» no se guardan): qué listas están en «Otros/Otra».
     d._areaOtros = listaEsOtro(LISTAS.area); d._plataformaOtra = listaEsOtro(LISTAS.plataforma); d._segOtros = listaEsOtro(LISTAS.seg);
+    d._productoPendiente = prodLimpio($('e-productos-in').value);   // escrito en el cuadro y sin agregar
     return d;
   }
 
@@ -571,7 +606,8 @@
       }
     }
     if (n === 3) {
-      if (d._segOtros && (d.segmento_profesional.length < 3 || d.segmento_profesional.length > LISTAS.seg.max)) return 'Escribe la segmentación (entre 3 y ' + LISTAS.seg.max + ' caracteres)';
+      if (d._productoPendiente) return 'Tienes un producto escrito sin agregar («' + d._productoPendiente + '»): presiona «Agregar» o borra el texto';
+      if (d._segOtros &&(d.segmento_profesional.length < 3 || d.segmento_profesional.length > LISTAS.seg.max)) return 'Escribe la segmentación (entre 3 y ' + LISTAS.seg.max + ' caracteres)';
       var enteros = [['total_invitados', 'El total de invitados'], ['asistentes_presencial', 'Los asistentes presenciales'], ['asistentes_virtual', 'Los asistentes virtuales']];
       for (var i = 0; i < enteros.length; i++) {
         var v = d[enteros[i][0]];
@@ -1225,6 +1261,8 @@
       if (filas.length) filas[filas.length - 1].focus();
     },
     'gasto-quitar': function (id, el) { var f = el.closest('.ev-gasto'); if (f) f.remove(); actualizarPresupuesto(); },
+    'producto-agregar': agregarProducto,
+    'producto-quitar': function (id) { productos.splice(Number(id), 1); pintarProductos(); },
     'comentar': comentar,
     'responder': responder,
     'adj-abrir': function (id, el) { abrirAdjunto(el.getAttribute('data-path')); },
@@ -1261,6 +1299,7 @@
   ['e-fecha', 'e-radicacion'].forEach(function (id) { $(id).addEventListener('change', actualizarAnticipacion); });
   ['e-presupuesto', 'e-solicitado'].forEach(function (id) { $(id).addEventListener('input', actualizarPresupuesto); });
   $('e-desglose').addEventListener('input', actualizarPresupuesto);
+  $('e-productos-in').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); agregarProducto(); } });
   // Checklist: cada campo se guarda al cambiarlo; Enter en el cuadro de «nueva actividad» la agrega.
   $('e-chk-lista').addEventListener('change', function (ev) {
     var el = ev.target, campo = el.getAttribute('data-f'), item = el.closest ? el.closest('.ev-chk-item') : null;
