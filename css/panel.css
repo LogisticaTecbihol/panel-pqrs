@@ -250,8 +250,20 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, select:focus-vi
 textarea.ef { resize: vertical; }
 
 /* ── Tablero kanban de Mercadeo ───────────────────────────── */
-.kb-board { display: flex; gap: 12px; overflow-x: auto; align-items: flex-start; padding-bottom: 12px; }
-.kb-col { flex: 0 0 290px; background: #e4eaf1; border-radius: 10px; display: flex; flex-direction: column; max-height: calc(100vh - 270px); min-height: 200px; border-top: 4px solid #a0aec0; }
+/* La página del Tablero usa todo el ancho de la pantalla (las demás páginas conservan el tope de 1400px). */
+body.kb-page #main { max-width: 2200px; }
+/* Barra sobre el tablero: leyenda de colores a la izquierda; vista compacta y «Nueva tarea» a la derecha. */
+.kb-toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px 14px; flex-wrap: wrap; margin: 0 0 10px; }
+.kb-toolbar .kb-ley { margin: 0; flex: 1 1 320px; }
+.kb-tools { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.kb-vista { background: #fff; border: 1px solid #cbd5e0; border-radius: 7px; padding: 8px 14px; font-size: 0.84rem; font-weight: 600; color: #4a5568; cursor: pointer; }
+.kb-vista:hover { background: #f0f4f8; }
+.kb-vista.on { background: #1a5276; border-color: #1a5276; color: #fff; }
+/* Columnas fluidas: se reparten el ancho disponible (con un mínimo legible y un tope) en vez de medir 290px fijos. */
+.kb-board { --kb-w: 250px; display: flex; gap: 12px; overflow-x: auto; align-items: flex-start; padding-bottom: 12px; }
+.kb-board.kb-compacto { --kb-w: 220px; }
+/* Altura: casi toda la pantalla; la columna hace scroll por dentro solo cuando ya no cabe más. */
+.kb-col { flex: 1 1 var(--kb-w); min-width: var(--kb-w); max-width: 420px; background: #e4eaf1; border-radius: 10px; display: flex; flex-direction: column; max-height: calc(100vh - 110px); max-height: calc(100dvh - 110px); min-height: 200px; border-top: 4px solid #a0aec0; }
 .kb-col[data-estado="solicitada"] { border-top-color: #d97706; }
 .kb-col[data-estado="confirmada"] { border-top-color: #2563eb; }
 .kb-col[data-estado="en_produccion"] { border-top-color: #7c3aed; }
@@ -261,6 +273,9 @@ textarea.ef { resize: vertical; }
 .kb-count { background: #fff; border-radius: 10px; padding: 0 8px; font-size: 0.74rem; color: #4a5568; }
 .kb-list { padding: 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 70px; border-radius: 0 0 10px 10px; }
 .kb-list.over { background: #cfe3f3; outline: 2px dashed #2471a3; outline-offset: -4px; }
+/* flex-shrink: 0 — la lista es una columna flex con altura limitada. Una tarjeta con varios responsables lleva overflow:hidden
+   (para la franja de colores), lo que le quita el alto mínimo y, sin esto, el navegador la aplastaba hasta dejar solo la franja. */
+.kb-card, .kb-ev { flex-shrink: 0; }
 .kb-card { background: #fff; border-radius: 8px; padding: 10px 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); cursor: grab; border-left: 4px solid #cbd5e0; font-size: 0.84rem; }
 .kb-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.18); }
 .kb-card.dragging { opacity: 0.4; }
@@ -378,7 +393,30 @@ textarea.ef { resize: vertical; min-height: 80px; }
 .kb-ev { display: block; background: #fff; border-radius: 8px; padding: 10px 12px; font-size: 0.84rem; color: inherit; text-decoration: none; cursor: pointer; border: 2px dashed #94a3b8; }
 .kb-ev:hover, .kb-ev:focus-visible { border-color: #475569; box-shadow: 0 3px 10px rgba(0,0,0,0.18); }
 .kb-chip-pend { background: #475569; color: #fff; }
-@media (max-width: 700px) { .kb-col { flex-basis: 84vw; max-height: none; } }
+/* Plegar «Por aprobar»: la columna pasa a una franja angosta con el título en vertical (clic para volver a abrirla). */
+.kb-plegar { background: #fff; border: 1px solid #cbd5e0; border-radius: 5px; width: 24px; height: 24px; flex: none; margin-right: 6px; cursor: pointer; font-size: 0.7rem; color: #4a5568; line-height: 1; }
+.kb-plegar:hover { background: #f0f4f8; }
+.kb-col-t { flex: 1; min-width: 0; }
+.kb-board .kb-col.kb-col-plegada { flex: 0 0 46px; min-width: 46px; max-width: 46px; }
+.kb-col-plegada .kb-col-head { flex-direction: column; align-items: center; gap: 8px; padding: 10px 0; cursor: pointer; }
+.kb-col-plegada .kb-plegar { margin-right: 0; }
+.kb-col-plegada .kb-count { order: 1; }
+.kb-col-plegada .kb-col-t { order: 2; flex: none; writing-mode: vertical-rl; white-space: nowrap; }
+
+/* Vista compacta: tarjetas de 3-4 líneas (título, empresa, fecha y responsable) para ver más tareas por columna.
+   Se conservan los avisos que importan (🔥 urgente y ⏱ sin confirmar / vencidos); el resto de chips se ven al abrir la tarjeta. */
+.kb-compacto .kb-list { padding: 6px; gap: 6px; }
+.kb-compacto .kb-card, .kb-compacto .kb-ev { padding: 6px 10px; font-size: 0.8rem; }
+.kb-compacto .kb-card-top { margin-bottom: 4px; }
+.kb-compacto .kb-card-top .kb-chip:not(.urg):not(.warn) { display: none; }
+.kb-compacto .kb-card-top:not(:has(.urg, .warn)) { display: none; }
+.kb-compacto .kb-title { margin-bottom: 3px; font-size: 0.8rem; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.kb-compacto .kb-emp { margin-bottom: 3px; }
+.kb-compacto .kb-act { display: none; }
+.kb-compacto .kb-franja { margin: -6px -10px 5px; }
+.kb-compacto .kb-move { display: none; }
+@media (hover: none) { .kb-compacto .kb-move { display: flex; margin-top: 4px; } }  /* en táctil no hay arrastre: se conservan ◀ ▶ */
+@media (max-width: 700px) { .kb-col { flex: 0 0 84vw; min-width: 0; max-width: none; max-height: none; } }
 
 /* Ajustes de usabilidad (móvil y contraste) */
 .header .btn-secondary { color: #fff; border-color: rgba(255,255,255,0.65); }

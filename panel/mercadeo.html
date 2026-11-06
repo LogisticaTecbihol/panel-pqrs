@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mercadeo — Tablero</title>
-<link rel="stylesheet" href="../css/panel.css?v=20261029">
+<link rel="stylesheet" href="../css/panel.css?v=20261105">
 </head>
-<body data-modulo="mercadeo">
+<body data-modulo="mercadeo" class="kb-page">
   <div class="header">
     <div>
       <h1>Mercadeo</h1>
@@ -52,10 +52,15 @@
           <select id="f-entregadas"><option value="30">Últimos 30 días</option><option value="todas">Todas</option></select></div>
         <div class="fg"><label for="f-canceladas" style="cursor:pointer"><input type="checkbox" id="f-canceladas"> Ver canceladas y rechazadas</label></div>
         <button class="btn-clear-filters" data-act="limpiar">Limpiar filtros</button>
-        <button class="btn-primary" data-act="tarea-nueva">➕ Nueva tarea</button>
       </div>
 
-      <div class="kb-ley" id="kb-leyenda" role="group" aria-label="Color de cada responsable; al hacer clic se filtra el tablero"></div>
+      <div class="kb-toolbar">
+        <div class="kb-ley" id="kb-leyenda" role="group" aria-label="Color de cada responsable; al hacer clic se filtra el tablero"></div>
+        <div class="kb-tools">
+          <button type="button" class="kb-vista" id="kb-vista" data-act="vista-compacta" aria-pressed="false" title="Tarjetas más cortas (título, empresa, fecha y responsable) para ver más tareas por columna">☰ Vista compacta</button>
+          <button class="btn-primary" data-act="tarea-nueva">➕ Nueva tarea</button>
+        </div>
+      </div>
       <div class="kb-board" id="kb-board" aria-label="Tablero de tareas"></div>
       <div id="kb-canceladas"></div>
     </div>
@@ -175,6 +180,6 @@
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="../js/panel/eventos-pdf.js?v=20261027"></script>
   <script src="../js/panel/auth.js?v=20261021"></script>
-  <script src="../js/panel/mercadeo.js?v=20261029"></script>
+  <script src="../js/panel/mercadeo.js?v=20261105"></script>
 </body>
 </html>
