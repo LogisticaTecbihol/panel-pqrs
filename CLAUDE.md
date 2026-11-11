@@ -359,6 +359,15 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
   aprobar» (con cuántas pasan de 48 h hábiles). El clic es un enlace a `eventos.html?evento=<id>`, donde se revisa/aprueba/rechaza (flujo sin cambios). Al aprobarse, el trigger crea
   la tarea real en «Recibido» y la provisional desaparece (Realtime sobre `mercadeo_eventos`). Los filtros que solo tiene una tarea (responsable, clase, asunto, urgentes) la ocultan;
   Empresa, Origen, Tipo=Evento y Buscar sí aplican. Si la consulta de eventos falla, el Tablero sigue con sus tareas y avisa. Probado con un arnés de navegador y una BD simulada.
+- **Disposición del Tablero** (`panel.css` `.kb-*` + `mercadeo.js`, sin migración): `.kb-card, .kb-ev { flex-shrink: 0 }` — `.kb-list` es una columna flex con altura
+  limitada y las tarjetas con varios responsables (`.um`) llevan `overflow:hidden`, lo que les quitaba el alto mínimo y el navegador las aplastaba hasta dejar solo la franja
+  de color (no quitar esa regla). Las columnas son fluidas (`flex: 1 1 var(--kb-w)`, mínimo 250px / 220px en compacta, tope 420px), la página lleva `<body class="kb-page">`
+  para que `#main` use todo el ancho (hasta 2200px; las demás páginas conservan 1400px) y cada columna mide casi toda la pantalla (`100dvh - 110px`) y hace scroll por dentro.
+  **Vista compacta** (botón de la barra sobre el tablero, junto a «Nueva tarea», que antes estaba en los filtros): clase `kb-compacto` en `#kb-board` (no re-renderiza, así que
+  no mueve el scroll); deja título (2 líneas), empresa, fecha y responsables, y conserva solo los chips 🔥 Urgente y ⏱ de aviso (`.urg` / `.warn`); el resto, incluido el 📄 PDF
+  del evento, se ve al abrir la tarjeta. En dispositivos sin hover (táctil) se conservan los botones ◀ ▶. **Plegar «Por aprobar»**: el botón ◀ de su cabecera la deja en una tira
+  de 46px (título vertical y contador; clic en cualquier parte de la tira la abre). Ambas preferencias se guardan en `localStorage` de ESE navegador (`mk_tablero_vista_compacta`,
+  `mk_tablero_por_aprobar_plegada`). Probado con un arnés de navegador y una BD simulada a 1500px y en móvil.
 - **Impacto en ventas** (nov-2026, sin migración; `js/panel/eventos-impacto.js` + modal `#impacto-overlay` de `eventos.html`): botón «📈 Ventas» en cada fila (salvo
   rechazados/cancelados) y «📈 Impacto en ventas» en el pie del modal. Cruza el evento con las ventas de panel-pedidos para ver si lo vendido cambió después de él. Solo lectura, nada se guarda.
   Cadena: navegador → Edge Function `impacto-evento` (`verify_jwt=true`, exige módulo `mercadeo`; solo recibe `evento_id` y lee de la BD fecha, empresa, municipio,

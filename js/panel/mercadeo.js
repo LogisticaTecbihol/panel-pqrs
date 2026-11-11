@@ -22,6 +22,9 @@
 // ('radicada' / 'en_revision') se ven aquí desde que llegan. NO son tareas: no se arrastran, no tienen responsable ni cuentan en
 // Indicadores; el clic abre la solicitud en Eventos, donde se revisa, aprueba o rechaza (ese flujo no cambia). Al aprobarse,
 // el trigger de la BD crea la tarea real en «Recibido» y la tarjeta provisional desaparece sola (Realtime sobre mercadeo_eventos).
+//
+// Disposición: vista compacta (clase kb-compacto en el tablero) y columna «Por aprobar» plegable; las dos preferencias se guardan en
+// localStorage del navegador. Las columnas son fluidas y las tarjetas no se encogen (ver «Disposición del Tablero» en CLAUDE.md).
 (async function () {
   await AUTH.authReady;
   if (!AUTH.getProfile() || !AUTH.hasModule('mercadeo')) return;
@@ -195,6 +198,21 @@
     return String(a.creado_en).localeCompare(String(b.creado_en)) || a.id - b.id;
   }
 
+  // ── Preferencias de vista (solo de este navegador; si no hay almacenamiento, duran lo que dure la página) ──
+  var PREF_COMPACTA = 'mk_tablero_vista_compacta', PREF_PLEGADA = 'mk_tablero_por_aprobar_plegada';
+  function prefLeer(k) { try { return localStorage.getItem(k) === '1'; } catch (e) { return false; } }
+  function prefGuardar(k, v) { try { localStorage.setItem(k, v ? '1' : '0'); } catch (e) { /* sin almacenamiento */ } }
+  var vistaCompacta = prefLeer(PREF_COMPACTA);
+  var porAprobarPlegada = prefLeer(PREF_PLEGADA);
+
+  // La vista compacta es una clase del tablero (no reconstruye las columnas, así que no mueve el scroll de ninguna).
+  function aplicarVistaCompacta() {
+    $('kb-board').classList.toggle('kb-compacto', vistaCompacta);
+    var b = $('kb-vista');
+    b.classList.toggle('on', vistaCompacta);
+    b.setAttribute('aria-pressed', String(vistaCompacta));
+  }
+
   // ── Columna «Por aprobar» (solicitudes de evento pendientes; solo lectura) ──
   // Los filtros que solo existen en una tarea (responsable, clase, asunto, urgente) las ocultan: una solicitud aún no los tiene.
   function filtrarEventos() {
@@ -237,7 +255,7 @@
     var quien = '<div class="kb-act">👤 ' + esc(e.solicitante_nombre || '—') + (e.solicitante_area ? ' · ' + esc(e.solicitante_area) : '') +
       (e.empresa === 'OTROS' && e.empresa_otra ? ' · ' + esc(e.empresa_otra) : '') + '</div>';
     return '<a class="kb-ev" href="eventos.html?evento=' + encodeURIComponent(e.id) + '" draggable="false" ' +
-      'title="Abrir la solicitud en Eventos para revisarla, aprobarla o rechazarla" ' +
+      'title="' + esc(e.nombre) + ' — abrir la solicitud en Eventos para revisarla, aprobarla o rechazarla" ' +
       'aria-label="Solicitud de evento EV-' + esc(e.id) + ' pendiente de aprobación: ' + esc(e.nombre) + '. Abrir en Eventos">' +
       '<div class="kb-card-top"><span class="kb-chip kb-chip-pend">⏳ Pendiente de aprobación</span>' +
       '<span class="kb-chip" title="Solicitud de evento EV-' + esc(e.id) + '">🎪 EV-' + esc(e.id) + '</span>' +
@@ -249,13 +267,17 @@
       '</a>';
   }
 
+  // Plegada: queda solo la cabecera (franja angosta con el título en vertical); el clic en cualquier parte de ella la vuelve a abrir.
   function columnaPorAprobarHtml() {
-    var evs = filtrarEventos();
-    return '<section class="kb-col" data-estado="por_aprobar" aria-label="Por aprobar: ' + evs.length + ' solicitudes de evento">' +
-      '<div class="kb-col-head"><span title="Solicitudes de evento que Mercadeo aún no aprueba. Solo lectura: se revisan, aprueban o rechazan en Eventos">Por aprobar · eventos</span><span class="kb-count">' + evs.length + '</span></div>' +
-      '<div class="kb-list">' +
-      (evs.length ? evs.map(eventoPendHtml).join('') : '<div class="kb-vacio">' + (eventosFallo ? 'No se pudieron cargar las solicitudes de evento' : 'Sin solicitudes de evento por aprobar') + '</div>') +
-      '</div></section>';
+    var evs = filtrarEventos(), plegada = porAprobarPlegada;
+    return '<section class="kb-col' + (plegada ? ' kb-col-plegada' : '') + '" data-estado="por_aprobar" aria-label="Por aprobar: ' + evs.length + ' solicitudes de evento">' +
+      '<div class="kb-col-head"' + (plegada ? ' data-act="plegar-aprobar"' : '') + '>' +
+      '<button type="button" class="kb-plegar" data-act="plegar-aprobar" aria-expanded="' + !plegada + '" aria-label="' + (plegada ? 'Mostrar' : 'Plegar') + ' la columna Por aprobar" title="' + (plegada ? 'Mostrar' : 'Plegar') + ' la columna">' + (plegada ? '▶' : '◀') + '</button>' +
+      '<span class="kb-col-t" title="Solicitudes de evento que Mercadeo aún no aprueba. Solo lectura: se revisan, aprueban o rechazan en Eventos">Por aprobar · eventos</span><span class="kb-count">' + evs.length + '</span></div>' +
+      (plegada ? '' : '<div class="kb-list">' +
+        (evs.length ? evs.map(eventoPendHtml).join('') : '<div class="kb-vacio">' + (eventosFallo ? 'No se pudieron cargar las solicitudes de evento' : 'Sin solicitudes de evento por aprobar') + '</div>') +
+        '</div>') +
+      '</section>';
   }
 
   function tarjetaHtml(t, idxCol) {
@@ -291,7 +313,7 @@
       (t.fecha_tentativa ? ' · lo necesita para ' + esc(fmtDateOnly(t.fecha_tentativa)) : '') + '</div>' : '';
     return '<div class="kb-card p-' + esc(t.prioridad) + (t.urgente ? ' urg' : '') + uClase + '"' + uEstilo + ' draggable="true" tabindex="0" role="button" data-act="tarea-abrir" data-id="' + esc(t.id) + '" aria-label="Abrir tarea: ' + esc(t.titulo) + '">' + franja +
       '<div class="kb-card-top">' + urg + ped + evento + prueba + '<span class="kb-chip">' + esc(TIPOS[t.tipo] || t.tipo) + '</span><span class="kb-chip" title="Clase de prioridad">' + esc(CLASE_CORTA[t.prioridad] || t.prioridad) + '</span>' + edad + '</div>' +
-      '<div class="kb-title">' + esc(t.titulo) + '</div>' +
+      '<div class="kb-title" title="' + esc(t.titulo) + '">' + esc(t.titulo) + '</div>' +
       '<div class="kb-emp">' + empresaChips(t.empresas) + '</div>' + act + quien +
       '<div class="kb-meta">' + (fechaHtml || '<span></span>') + '<span class="kb-avatars">' + avatars + '</span></div>' +
       '<div class="kb-move"><button data-act="mover" data-id="' + esc(t.id) + '" data-dir="-1" aria-label="Mover a la columna anterior"' + (idxCol === 0 ? ' disabled' : '') + '>◀</button>' +
@@ -768,6 +790,15 @@
       if (b) b.focus({ preventScroll: true });   // render() reconstruye la leyenda: se devuelve el foco al chip para quien usa teclado
     },
     'tarea-nueva': function () { abrirTarea(null); },
+    'vista-compacta': function () { vistaCompacta = !vistaCompacta; prefGuardar(PREF_COMPACTA, vistaCompacta); aplicarVistaCompacta(); },
+    // Se rehace solo esa columna (no render()): así las demás conservan su scroll. El foco vuelve al botón para quien usa teclado.
+    'plegar-aprobar': function () {
+      porAprobarPlegada = !porAprobarPlegada; prefGuardar(PREF_PLEGADA, porAprobarPlegada);
+      var col = document.querySelector('.kb-col[data-estado="por_aprobar"]');
+      if (col) col.outerHTML = columnaPorAprobarHtml();
+      var b = document.querySelector('.kb-plegar');
+      if (b) b.focus({ preventScroll: true });
+    },
     'tarea-abrir': function (id) { abrirTarea(Number(id)); },
     // PDF con todas las especificaciones de la solicitud del evento (el mismo del módulo Eventos; js/panel/eventos-pdf.js).
     'evento-pdf': function (id) {
@@ -864,6 +895,7 @@
   } catch (e) { /* sin Realtime: queda la recarga al volver a la pestaña */ }
   document.addEventListener('visibilitychange', function () { if (!document.hidden) programarRecarga(); });
 
+  aplicarVistaCompacta();
   await cargar(true);
 
   // Enlace directo desde la campanita: ?tarea=<id> abre esa tarjeta.
