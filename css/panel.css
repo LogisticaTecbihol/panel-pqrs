@@ -528,3 +528,26 @@ textarea.ef { resize: vertical; min-height: 80px; }
 /* Botones «PDF» de Eventos y del Tablero: naranja intenso para que se vean (no se confunden con azul = acción, rojo = peligro) */
 .btn-pdf { background: #c2410c; color: #fff; border: 1px solid #c2410c; font-weight: 700; }
 .btn-pdf:hover { background: #9a3412; border-color: #9a3412; color: #fff; }
+
+/* Impacto en ventas de un evento (Eventos > «Impacto en ventas»; js/panel/eventos-impacto.js) */
+.imp-aviso { background: #ebf5fb; border: 1px solid #aed6f1; color: #1a5276; border-radius: 8px; padding: 9px 12px; font-size: 0.8rem; margin-bottom: 10px; line-height: 1.4; }
+.imp-aviso.warn { background: #fef3c7; border-color: #f6d27a; color: #92400e; }
+.imp-h { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.4px; color: #4a5568; margin: 18px 0 8px; }
+.imp-tabs { margin-bottom: 12px; }
+.imp-tabs .mk-tab { padding: 5px 12px; font-size: 0.78rem; }
+.imp-lectura { margin: 4px 0 8px 18px; font-size: 0.83rem; color: #2d3748; line-height: 1.5; }
+.imp-lectura li { margin-bottom: 3px; }
+.imp-calidad { font-size: 0.78rem; color: #718096; }
+.imp-conf { font-size: 0.8rem; color: #4a5568; margin: 6px 0 4px; }
+.imp-chart { display: flex; align-items: flex-end; gap: 3px; height: 150px; padding: 8px 4px 0; border-bottom: 1px solid #cbd5e0; overflow-x: auto; }
+.imp-col { flex: 1; min-width: 34px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+.imp-col.ev { border-left: 2px dashed #c2410c; }
+.imp-bar-w { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.imp-bar { width: 70%; max-width: 26px; min-height: 0; background: #2471a3; border-radius: 3px 3px 0 0; }
+.imp-bar.post { background: #15803d; }
+.imp-bar.parcial { opacity: 0.55; background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.45) 0 4px, transparent 4px 8px); }
+.imp-lab { font-size: 0.66rem; color: #718096; margin-top: 4px; white-space: nowrap; }
+.imp-defs { margin-top: 16px; font-size: 0.8rem; color: #4a5568; }
+.imp-defs summary { cursor: pointer; font-weight: 700; color: #1a5276; }
+.imp-defs ul { margin: 8px 0 0 18px; line-height: 1.5; }
+#impacto-overlay .ind-mini > div { min-width: 130px; }

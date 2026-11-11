@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mercadeo — Eventos</title>
-<link rel="stylesheet" href="../css/panel.css?v=20261030">
+<link rel="stylesheet" href="../css/panel.css?v=20261111">
 </head>
 <body data-modulo="mercadeo">
   <div class="header">
@@ -282,6 +282,7 @@
         <div class="mk-actions" id="e-acciones"></div>
         <div class="mftr-btns">
           <button class="btn-secondary btn-pdf" id="e-pdf" data-act="evento-pdf" style="display:none" title="Genera el PDF con todas las especificaciones de la solicitud (lo guardado), su estado y el checklist">📄 Ver PDF</button>
+          <button class="btn-secondary" id="e-impacto" data-act="evento-impacto" style="display:none" title="Cruza el evento con las ventas de Pedidos: lo vendido antes y después, contra el resto de la empresa">📈 Impacto en ventas</button>
           <button class="btn-danger" id="e-eliminar" data-act="evento-eliminar" style="display:none">🗑 Eliminar</button>
           <button class="btn-cancel" data-act="cerrar-modal">Cerrar</button>
           <button class="btn-confirm" id="e-guardar" data-act="evento-guardar">Guardar</button>
@@ -309,6 +310,21 @@
     </div>
   </div>
 
+  <!-- ══ Modal: impacto en ventas (cruce con Pedidos; js/panel/eventos-impacto.js) ══ -->
+  <div class="overlay over" id="impacto-overlay" role="dialog" aria-modal="true" aria-labelledby="impacto-titulo">
+    <div class="modal-box" style="max-width:940px">
+      <div class="mhdr"><div><h2 id="impacto-titulo">📈 Impacto en ventas</h2><div class="meta" id="imp-meta"></div></div>
+        <button class="btn-close" data-act="impacto-cerrar" aria-label="Cerrar">✕</button></div>
+      <div class="mbody" id="imp-body"></div>
+      <div class="mftr">
+        <span class="ef-help">Solo lectura: no guarda nada ni modifica Pedidos.</span>
+        <div class="mftr-btns">
+          <button class="btn-cancel" id="imp-cerrar" data-act="impacto-cerrar">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="../js/shared/supabase-client.js?v=20261023"></script>
   <script src="../js/shared/modal.js?v=20261006"></script>
@@ -317,7 +333,8 @@
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="../js/panel/eventos-pdf.js?v=20261030"></script>
+  <script src="../js/panel/eventos-impacto.js?v=20261111"></script>
   <script src="../js/panel/auth.js?v=20261021"></script>
-  <script src="../js/panel/eventos.js?v=20261030"></script>
+  <script src="../js/panel/eventos.js?v=20261111"></script>
 </body>
 </html>

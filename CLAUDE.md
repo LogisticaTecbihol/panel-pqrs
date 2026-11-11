@@ -36,7 +36,7 @@ Panel interno del holding con dos áreas:
 - `supabase/migrations/` — migraciones SQL, aplicadas con el MCP de Supabase
   (`apply_migration`), igual que en panel-pedidos.
 - `supabase/functions/` — Edge Functions (`ingest-formulario`, `create-user-pqrs`, `solicitud-mercadeo-pedidos`,
-  `notificar-solicitante`, `solicitud-evento-pedidos`, `notificar-evento-solicitante`).
+  `notificar-solicitante`, `solicitud-evento-pedidos`, `notificar-evento-solicitante`, `impacto-evento`).
 - `google-apps-script/` — plantilla del script puente (se despliega manualmente
   en el editor de Apps Script de cada Form, no vía CI).
 - `scripts/importar_historico_pqrs.mjs` — script de un solo uso para importar
@@ -359,6 +359,32 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
   aprobar» (con cuántas pasan de 48 h hábiles). El clic es un enlace a `eventos.html?evento=<id>`, donde se revisa/aprueba/rechaza (flujo sin cambios). Al aprobarse, el trigger crea
   la tarea real en «Recibido» y la provisional desaparece (Realtime sobre `mercadeo_eventos`). Los filtros que solo tiene una tarea (responsable, clase, asunto, urgentes) la ocultan;
   Empresa, Origen, Tipo=Evento y Buscar sí aplican. Si la consulta de eventos falla, el Tablero sigue con sus tareas y avisa. Probado con un arnés de navegador y una BD simulada.
+- **Impacto en ventas** (nov-2026, sin migración; `js/panel/eventos-impacto.js` + modal `#impacto-overlay` de `eventos.html`): botón «📈 Ventas» en cada fila (salvo
+  rechazados/cancelados) y «📈 Impacto en ventas» en el pie del modal. Cruza el evento con las ventas de panel-pedidos para ver si lo vendido cambió después de él. Solo lectura, nada se guarda.
+  Cadena: navegador → Edge Function `impacto-evento` (`verify_jwt=true`, exige módulo `mercadeo`; solo recibe `evento_id` y lee de la BD fecha, empresa, municipio,
+  `lugar_distribuidor_nit` y `productos`) → `ventas-evento-resumen` del proyecto de PEDIDOS (`verify_jwt=false`, secreto `PQRS_BRIDGE_SECRET` allá = `PEDIDOS_BRIDGE_SECRET` aquí;
+  `PEDIDOS_VENTAS_URL` opcional). **La función de Pedidos devuelve solo agregados** (sumas, conteos y fechas; sin nombres de clientes ni líneas). Su código vive en el repo de
+  Pedidos (`supabase/functions/ventas-evento-resumen/`: `index.ts` + `calculo.js`, este último puro y probado aparte en un navegador con 62 casos). **Hay que desplegar PRIMERO
+  `ventas-evento-resumen` en Pedidos y luego `impacto-evento` aquí**; sin la primera la pantalla muestra «Pedidos todavía no tiene habilitada la consulta de ventas».
+  Desplegadas el 2026-11-11 (versión 1 de cada una, con el MCP de Supabase): ambas responden 401 sin credenciales y la de Pedidos arranca bien.
+  - **Qué compara**: lo vendido en los N días desde el evento (el día del evento cuenta) contra los N días anteriores (N = 30/60/90 o lo transcurrido, mismo número de días en ambos lados),
+    para cuatro alcances: **distribuidor** (por NIT sin dígito de verificación: Pedidos guarda al mismo cliente con y sin DV y con nombres distintos, p. ej. «TODO RIEGO LA VILLA» y
+    «VARGAS AGUILERA INGRITH YOHANA» son el mismo NIT), **zona** (municipio sin tildes; «Bogotá D.C.» = «Bogota»), **productos del evento en la zona** (nombre sin presentación y sin
+    guiones: «BA-BOR-ZINC X LITRO» = «BABORZINC») y, como CONTROL, **el resto de la empresa** (ni distribuidor ni zona) y esos mismos productos fuera de la zona. La «diferencia neta» =
+    variación del alcance − variación de su control (en puntos porcentuales): descuenta temporada, clima y precios que afectan a todos.
+  - **Qué cuenta**: líneas de `Pedidos` de la empresa del evento (`Nombre_Empresa` por la tabla `empresas` de Pedidos), sin `Estado_2 = 'Anulado'`; incluye las históricas. Es lo PEDIDO (`Valor_Total`),
+    no lo facturado ni lo cobrado. Solo las 5 empresas del holding venden por Pedidos: Chía Abagó, Tecbihol y «Otros» responden «sin cruce».
+  - **Evento futuro**: devuelve la LÍNEA BASE (últimos 30/60/90 días hasta hoy, con promedio semanal) para compararla después; no hace falta guardar una foto, la base se recalcula de Pedidos.
+  - **Honestidad de la lectura**: la pantalla avisa que es correlación, marca «Confianza baja» (ventana < 28 días, < 5 pedidos antes, < 3 después, o un solo pedido que pesa ≥ 50 %) y nunca
+    dice «alta». Si el evento sigue «aprobada» y no «realizada» avisa que hay que confirmar que se hizo. Gráfico semanal CSS (semana 0 = la del evento; la última barra puede ser parcial).
+  - **Límites conocidos**: no separa el efecto del evento del de otras acciones (visitas del comercial, promociones, redes) ni de un pedido grande aislado; el NIT debe estar bien escrito en el evento
+    (sin DV o con DV, pero sin errores); líneas de la zona sin NIT en Pedidos no se asignan al distribuidor (la pantalla dice cuántas); es una consulta en vivo (se repite cada vez que se abre).
+  - Probado: el cálculo con 62 casos (NIT con/sin DV, anuladas, ventanas parciales, evento futuro, semana parcial, pedido mayor); la pantalla con un arnés de navegador y una Edge Function simulada
+    (resultado, línea base, sin cruce, error con «Reintentar», pocos datos, móvil). Las cifras del caso real (EV-5, Villa de Leyva, 29-oct) se verificaron con SQL directo contra Pedidos con
+    las mismas definiciones. **Probado de punta a punta el 2026-11-11** (navegador con sesión real → `impacto-evento` → `ventas-evento-resumen`, desde la consola con
+    `_sb.functions.invoke('impacto-evento', { body: { evento_id: 5 } })`): devolvió `ok: true`, fase `posterior`, 14 días; distribuidor $1.620.242 (4 pedidos) → $8.033.016 (6 pedidos; el mayor
+    pesa 66 %), resto de PARCELAR $70.029.581 → $34.577.014; coincide al peso con el SQL directo contra Pedidos (el «resto después» ya incluía pedidos que entraron tras la primera consulta). Lo que NO se
+    probó en vivo: el botón y el modal contra el servidor real (el frontend no estaba publicado; se probaron con un arnés y una Edge Function simulada).
 - **KPI del encabezado** (cliente, sin festivos): Por atender (y cuántas pasan de 48 h hábiles sin respuesta), eventos de los
   próximos 30 días, Oportunidad del mes (≥ 15 días) y Retorno de la base de datos (entregada en ≤ 3 días hábiles tras el evento,
   últimos 90 días; «no aplica» no cuenta). Cada evento realizado sin base de datos y con plazo vencido se marca en la lista.

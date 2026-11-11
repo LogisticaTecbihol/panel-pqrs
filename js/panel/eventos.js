@@ -243,6 +243,7 @@
         '<td>' + badge(ESTADO_T[e.estado] || e.estado, ESTADO_COLOR[e.estado] || '#718096') + '</td>' +
         '<td>' + atencionHtml(e) + '</td>' +
         '<td><div class="mk-actions"><button class="btn-ver btn-pdf" data-act="evento-pdf" data-id="' + esc(e.id) + '" title="Ver todas las especificaciones de la solicitud en PDF" aria-label="Ver PDF de ' + esc(refEv(e)) + '">📄 PDF</button>' +
+        (mideImpacto(e) ? '<button class="btn-ver" data-act="evento-impacto" data-id="' + esc(e.id) + '" title="Cruza el evento con las ventas de Pedidos: antes y después, contra el resto de la empresa" aria-label="Ver el impacto en ventas de ' + esc(refEv(e)) + '">📈 Ventas</button>' : '') +
         '<button class="btn-ver" data-act="evento-abrir" data-id="' + esc(e.id) + '">' + (esFinal(e) ? 'Ver' : 'Abrir') + '</button></div></td>' +
         '</tr>';
     }).join('');
@@ -707,6 +708,7 @@
     $('e-guardar').disabled = false; $('e-guardar').textContent = e ? 'Guardar cambios' : 'Registrar solicitud';
     $('e-eliminar').style.display = e && esAdmin ? '' : 'none';
     $('e-pdf').style.display = e ? '' : 'none';
+    $('e-impacto').style.display = e && mideImpacto(e) ? '' : 'none';
     var enBD = !!e && (e.estado === 'realizada' || e.estado === 'cerrada');
     $('e-bd-box').style.display = enBD ? '' : 'none';
     if (enBD) {
@@ -1151,6 +1153,14 @@
       .catch(function (err) { fail('generar el PDF', err); });
   }
 
+  // Impacto en ventas (js/panel/eventos-impacto.js): cruza el evento con Pedidos. Un evento rechazado o cancelado no se hizo.
+  function mideImpacto(e) { return !!e && e.estado !== 'rechazada' && e.estado !== 'cancelada'; }
+  function verImpacto(id) {
+    var e = id ? eventoById[id] : null;
+    if (!e) return;
+    EVENTO_IMPACTO.abrir({ sb: _sb, evento: e });
+  }
+
   function listaTxt(arr) { return (arr && arr.length) ? arr.map(esc).join(', ') : '—'; }
   function valorCampo(k, v) {
     if (v === null || v === undefined || v === '') return '—';
@@ -1245,6 +1255,8 @@
     'paso-sig': function () { mostrarPaso(paso + 1, true); },
     'evento-abrir': function (id) { abrirEvento(Number(id)); },
     'evento-pdf': function (id) { verPdf(Number(id) || editId); },   // desde la fila (con id) o desde el pie del modal (evento abierto)
+    'evento-impacto': function (id) { verImpacto(Number(id) || editId); },
+    'impacto-cerrar': function () { EVENTO_IMPACTO.cerrar(); },
     'chk-agregar': function () { agregarActividad(); },
     'chk-sugerir': function () { sugerirActividades(); },
     'chk-eliminar': function (id) { eliminarActividad(Number(id)); },
