@@ -560,6 +560,17 @@ textarea.ef { resize: vertical; min-height: 80px; }
 .ev-chk-meta { display: grid; grid-template-columns: 1fr 170px; gap: 8px; margin: 8px 0 0 28px; }
 .ev-chk-notas { display: block; width: calc(100% - 28px); margin: 8px 0 0 28px; }
 .ev-chk-pie { margin: 6px 0 0 28px; font-size: 0.72rem; color: #718096; }
+.ev-chk-adj { margin: 8px 0 0 28px; }
+.ev-chk-adj:empty { display: none; }
+.ev-chk-adj-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 6px; font-size: 0.82rem; background: #f8fafc; }
+.ev-chk-adj-nom { min-width: 0; overflow-wrap: anywhere; }
+.ev-chk-adj-nom .tag { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.3px; color: #718096; }
+.ev-chk-adj-meta { display: block; font-size: 0.7rem; color: #718096; }
+.ev-chk-adj-sub { font-size: 0.8rem; color: #4a5568; padding: 4px 0; }
+.ev-chk-adj-nuevo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ev-chk-adj-btn { position: relative; display: inline-block; overflow: hidden; }
+.ev-chk-adj-btn:focus-within { outline: 2px solid #3182ce; outline-offset: 2px; }
+.ev-chk-file { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; font-size: 0; }
 @media (max-width: 700px) { .ev-chk-meta { grid-template-columns: 1fr; } }
 .kb-chip-btn { cursor: pointer; background: #c2410c; color: #fff; }
 .kb-chip-btn:hover { background: #9a3412; color: #fff; }

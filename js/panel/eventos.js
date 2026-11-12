@@ -943,10 +943,14 @@
     if (!editId || !esAdmin) return;
     var e = eventoById[editId];
     if (!confirm('¿Eliminar definitivamente ' + (e ? refEv(e) + ' «' + e.nombre + '»' : 'el evento') + '? Se borran también sus comentarios, adjuntos e historial. Normalmente conviene cancelarlo en lugar de eliminarlo.')) return;
-    var ad = await _sb.from('mercadeo_evento_adjuntos').select('storage_path').eq('evento_id', editId);
-    if (!ad.error && ad.data && ad.data.length) {
-      await _sb.storage.from('mercadeo-adjuntos').remove(ad.data.map(function (a) { return a.storage_path; }));
-    }
+    // Archivos del Storage del evento: los adjuntos generales y los de cada actividad del checklist (la BD solo borra las filas).
+    var rutas = [];
+    var rd = await Promise.all([
+      _sb.from('mercadeo_evento_adjuntos').select('storage_path').eq('evento_id', editId),
+      _sb.from('mercadeo_evento_checklist_adjuntos').select('storage_path').eq('evento_id', editId),
+    ]);
+    rd.forEach(function (r) { if (!r.error && r.data) r.data.forEach(function (a) { rutas.push(a.storage_path); }); });
+    if (rutas.length) await _sb.storage.from('mercadeo-adjuntos').remove(rutas);
     var res = await _sb.from('mercadeo_eventos').delete().eq('id', editId).select('id');
     if (res.error) { fail('eliminar el evento', res.error); return; }
     if (!res.data || !res.data.length) { showToast('No se eliminó: solo un administrador puede borrar eventos', '#e74c3c'); return; }
@@ -1000,23 +1004,62 @@
   // está En revisión … Realizada (la BD lo exige); después queda de solo lectura. El solicitante ve únicamente el avance, en Pedidos.
   var CHK_ESTADOS = ['en_revision', 'aprobada', 'en_preparacion', 'realizada'];
   var checklist = [], equipo = [], chkOcupado = false;
+  // Adjuntos por actividad (migración 0041): chkAdj[actividad_id] = filas de mercadeo_evento_checklist_adjuntos; chkSubiendo[actividad_id] = archivos en
+  // vuelo. Son internos de Mercadeo (no salen a Pedidos ni al PDF). Subir y borrar siguen la misma regla que el checklist (En revisión … Realizada).
+  var CHK_MAX_ADJ = 20;
+  var chkAdj = {}, chkSubiendo = {};
 
   function chkEditable(e) { return !!e && CHK_ESTADOS.indexOf(e.estado) >= 0; }
   function etiquetaDe(catalogo, k) { var c = catalogo.filter(function (x) { return x[0] === k; })[0]; return c ? c[1] : k; }
 
   async function cargarChecklist(id) {
     checklist = [];
+    chkAdj = {};
     renderChecklist();
     if (!id) return;
     var rs = await Promise.all([
       _sb.from('mercadeo_evento_checklist').select('*').eq('evento_id', id).order('id', { ascending: true }),
       equipo.length ? Promise.resolve({ data: equipo }) : _sb.rpc('list_equipo_mercadeo'),
+      _sb.from('mercadeo_evento_checklist_adjuntos').select('*').eq('evento_id', id).order('id', { ascending: true }),
     ]);
     if (editId !== id) return;
     if (rs[0].error) { $('e-chk-aviso').innerHTML = '<span class="mk-warn">No se pudo cargar el checklist: ' + esc(errMsg(rs[0].error)) + '</span>'; return; }
     checklist = rs[0].data;
     if (!rs[1].error && rs[1].data) equipo = rs[1].data;
+    // Si fallan solo los adjuntos, el checklist sigue funcionando; se avisa para que no parezca que no hay archivos.
+    var avisoAdj = '';
+    if (rs[2].error) avisoAdj = '<span class="mk-warn">No se pudieron cargar los archivos de las actividades: ' + esc(errMsg(rs[2].error)) + '</span>';
+    else (rs[2].data || []).forEach(function (x) { (chkAdj[x.actividad_id] = chkAdj[x.actividad_id] || []).push(x); });
     renderChecklist();
+    if (avisoAdj) $('e-chk-aviso').innerHTML = avisoAdj;
+  }
+
+  // Bloque de archivos de una actividad: lista (Abrir / eliminar), estado de subida y el botón «Adjuntar archivos».
+  function adjActividadHtml(a, edit) {
+    var lista = chkAdj[a.id] || [], sub = chkSubiendo[a.id] || 0;
+    var h = lista.map(function (x) {
+      return '<div class="ev-chk-adj-item"><span class="ev-chk-adj-nom">📎 ' + esc(x.nombre_original || 'archivo') + ' <span class="tag">' + esc(fmtTam(x.tamano_bytes)) + '</span>' +
+        '<span class="ev-chk-adj-meta">' + esc(x.subido_por_nombre || '—') + (x.creado_en ? ' · ' + esc(fmtDateTime(x.creado_en)) : '') + '</span></span>' +
+        '<span class="mk-actions"><button type="button" class="btn-ver" data-act="chk-adj-abrir" data-path="' + esc(x.storage_path) + '">Abrir</button>' +
+        (edit ? '<button type="button" class="btn-danger" data-act="chk-adj-eliminar" data-id="' + esc(x.id) + '" aria-label="Eliminar el archivo ' + esc(x.nombre_original || '') + '">🗑</button>' : '') + '</span></div>';
+    }).join('');
+    if (sub) h += '<div class="ev-chk-adj-sub" role="status">⏳ Subiendo ' + sub + ' archivo' + (sub === 1 ? '' : 's') + '…</div>';
+    else if (edit) {
+      h += lista.length >= CHK_MAX_ADJ
+        ? '<div class="ef-help">Esta actividad ya tiene el máximo de ' + CHK_MAX_ADJ + ' archivos.</div>'
+        : '<div class="ev-chk-adj-nuevo"><label class="btn-secondary ev-chk-adj-btn">📎 Adjuntar archivos' +
+          '<input type="file" multiple class="ev-chk-file" data-chk-files aria-label="Adjuntar archivos a esta actividad"></label>' +
+          '<span class="ef-help">Máx. 25 MB por archivo · hasta ' + CHK_MAX_ADJ + ' por actividad</span></div>';
+    }
+    return h;
+  }
+
+  // Redibuja solo el bloque de archivos de esa actividad (no toca lo que se esté escribiendo en las demás filas).
+  function pintarAdjActividad(id) {
+    var a = checklist.filter(function (x) { return x.id === id; })[0];
+    var caja = $('e-chk-lista').querySelector('[data-adj="' + id + '"]');
+    if (!a || !caja) return;
+    caja.innerHTML = adjActividadHtml(a, chkEditable(editId ? eventoById[editId] : null));
   }
 
   function filaChk(a, edit) {
@@ -1033,6 +1076,7 @@
       '<div class="ev-chk-meta"><select class="ef" data-f="responsable_id"' + dis + ' aria-label="Responsable">' + resp + '</select>' +
       '<input class="ef" type="date" data-f="fecha_limite" value="' + esc(a.fecha_limite || '') + '"' + dis + ' aria-label="Fecha límite"></div>' +
       '<textarea class="ef ev-chk-notas" data-f="notas" rows="2" maxlength="1000" placeholder="Notas (texto libre)" aria-label="Notas"' + dis + '>' + esc(a.notas || '') + '</textarea>' +
+      '<div class="ev-chk-adj" data-adj="' + esc(a.id) + '">' + adjActividadHtml(a, edit) + '</div>' +
       '<div class="ev-chk-pie">' + pie + (a.origen_clave ? ' · sugerida desde lo solicitado' : '') + '</div></div>';
   }
 
@@ -1132,16 +1176,77 @@
 
   async function eliminarActividad(id) {
     var a = checklist.filter(function (x) { return x.id === id; })[0];
-    if (!a || chkOcupado || !confirm('¿Eliminar la actividad «' + a.descripcion + '»?')) return;
+    if (!a || chkOcupado) return;
+    if (chkSubiendo[id]) { showToast('Espera a que termine de subirse el archivo de esa actividad', '#e74c3c'); return; }
+    var nAdj = (chkAdj[id] || []).length;
+    if (!confirm('¿Eliminar la actividad «' + a.descripcion + '»?' + (nAdj ? ' Se eliminarán también sus ' + nAdj + ' archivo' + (nAdj === 1 ? '' : 's') + ' adjunto' + (nAdj === 1 ? '' : 's') + '.' : ''))) return;
     chkOcupado = true;
+    // Los archivos del Storage no se van con la fila (la BD solo borra el registro en cascada): se anotan las rutas ANTES, releídas de la BD
+    // por si otra persona subió algo que esta pantalla no tiene.
+    var ra = await _sb.from('mercadeo_evento_checklist_adjuntos').select('storage_path').eq('actividad_id', id);
+    var rutas = ra.error || !ra.data ? (chkAdj[id] || []).map(function (x) { return x.storage_path; }) : ra.data.map(function (x) { return x.storage_path; });
     var res = await _sb.from('mercadeo_evento_checklist').delete().eq('id', id).select('id');
     chkOcupado = false;
     if (res.error || !res.data || !res.data.length) {
       if (res.error) fail('eliminar la actividad', res.error); else showToast('No se eliminó: no tienes permiso o ya no existe', '#e74c3c');
       return;
     }
+    if (rutas.length) await _sb.storage.from('mercadeo-adjuntos').remove(rutas);
+    delete chkAdj[id];
     checklist = checklist.filter(function (x) { return x.id !== id; });
     renderChecklist();
+  }
+
+  async function subirAdjuntosActividad(actId, files, input) {
+    var lista = [].slice.call(files);   // copia: al vaciar el input la FileList se vacía también
+    input.value = '';                   // así se puede volver a elegir el mismo archivo
+    var e = editId ? eventoById[editId] : null;
+    var a = checklist.filter(function (x) { return x.id === actId; })[0];
+    if (!a || !chkEditable(e) || !lista.length) return;
+    var errores = [];
+    var cupo = CHK_MAX_ADJ - (chkAdj[actId] || []).length - (chkSubiendo[actId] || 0);
+    if (lista.length > cupo) {
+      errores.push((lista.length - Math.max(cupo, 0)) + ' archivo(s) de más (máximo ' + CHK_MAX_ADJ + ' por actividad)');
+      lista = lista.slice(0, Math.max(cupo, 0));
+    }
+    if (!lista.length) { showToast('No se pudo subir: ' + errores.join(', '), '#e74c3c'); return; }
+    var eventoId = e.id, ok = 0;
+    chkSubiendo[actId] = (chkSubiendo[actId] || 0) + lista.length;
+    pintarAdjActividad(actId);
+    for (var i = 0; i < lista.length; i++) {
+      var f = lista[i];
+      try {
+        if (f.size > MAX_ARCHIVO) { errores.push(f.name + ' (supera 25 MB)'); continue; }
+        var path = 'evento_' + eventoId + '/actividad_' + actId + '/' + Date.now() + '-' + i + '-' + nombreSeguro(f.name);
+        var up = await _sb.storage.from('mercadeo-adjuntos').upload(path, f, { cacheControl: '3600', upsert: false });
+        if (up.error) { errores.push(f.name + ' (' + errMsg(up.error) + ')'); continue; }
+        var ins = await _sb.from('mercadeo_evento_checklist_adjuntos')
+          .insert({ actividad_id: actId, storage_path: path, nombre_original: f.name, tipo_mime: f.type || null, tamano_bytes: f.size }).select('*').single();
+        if (ins.error) { await _sb.storage.from('mercadeo-adjuntos').remove([path]); errores.push(f.name + ' (' + errMsg(ins.error) + ')'); continue; }
+        ok++;
+        if (editId === eventoId) {
+          var arr = chkAdj[actId] = chkAdj[actId] || [];
+          if (!arr.some(function (x) { return x.id === ins.data.id; })) arr.push(ins.data);
+        }
+      } finally {
+        chkSubiendo[actId] = Math.max(0, (chkSubiendo[actId] || 0) - 1);
+        if (editId === eventoId) pintarAdjActividad(actId);
+      }
+    }
+    if (errores.length) showToast((ok ? 'Se adjuntaron ' + ok + '. ' : '') + 'No se pudo subir: ' + errores.join(', '), '#e74c3c');
+    else if (ok) showToast('✅ ' + ok + ' archivo' + (ok === 1 ? '' : 's') + ' adjuntado' + (ok === 1 ? '' : 's') + ' a la actividad');
+  }
+
+  async function eliminarAdjuntoActividad(id) {
+    var actId = null, adj = null;
+    Object.keys(chkAdj).forEach(function (k) { (chkAdj[k] || []).forEach(function (x) { if (x.id === id) { adj = x; actId = Number(k); } }); });
+    if (!adj || !confirm('¿Eliminar el archivo «' + adj.nombre_original + '» de esta actividad?')) return;
+    var res = await _sb.from('mercadeo_evento_checklist_adjuntos').delete().eq('id', id).select('id');
+    if (res.error) { fail('eliminar el archivo', res.error); return; }
+    if (!res.data || !res.data.length) { showToast('No se eliminó el archivo: no tienes permiso o ya no existe', '#e74c3c'); return; }
+    await _sb.storage.from('mercadeo-adjuntos').remove([adj.storage_path]);
+    chkAdj[actId] = (chkAdj[actId] || []).filter(function (x) { return x.id !== id; });
+    pintarAdjActividad(actId);
   }
 
   // PDF con todas las especificaciones de la solicitud (lo ya guardado), su estado y el checklist (js/panel/eventos-pdf.js, compartido con el Tablero).
@@ -1196,8 +1301,8 @@
       case 'observacion_solicitante':
         return '💬 <strong>Observación ' + (d.como === 'aprobador' ? 'del aprobador' : 'del solicitante') + ':</strong> <span style="white-space:pre-wrap">' + esc(d.texto) + '</span>';
       case 'actividad': return '☑️ Actividad ' + ({ agregada: 'agregada', completada: 'completada ✔', reabierta: 'reabierta', eliminada: 'eliminada' }[d.accion] || esc(d.accion)) + ': ' + esc(d.texto);
-      case 'adjunto_agregado': return 'Adjuntó el archivo <strong>' + esc(d.nombre) + '</strong>';
-      case 'adjunto_eliminado': return 'Eliminó el adjunto <strong>' + esc(d.nombre) + '</strong>';
+      case 'adjunto_agregado': return 'Adjuntó el archivo <strong>' + esc(d.nombre) + '</strong>' + (d.actividad ? ' a la actividad «' + esc(d.actividad) + '»' : '');
+      case 'adjunto_eliminado': return 'Eliminó el adjunto <strong>' + esc(d.nombre) + '</strong>' + (d.actividad ? ' de la actividad «' + esc(d.actividad) + '»' : '');
       case 'tarea_creada': return '🗂️ Se creó la tarea <a href="mercadeo.html?tarea=' + encodeURIComponent(d.tarea_id) + '"><strong>#' + esc(d.tarea_id) + '</strong></a> en el Tablero';
       default: return esc(ev.tipo_evento);
     }
@@ -1260,6 +1365,8 @@
     'chk-agregar': function () { agregarActividad(); },
     'chk-sugerir': function () { sugerirActividades(); },
     'chk-eliminar': function (id) { eliminarActividad(Number(id)); },
+    'chk-adj-abrir': function (id, el) { abrirAdjunto(el.getAttribute('data-path')); },
+    'chk-adj-eliminar': function (id) { eliminarAdjuntoActividad(Number(id)); },
     'evento-guardar': guardarEvento,
     'evento-eliminar': eliminarEvento,
     'cerrar-modal': function () { MODAL.close('evento-overlay'); },
@@ -1315,7 +1422,9 @@
   // Checklist: cada campo se guarda al cambiarlo; Enter en el cuadro de «nueva actividad» la agrega.
   $('e-chk-lista').addEventListener('change', function (ev) {
     var el = ev.target, campo = el.getAttribute('data-f'), item = el.closest ? el.closest('.ev-chk-item') : null;
-    if (campo && item) guardarActividad(Number(item.getAttribute('data-chk')), campo, el);
+    if (!item) return;
+    if (el.type === 'file') { subirAdjuntosActividad(Number(item.getAttribute('data-chk')), el.files, el); return; }
+    if (campo) guardarActividad(Number(item.getAttribute('data-chk')), campo, el);
   });
   $('e-chk-nueva').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); agregarActividad(); } });
   $('e-bd-na').addEventListener('change', function () { $('e-bd-fecha').disabled = this.checked; if (this.checked) $('e-bd-fecha').value = ''; });

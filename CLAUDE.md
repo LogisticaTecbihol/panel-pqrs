@@ -299,7 +299,7 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
 
 - **Tablas**: `mercadeo_eventos` (consecutivo visible `EV-<id>`; listas de opciones en códigos ASCII con CHECK `<@`:
   `objetivos`, `canales`, `materiales`, `logistica`, cada una con su texto «Otros»; `desglose_gastos` jsonb de `{concepto, valor}`),
-  `mercadeo_evento_bitacora` y `mercadeo_evento_adjuntos` (mismo bucket privado `mercadeo-adjuntos`, rutas `evento_<id>/…` y,
+  `mercadeo_evento_bitacora`, `mercadeo_evento_adjuntos` y (0041) `mercadeo_evento_checklist_adjuntos` (mismo bucket privado `mercadeo-adjuntos`, rutas `evento_<id>/…` y,
   desde Pedidos, `eventos/<request_id>/…`). `mercadeo_tareas.evento_id` liga la tarea del Tablero (índice único: una por evento).
 - **Flujo**: `radicada → en_revision → aprobada → en_preparacion → realizada → cerrada`; `rechazada` solo antes de aprobar;
   `cancelada` mientras no esté cerrada. `rechazada`/`cancelada`/`cerrada` son FINALES (el trigger rechaza cualquier edición).
@@ -347,6 +347,21 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
   evento En revisión / Aprobada / En preparación / Realizada y sella quién creó y quién/cuándo marcó «hecha»; la bitácora del evento registra el tipo `actividad`
   (agregada a mano, completada, reabierta, eliminada). La función puente `listar` entrega solo el AVANCE (`actividades_total` / `actividades_hechas`) para
   mostrárselo al solicitante en Pedidos; las notas y los responsables no salen de aquí.
+  - **Adjuntos por actividad** (migración 0041, nov-2026): cada actividad lleva sus archivos de evidencia (flyer, fotos del montaje, cotizaciones…) con el botón «📎 Adjuntar
+    archivos» (varios a la vez; 25 MB c/u, hasta 20 por actividad) y, por archivo, Abrir y 🗑. Tabla APARTE `mercadeo_evento_checklist_adjuntos` (no `mercadeo_evento_adjuntos`) a
+    propósito: esa la lee `listar` de `solicitud-evento-pedidos` y la imprime el PDF, y la evidencia interna no debe llegarle al solicitante; esta no sale del panel (ni
+    al puente, ni al PDF, que sigue mostrando solo el avance). Mismo bucket `mercadeo-adjuntos`, ruta `evento_<id>/actividad_<id>/<ts>-<n>-<nombre>`; sin cambios en las policies de
+    Storage. El trigger `mercadeo_evento_chk_adj_reglas` (BEFORE INSERT/DELETE) saca `evento_id` de la actividad, sella `subido_por`/`subido_por_nombre`/`creado_en`, exige la
+    misma ventana de estados del checklist (En revisión … Realizada), que la ruta empiece por `evento_<id>/` y no lleve `..`, y el tope de 20 por actividad; el CHECK de la fila
+    limita el tamaño a 25 MB. RLS: el módulo `mercadeo` lee, sube y borra; NO hay UPDATE (ni policy ni GRANT: es evidencia, se borra y se vuelve a subir). La bitácora del evento
+    registra `adjunto_agregado` / `adjunto_eliminado` con `actividad` (trigger `trg_chk_adj_bitacora`; al eliminar la actividad o el evento en cascada no se anota cada archivo).
+    **La BD no borra los objetos del Storage**: `eliminarActividad` y `eliminarEvento` (`eventos.js`) releen las rutas de la BD y las remueven del bucket. En la interfaz
+    (`adjActividadHtml` / `pintarAdjActividad` / `subirAdjuntosActividad`) el bloque de archivos se redibuja solo, sin tocar lo que se esté escribiendo en otras filas; con el
+    evento fuera de la ventana de estados o ya cerrado queda de solo lectura (solo Abrir). Si falla la carga de los archivos, el checklist sigue y se avisa.
+    Probado en SQL en una transacción revertida (12 casos: sellos no falsificables, ruta de otro evento / con `..`, actividad inexistente, > 25 MB, archivo 21, UPDATE bloqueado,
+    borrado + bitácora, SST sin acceso, anon, evento cancelado, cascada por actividad y por evento) y la interfaz en navegador con un Supabase simulado (subida de varios, durante la
+    subida, > 25 MB, fallo de Storage, fallo de BD con limpieza del objeto, límite de 20, borrar archivo, borrar actividad con sus archivos, solo lectura, fallo de carga, móvil).
+    No probado contra el servidor real: el botón de subida con archivos reales hacia Storage.
 - **PDF de la solicitud** (`js/panel/eventos-pdf.js`: `EVENTO_PDF.solicitud` arma el documento y `EVENTO_PDF.ver` lo abre; ese archivo también guarda la ÚNICA copia de los
   catálogos `CAT` y `ESTADO_T`, que `eventos.js` usa): botón «📄 PDF» en cada fila de la lista de Eventos y «📄 Ver PDF» en el pie del modal, y en el **Tablero** el chip
   «📄 PDF» de cada tarjeta de tarea de evento y el botón «📄 Ver PDF del evento» en su detalle (`mercadeo.html` también carga jsPDF y `eventos-pdf.js`). Abre en una
