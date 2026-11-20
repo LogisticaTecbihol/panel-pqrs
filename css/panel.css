@@ -546,6 +546,17 @@ textarea.ef { resize: vertical; min-height: 80px; }
 .ac-sub{font-size:.72rem;color:#718096;margin-top:2px}
 
 /* Checklist de actividades del evento */
+.ev-ped { border: 1px solid #bee3f8; background: #ebf8ff; border-radius: 9px; padding: 10px 12px; margin-bottom: 12px; }
+.ev-ped-t { font-weight: 700; font-size: 0.88rem; margin-bottom: 4px; }
+.ev-ped-res { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 0.82rem; color: #2c5282; margin-bottom: 6px; }
+.ev-ped-lista { list-style: none; margin: 0; padding: 0; }
+.ev-ped-lista li { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 5px 0; border-top: 1px solid #d6ebf8; font-size: 0.84rem; }
+.ev-ped-txt { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.ev-ped-lista li > .btn-ver { flex: none; }
+.ev-ped-est { flex: none; margin-left: auto; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+.ev-ped-est.falta { background: #fefcbf; color: #744210; }
+.ev-ped-est.curso { background: #e2e8f0; color: #4a5568; }
+.ev-ped-est.ok { background: #c6f6d5; color: #22543d; }
 .ev-chk-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; font-size: 0.86rem; }
 .ev-chk-bar { flex: 1; height: 8px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
 .ev-chk-bar i { display: block; height: 100%; width: 0; background: #27ae60; transition: width 0.3s; }

@@ -347,6 +347,16 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
   evento En revisión / Aprobada / En preparación / Realizada y sella quién creó y quién/cuándo marcó «hecha»; la bitácora del evento registra el tipo `actividad`
   (agregada a mano, completada, reabierta, eliminada). La función puente `listar` entrega solo el AVANCE (`actividades_total` / `actividades_hechas`) para
   mostrárselo al solicitante en Pedidos; las notas y los responsables no salen de aquí.
+  - **Lo pedido por el solicitante no se pierde** (nov-2026, sin migración; `eventos.js`: `sugerenciasChk`, `pedidoChkHtml`, `sembrarPedidoEnChecklist`): lo que el solicitante marcó
+    en Pedidos (canales, materiales, logística y sus «Otros»; Pedidos no tiene otro campo de «actividades») ya no depende de acordarse de «Sugerir desde lo solicitado». (1) El paso 6
+    abre con el panel **«Lo que pidió el solicitante»**: cada ítem con su situación en el checklist (Sin actividad / En el checklist / ✔ Hecha), «➕ Al checklist» por ítem y
+    «➕ Agregar las N pendientes»; se ve desde `radicada` y en solo lectura una vez cerrado. (2) Al pasar de `radicada` a En revisión / Aprobada, `cambiarEstado` siembra solo una actividad por
+    ítem (`origen_clave`), DESPUÉS del cambio de estado (la BD solo deja escribir el checklist En revisión … Realizada); si falla, el estado ya quedó y un aviso naranja manda al panel.
+    Es del cliente, no un trigger: un evento que cambie de estado por otra vía (SQL) no se siembra, pero el panel lo muestra pendiente. (3) El texto de un «Otro» que no cabe en los
+    300 caracteres de la actividad ya no se corta en silencio: la actividad lleva el inicio y las `notas` el texto completo. (4) Una actividad sugerida cuyo ítem el solicitante/Mercadeo
+    quitó después de la solicitud se marca «ya no figura en la solicitud» (no se borra). Los eventos que ya estaban en revisión o más NO se rellenaron: el panel les muestra lo pendiente
+    y se agrega con un clic. Probado con un arnés de navegador y un Supabase simulado (siembra al poner en revisión, falla del insert, agregar uno y todos, hecha/en curso/ya no figura,
+    cerrada, sin ítems, móvil). No probado contra el servidor real.
   - **Adjuntos por actividad** (migración 0041, nov-2026): cada actividad lleva sus archivos de evidencia (flyer, fotos del montaje, cotizaciones…) con el botón «📎 Adjuntar
     archivos» (varios a la vez; 25 MB c/u, hasta 20 por actividad) y, por archivo, Abrir y 🗑. Tabla APARTE `mercadeo_evento_checklist_adjuntos` (no `mercadeo_evento_adjuntos`) a
     propósito: esa la lee `listar` de `solicitud-evento-pedidos` y la imprime el PDF, y la evidencia interna no debe llegarle al solicitante; esta no sale del panel (ni

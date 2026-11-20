@@ -883,6 +883,9 @@
     }
     var origen = e.origen, id = e.id;
     showToast(nuevo === 'aprobada' ? '✅ Evento aprobado; se creó la tarea en el Tablero' : '✅ Estado: ' + ESTADO_T[nuevo]);
+    // Primera vez que Mercadeo toma la solicitud: lo que pidió el solicitante pasa al checklist con lo que quedó guardado ahora.
+    // (Va después del aviso de éxito para que, si algo falla, el aviso de la falla sea el que se quede en pantalla.)
+    if (e.estado === 'radicada' && CHK_ESTADOS.indexOf(nuevo) >= 0) await sembrarPedidoEnChecklist(id, Object.assign({}, e, diff));
     MODAL.close('motivo-overlay');
     MODAL.close('evento-overlay');
     avisarSolicitante(id, nuevo === 'rechazada' ? 'rechazo' : 'estado', origen);
@@ -1003,7 +1006,7 @@
   // fecha límite y notas. Cada cambio se guarda al instante (no depende del botón Guardar del formulario). Solo se escribe mientras el evento
   // está En revisión … Realizada (la BD lo exige); después queda de solo lectura. El solicitante ve únicamente el avance, en Pedidos.
   var CHK_ESTADOS = ['en_revision', 'aprobada', 'en_preparacion', 'realizada'];
-  var checklist = [], equipo = [], chkOcupado = false;
+  var checklist = [], equipo = [], chkOcupado = false, claveVigente = {};
   // Adjuntos por actividad (migración 0041): chkAdj[actividad_id] = filas de mercadeo_evento_checklist_adjuntos; chkSubiendo[actividad_id] = archivos en
   // vuelo. Son internos de Mercadeo (no salen a Pedidos ni al PDF). Subir y borrar siguen la misma regla que el checklist (En revisión … Realizada).
   var CHK_MAX_ADJ = 20;
@@ -1077,7 +1080,7 @@
       '<input class="ef" type="date" data-f="fecha_limite" value="' + esc(a.fecha_limite || '') + '"' + dis + ' aria-label="Fecha límite"></div>' +
       '<textarea class="ef ev-chk-notas" data-f="notas" rows="2" maxlength="1000" placeholder="Notas (texto libre)" aria-label="Notas"' + dis + '>' + esc(a.notas || '') + '</textarea>' +
       '<div class="ev-chk-adj" data-adj="' + esc(a.id) + '">' + adjActividadHtml(a, edit) + '</div>' +
-      '<div class="ev-chk-pie">' + pie + (a.origen_clave ? ' · sugerida desde lo solicitado' : '') + '</div></div>';
+      '<div class="ev-chk-pie">' + pie + (a.origen_clave ? ' · pedida por el solicitante' + (claveVigente[a.origen_clave] ? '' : ' (ya no figura en la solicitud)') : '') + '</div></div>';
   }
 
   function resumenChk() {
@@ -1086,17 +1089,45 @@
     $('e-chk-bar').style.width = total ? Math.round(hechas / total * 100) + '%' : '0%';
   }
 
+  // Panel «Lo que pidió el solicitante»: cada canal, material y logística marcados (y sus «Otros») con su situación en el checklist. Se ve desde
+  // que llega la solicitud, así que lo pedido no se pierde de vista aunque Mercadeo agregue actividades propias; lo que aún no tiene actividad
+  // se pasa al checklist con un clic (o todo junto).
+  function pedidoChkHtml(e, edit) {
+    var lista = sugerenciasChk(e);
+    var titulo = '<div class="ev-ped-t">📋 Lo que pidió el solicitante</div>';
+    if (!lista.length) return titulo + '<div class="ef-help">El solicitante no marcó canales, materiales ni logística.</div>';
+    var tiene = clavesEnChecklist(), faltan = 0;
+    var filas = lista.map(function (s) {
+      var a = tiene[s.clave], est;
+      if (!a) {
+        faltan++;
+        est = '<span class="ev-ped-est falta">Sin actividad</span>' +
+          (edit ? '<button type="button" class="btn-ver" data-act="chk-pedido-agregar" data-id="' + esc(s.clave) + '">➕ Al checklist</button>' : '');
+      } else est = a.hecha ? '<span class="ev-ped-est ok">✔ Hecha</span>' : '<span class="ev-ped-est curso">En el checklist</span>';
+      return '<li><span class="ev-ped-txt">' + esc(s.nota || s.texto) + '</span>' + est + '</li>';
+    }).join('');
+    var resumen = faltan
+      ? faltan + ' de ' + lista.length + ' aún no ' + (faltan === 1 ? 'tiene' : 'tienen') + ' actividad en el checklist'
+      : '✔ Las ' + lista.length + ' ya están en el checklist';
+    var todas = faltan && edit ? '<button type="button" class="btn-secondary" data-act="chk-sugerir">➕ Agregar ' + (faltan === 1 ? 'la pendiente' : 'las ' + faltan + ' pendientes') + '</button>' : '';
+    var nota = e.estado === 'radicada' ? '<div class="ef-help">Al poner la solicitud en revisión (o aprobarla) estas actividades pasan solas al checklist.</div>' : '';
+    return titulo + '<div class="ev-ped-res"><span>' + esc(resumen) + '</span>' + todas + '</div><ul class="ev-ped-lista">' + filas + '</ul>' + nota;
+  }
+
   function renderChecklist() {
     var e = editId ? eventoById[editId] : null, edit = chkEditable(e);
     $('e-chk-nuevo').style.display = e ? 'none' : '';
     $('e-chk-box').style.display = e ? '' : 'none';
     if (!e) return;
+    // Claves que el solicitante sigue pidiendo (para marcar las actividades sugeridas que ya no figuran en la solicitud).
+    claveVigente = {}; sugerenciasChk(e).forEach(function (s) { claveVigente[s.clave] = true; });
+    $('e-chk-pedido').innerHTML = pedidoChkHtml(e, edit);
     resumenChk();
     $('e-chk-lista').innerHTML = checklist.length ? checklist.map(function (a) { return filaChk(a, edit); }).join('')
       : '<div class="mk-sin">Aún no hay actividades. Agrégalas arriba o usa «Sugerir desde lo solicitado».</div>';
     $('e-chk-nueva').disabled = $('e-chk-agregar').disabled = $('e-chk-sugerir').disabled = !edit;
     $('e-chk-aviso').textContent = edit ? '' : (e.estado === 'radicada'
-      ? 'Pasa el evento a «En revisión» para armar el checklist de actividades.'
+      ? 'Pasa el evento a «En revisión» para armar el checklist de actividades (lo que pidió el solicitante pasa solo).'
       : 'El evento está «' + (ESTADO_T[e.estado] || e.estado) + '»: el checklist queda de solo lectura.');
   }
 
@@ -1116,10 +1147,16 @@
     $('e-chk-nueva').focus();
   }
 
-  // Una actividad por cada canal, material y logística que pidió el solicitante (y sus «Otros»); solo las que aún no están.
+  // Lo que el solicitante pidió, una entrada por cada canal, material y logística marcados (y sus «Otros»). Es la fuente de las actividades
+  // «sugeridas» y del panel «Lo que pidió el solicitante». Si el texto no cabe en la actividad (300), el completo viaja en `nota` para no perderlo.
   function sugerenciasChk(e) {
     var out = [];
-    var add = function (clave, prefijo, texto) { out.push({ clave: clave, texto: (prefijo + texto).slice(0, 300) }); };
+    var add = function (clave, prefijo, texto) {
+      var completo = prefijo + texto;
+      var s = { clave: clave, texto: completo.length > 300 ? completo.slice(0, 299) + '…' : completo };
+      if (completo.length > 300) s.nota = completo.slice(0, 1000);
+      out.push(s);
+    };
     (e.canales || []).forEach(function (k) { add('canal:' + k, 'Canal de promoción: ', etiquetaDe(CANALES, k)); });
     if (e.canales_otro) add('canal_otro', 'Canal de promoción (otro): ', e.canales_otro);
     (e.materiales || []).forEach(function (k) { add('material:' + k, 'Material: ', etiquetaDe(MATERIALES, k)); });
@@ -1129,23 +1166,54 @@
     return out;
   }
 
-  async function sugerirActividades() {
+  // Claves de lo pedido que ya tienen su actividad en el checklist (hecha o no).
+  function clavesEnChecklist() {
+    var m = {}; checklist.forEach(function (a) { if (a.origen_clave) m[a.origen_clave] = a; });
+    return m;
+  }
+
+  function filasSugeridas(eventoId, lista) {
+    return lista.map(function (s) {
+      var f = { evento_id: eventoId, descripcion: s.texto, origen_clave: s.clave };
+      if (s.nota) f.notas = s.nota;
+      return f;
+    });
+  }
+
+  // Agrega al checklist las actividades pedidas por el solicitante que aún no están (todas, o solo la de `soloClave`).
+  async function sugerirActividades(soloClave) {
     var e = editId ? eventoById[editId] : null;
     if (!chkEditable(e) || chkOcupado) return;
     var todas = sugerenciasChk(e);
     if (!todas.length) { showToast('El solicitante no marcó canales, materiales ni logística'); return; }
-    var existentes = {}; checklist.forEach(function (a) { if (a.origen_clave) existentes[a.origen_clave] = true; });
-    var nuevas = todas.filter(function (s) { return !existentes[s.clave]; });
+    var existentes = clavesEnChecklist();
+    var nuevas = todas.filter(function (s) { return !existentes[s.clave] && (!soloClave || s.clave === soloClave); });
     if (!nuevas.length) { showToast('Ya están todas las actividades sugeridas'); return; }
     chkOcupado = true;
-    var res = await _sb.from('mercadeo_evento_checklist')
-      .insert(nuevas.map(function (s) { return { evento_id: e.id, descripcion: s.texto, origen_clave: s.clave }; })).select('*');
+    var res = await _sb.from('mercadeo_evento_checklist').insert(filasSugeridas(e.id, nuevas)).select('*');
     chkOcupado = false;
     if (res.error) { fail('crear las actividades sugeridas', res.error); return; }
     if (editId !== e.id) return;
     checklist = checklist.concat(res.data).sort(function (a, b) { return a.id - b.id; });
     renderChecklist();
     showToast('✅ Se agregaron ' + res.data.length + ' actividad' + (res.data.length === 1 ? '' : 'es') + ' sugerida' + (res.data.length === 1 ? '' : 's'));
+  }
+
+  // Al empezar a gestionar la solicitud (radicada → En revisión / Aprobada) lo que pidió el solicitante pasa solo al checklist, para que
+  // no dependa de acordarse de «Sugerir desde lo solicitado» ni se quede fuera cuando Mercadeo agregue sus propias actividades.
+  // Corre DESPUÉS de cambiar el estado (la BD solo deja escribir el checklist En revisión … Realizada). Si falla, el estado ya quedó y solo se avisa.
+  async function sembrarPedidoEnChecklist(eventoId, datos) {
+    var lista = sugerenciasChk(datos);
+    if (!lista.length) return;
+    var aviso = function (error) { showToast('El evento cambió de estado, pero no se pudo pasar lo pedido al checklist (' + errMsg(error) + '). Usa «Sugerir desde lo solicitado» en el paso 6.', '#e67e22'); };
+    // El índice único de origen_clave es parcial (no sirve para upsert): se leen las que ya hay y se insertan solo las que faltan.
+    var ya = await _sb.from('mercadeo_evento_checklist').select('origen_clave').eq('evento_id', eventoId).not('origen_clave', 'is', null);
+    if (ya.error) { aviso(ya.error); return; }
+    var tiene = {}; (ya.data || []).forEach(function (x) { tiene[x.origen_clave] = true; });
+    var faltan = lista.filter(function (s) { return !tiene[s.clave]; });
+    if (!faltan.length) return;
+    var res = await _sb.from('mercadeo_evento_checklist').insert(filasSugeridas(eventoId, faltan));
+    if (res.error) aviso(res.error);
   }
 
   async function guardarActividad(id, campo, el) {
@@ -1364,6 +1432,7 @@
     'impacto-cerrar': function () { EVENTO_IMPACTO.cerrar(); },
     'chk-agregar': function () { agregarActividad(); },
     'chk-sugerir': function () { sugerirActividades(); },
+    'chk-pedido-agregar': function (clave) { sugerirActividades(clave); },
     'chk-eliminar': function (id) { eliminarActividad(Number(id)); },
     'chk-adj-abrir': function (id, el) { abrirAdjunto(el.getAttribute('data-path')); },
     'chk-adj-eliminar': function (id) { eliminarAdjuntoActividad(Number(id)); },
