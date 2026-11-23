@@ -372,6 +372,32 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
     borrado + bitácora, SST sin acceso, anon, evento cancelado, cascada por actividad y por evento) y la interfaz en navegador con un Supabase simulado (subida de varios, durante la
     subida, > 25 MB, fallo de Storage, fallo de BD con limpieza del objeto, límite de 20, borrar archivo, borrar actividad con sus archivos, solo lectura, fallo de carga, móvil).
     No probado contra el servidor real: el botón de subida con archivos reales hacia Storage.
+- **Registro de asistentes** (migración 0042, nov-2026; `js/panel/eventos-asistentes.js` + modal `#asistentes-overlay` de `eventos.html`): digitaliza la **Planilla de asistencia** en
+  papel que firman los asistentes (IASO «Registro de asistencia»: nombre completo, cédula, cultivo principal, vereda o ubicación, hectáreas, teléfono, correo y «¿ha usado productos
+  orgánicos/biorracionales?» Sí/No; la firma queda en el papel y no se digitaliza). Botón «👥 Asistentes · N» en cada fila (desde Aprobada; el N sale del RPC
+  `mercadeo_evento_asistentes_conteo()`, que si falla solo deja el botón sin número) y «👥 Asistentes» en el pie del modal del evento; el bloque «Base de datos de asistentes» (evento
+  Realizada/Cerrada) muestra cuántos hay. El modal tiene el formulario de una persona (mismo orden de columnas que la planilla; **solo el nombre es obligatorio**, porque la planilla
+  llega incompleta), el resumen (registrados, hectáreas, cuántos ya usaron orgánicos, cuántos sin cédula), buscador, editar (reusa el formulario) y eliminar, y **«⬇ Descargar para Excel»**
+  (CSV con `;` y BOM, las mismas columnas de la planilla; celdas que empiezan por `= @` o `+ -` no numéricos llevan `'` delante). Cada persona se guarda al instante; el módulo se cargó como
+  `var EVENTO_ASISTENTES` (igual que `EVENTO_IMPACTO`) y sus botones usan `data-aa`, no `data-act`, para no pasar por el despachador de `eventos.js`.
+  - **Tabla** `mercadeo_evento_asistentes` (APARTE de `mercadeo_evento_adjuntos` y del checklist, a propósito: son DATOS PERSONALES —cédula, teléfono, correo— y la función puente
+    `solicitud-evento-pedidos` y el PDF no los leen; el solicitante de Pedidos no los ve). Trigger `mercadeo_evento_asistentes_reglas` (BEFORE INSERT/UPDATE/DELETE): solo escribe con el
+    evento **Aprobada / En preparación / Realizada** (Cerrada y las demás quedan de solo lectura; la lista queda congelada al cerrar); normaliza el texto (vacío = sin dato, correo en minúsculas);
+    **la misma cédula no se repite dentro de un evento** (se compara sin puntos, guiones ni espacios, `cedula_clave`, con índice único parcial de respaldo; la misma cédula en otro evento sí
+    se permite; sin cédula no hay control de repetidos); tope de 2000 por evento; `creado_por*` / `modificado_por*` los sella el servidor y «modificado por» solo cambia si algo cambió de
+    verdad; `evento_id` no cambia nunca (se fija ANTES de las comprobaciones: la primera versión validaba contra el `evento_id` que mandara el navegador, lo destapó la prueba).
+  - **Bitácora**: tipo nuevo `asistente`, solo al ELIMINAR a alguien (nombre, sin cédula: la bitácora sobrevive a la fila); las altas no se registran una por una. Al borrar el evento entero
+    (cascada) no se anota nada. `evTexto` de `eventos.js` lo dibuja.
+  - **RLS**: el módulo `mercadeo` (y admin) lee, inserta, edita y borra; SST sin el módulo y `anon` no ven nada (el RPC es `SECURITY INVOKER`, pasa por la RLS).
+  - **Sin firma ni escaneo**: no hay subida de la foto/escaneo de la planilla firmada (evidencia de que sí asistieron); si se quiere, es una tabla de adjuntos aparte como la 0041, no
+    `mercadeo_evento_adjuntos`. Tampoco hay «imprimir la planilla en blanco con el encabezado del evento», ni expositor/tema propios (el tema es el nombre del evento).
+  - Probado en SQL con la migración y las pruebas dentro de UNA transacción que termina en `RAISE EXCEPTION` (nada se guarda): alta y normalización, sellos no falsificables, cédula repetida
+    (otro formato) y en otro evento, evento cancelado/cerrado, 6 CHECK, vacíos → NULL, update sin cambios y con cambios, update con `evento_id` ajeno, delete + bitácora, SST y `anon`, cascada
+    por evento (también cerrado). La interfaz, con un arnés de navegador y un Supabase simulado (alta con teclado, duplicado, validaciones, editar/cancelar, buscar, eliminar, evento cerrado en
+    solo lectura, contenido y BOM del CSV, falla de carga + Reintentar, cambio de estado con el modal abierto, doble envío, RPC de conteo roto, apilado con el modal del evento + Escape, móvil).
+    Migración **aplicada el 2026-11-23** (versión `eventos_asistentes`, con el MCP; tabla vacía, RLS y 4 policies, 2 triggers, RPC de conteo y el tipo `asistente` en la bitácora; sin advertencias
+    nuevas del asesor de seguridad). **No probado contra el servidor real**: el modal con la sesión de un usuario real (el frontend se publica después de la migración; sin ella el botón
+    abriría el modal pero la carga avisaría del error).
 - **PDF de la solicitud** (`js/panel/eventos-pdf.js`: `EVENTO_PDF.solicitud` arma el documento y `EVENTO_PDF.ver` lo abre; ese archivo también guarda la ÚNICA copia de los
   catálogos `CAT` y `ESTADO_T`, que `eventos.js` usa): botón «📄 PDF» en cada fila de la lista de Eventos y «📄 Ver PDF» en el pie del modal, y en el **Tablero** el chip
   «📄 PDF» de cada tarjeta de tarea de evento y el botón «📄 Ver PDF del evento» en su detalle (`mercadeo.html` también carga jsPDF y `eventos-pdf.js`). Abre en una

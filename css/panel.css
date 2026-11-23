@@ -611,3 +611,22 @@ textarea.ef { resize: vertical; min-height: 80px; }
 .imp-defs summary { cursor: pointer; font-weight: 700; color: #1a5276; }
 .imp-defs ul { margin: 8px 0 0 18px; line-height: 1.5; }
 #impacto-overlay .ind-mini > div { min-width: 130px; }
+
+/* ── Eventos: registro de asistentes (planilla de asistencia digitada; js/panel/eventos-asistentes.js) ── */
+.asis-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 12px; margin-bottom: 12px; }
+.asis-grid > div { min-width: 0; }
+.asis-grid .asis-2 { grid-column: span 2; }
+.asis-grid .ef-label { text-transform: none; letter-spacing: 0; }
+.asis-grid .asis-botones { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+#asis-form-box.asis-edit { background: #fffbeb; border-color: #f6e05e; }
+.asis-barra { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; margin: 14px 0 8px; }
+.asis-resumen { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.asis-buscar { flex: 0 1 300px; min-width: 200px; }
+.asis-tabla td, .asis-tabla th { vertical-align: middle; padding: 8px 7px; font-size: 0.8rem; }
+.asis-tabla .asis-n { color: #718096; font-weight: 700; width: 38px; }
+.asis-tabla .asis-num { text-align: right; white-space: nowrap; }
+.asis-tabla .asis-correo, .asis-tabla td:nth-child(3), .asis-tabla td:nth-child(7) { white-space: nowrap; }
+.asis-tabla .asis-acc { white-space: nowrap; text-align: right; }
+.asis-tabla tr.asis-editando td { background: #fffbeb; }
+@media (max-width: 900px) { .asis-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .asis-grid { grid-template-columns: 1fr; } .asis-grid .asis-2 { grid-column: auto; } .asis-buscar { flex-basis: 100%; } }

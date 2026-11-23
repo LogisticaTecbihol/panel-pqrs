@@ -60,6 +60,7 @@
 
   // ── Estado ──
   var eventos = [], eventoById = {}, tareaDeEvento = {};
+  var asisConteo = {};            // evento_id -> cuántos asistentes tiene registrados (js/panel/eventos-asistentes.js, migración 0042)
   var editId = null, orig = null, recargaTimer = null, motivoModo = null;
   var paso = 1, visitados = {};   // paso visible del modal (1-6) y pasos ya vistos (solo ellos muestran ✓ / !)
   var productos = [];             // «Productos relacionados» del formulario (migración 0038)
@@ -129,11 +130,15 @@
       var rs = await Promise.all([
         fetchAll('mercadeo_eventos', '*', 'id'),
         fetchAll('mercadeo_tareas', 'id,evento_id,estado', 'id', function (q) { return q.not('evento_id', 'is', null); }),
+        _sb.rpc('mercadeo_evento_asistentes_conteo'),
       ]);
-      for (var i = 0; i < rs.length; i++) if (rs[i].error) throw rs[i].error;
+      for (var i = 0; i < 2; i++) if (rs[i].error) throw rs[i].error;
       eventos = rs[0].data;
       tareaDeEvento = {};
       rs[1].data.forEach(function (t) { tareaDeEvento[t.evento_id] = t; });
+      // El conteo de asistentes es un adorno del botón: si falla (p. ej. aún no se aplicó la migración 0042) la lista sigue funcionando sin el número.
+      asisConteo = {};
+      if (!rs[2].error && rs[2].data) rs[2].data.forEach(function (c) { asisConteo[c.evento_id] = Number(c.total) || 0; });
     } catch (err) {
       if (primera) {
         $('estado-carga').innerHTML = 'No se pudieron cargar los datos: ' + esc(errMsg(err)) +
@@ -148,7 +153,11 @@
     $('contenido').style.display = '';
     rellenarFiltros();
     render();
-    if (editId && eventoById[editId] && MODAL.isOpen('evento-overlay')) { renderAcciones(eventoById[editId]); cargarDetalle(editId); }
+    if (editId && eventoById[editId] && MODAL.isOpen('evento-overlay')) {
+      renderAcciones(eventoById[editId]); cargarDetalle(editId);
+      $('e-asistentes').style.display = EVENTO_ASISTENTES.disponible(eventoById[editId]) ? '' : 'none';
+      pintarBdAsis(eventoById[editId]);
+    }
     return true;
   }
 
@@ -243,6 +252,7 @@
         '<td>' + badge(ESTADO_T[e.estado] || e.estado, ESTADO_COLOR[e.estado] || '#718096') + '</td>' +
         '<td>' + atencionHtml(e) + '</td>' +
         '<td><div class="mk-actions"><button class="btn-ver btn-pdf" data-act="evento-pdf" data-id="' + esc(e.id) + '" title="Ver todas las especificaciones de la solicitud en PDF" aria-label="Ver PDF de ' + esc(refEv(e)) + '">📄 PDF</button>' +
+        (EVENTO_ASISTENTES.disponible(e) ? '<button class="btn-ver" data-act="evento-asistentes" data-id="' + esc(e.id) + '" title="Registro de asistentes: digita la planilla de asistencia del evento" aria-label="Asistentes de ' + esc(refEv(e)) + (asisConteo[e.id] ? ' (' + asisConteo[e.id] + ' registrados)' : '') + '">👥 Asistentes' + (asisConteo[e.id] ? ' · ' + esc(asisConteo[e.id]) : '') + '</button>' : '') +
         (mideImpacto(e) ? '<button class="btn-ver" data-act="evento-impacto" data-id="' + esc(e.id) + '" title="Cruza el evento con las ventas de Pedidos: antes y después, contra el resto de la empresa" aria-label="Ver el impacto en ventas de ' + esc(refEv(e)) + '">📈 Ventas</button>' : '') +
         '<button class="btn-ver" data-act="evento-abrir" data-id="' + esc(e.id) + '">' + (esFinal(e) ? 'Ver' : 'Abrir') + '</button></div></td>' +
         '</tr>';
@@ -709,9 +719,11 @@
     $('e-eliminar').style.display = e && esAdmin ? '' : 'none';
     $('e-pdf').style.display = e ? '' : 'none';
     $('e-impacto').style.display = e && mideImpacto(e) ? '' : 'none';
+    $('e-asistentes').style.display = e && EVENTO_ASISTENTES.disponible(e) ? '' : 'none';
     var enBD = !!e && (e.estado === 'realizada' || e.estado === 'cerrada');
     $('e-bd-box').style.display = enBD ? '' : 'none';
     if (enBD) {
+      pintarBdAsis(e);
       $('e-bd-ayuda').textContent = 'El comercial debe entregar la base de datos de los asistentes en máximo 3 días hábiles tras el evento (plazo: ' + fmtDateOnly(plazoBD(e)) + '). Para cerrar el evento registra la fecha en que llegó, o márcala como «no aplica».';
       $('e-bd-fecha').disabled = final || $('e-bd-na').checked;
     }
@@ -1334,6 +1346,25 @@
     EVENTO_IMPACTO.abrir({ sb: _sb, evento: e });
   }
 
+  // Registro de asistentes (js/panel/eventos-asistentes.js, migración 0042): la planilla de asistencia digitada. Se muestra desde que el evento está
+  // Aprobada; el número del botón y el texto del bloque «Base de datos de asistentes» se reajustan con cada cambio que haga el modal.
+  function pintarBdAsis(e) {
+    var n = e ? asisConteo[e.id] || 0 : 0;
+    $('e-bd-asis').textContent = 'Planilla de asistencia: ' + (n ? n + (n === 1 ? ' asistente registrado' : ' asistentes registrados') : 'aún no hay asistentes registrados') + ' (botón «👥 Asistentes»).';
+  }
+  function verAsistentes(id) {
+    var e = id ? eventoById[id] : null;
+    if (!e || !EVENTO_ASISTENTES.disponible(e)) return;
+    EVENTO_ASISTENTES.abrir({
+      sb: _sb, evento: e,
+      onCambio: function (eventoId, total) {
+        if (total) asisConteo[eventoId] = total; else delete asisConteo[eventoId];
+        render();
+        if (editId === eventoId && eventoById[eventoId]) pintarBdAsis(eventoById[eventoId]);
+      },
+    });
+  }
+
   function listaTxt(arr) { return (arr && arr.length) ? arr.map(esc).join(', ') : '—'; }
   function valorCampo(k, v) {
     if (v === null || v === undefined || v === '') return '—';
@@ -1369,6 +1400,7 @@
       case 'observacion_solicitante':
         return '💬 <strong>Observación ' + (d.como === 'aprobador' ? 'del aprobador' : 'del solicitante') + ':</strong> <span style="white-space:pre-wrap">' + esc(d.texto) + '</span>';
       case 'actividad': return '☑️ Actividad ' + ({ agregada: 'agregada', completada: 'completada ✔', reabierta: 'reabierta', eliminada: 'eliminada' }[d.accion] || esc(d.accion)) + ': ' + esc(d.texto);
+      case 'asistente': return '👥 Asistente eliminado de la planilla: <strong>' + esc(d.nombre) + '</strong>';
       case 'adjunto_agregado': return 'Adjuntó el archivo <strong>' + esc(d.nombre) + '</strong>' + (d.actividad ? ' a la actividad «' + esc(d.actividad) + '»' : '');
       case 'adjunto_eliminado': return 'Eliminó el adjunto <strong>' + esc(d.nombre) + '</strong>' + (d.actividad ? ' de la actividad «' + esc(d.actividad) + '»' : '');
       case 'tarea_creada': return '🗂️ Se creó la tarea <a href="mercadeo.html?tarea=' + encodeURIComponent(d.tarea_id) + '"><strong>#' + esc(d.tarea_id) + '</strong></a> en el Tablero';
@@ -1430,6 +1462,7 @@
     'evento-pdf': function (id) { verPdf(Number(id) || editId); },   // desde la fila (con id) o desde el pie del modal (evento abierto)
     'evento-impacto': function (id) { verImpacto(Number(id) || editId); },
     'impacto-cerrar': function () { EVENTO_IMPACTO.cerrar(); },
+    'evento-asistentes': function (id) { verAsistentes(Number(id) || editId); },
     'chk-agregar': function () { agregarActividad(); },
     'chk-sugerir': function () { sugerirActividades(); },
     'chk-pedido-agregar': function (clave) { sugerirActividades(clave); },
