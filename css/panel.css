@@ -630,3 +630,8 @@ textarea.ef { resize: vertical; min-height: 80px; }
 .asis-tabla tr.asis-editando td { background: #fffbeb; }
 @media (max-width: 900px) { .asis-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px) { .asis-grid { grid-template-columns: 1fr; } .asis-grid .asis-2 { grid-column: auto; } .asis-buscar { flex-basis: 100%; } }
+/* Botones de asistentes (fila de la lista, pie del evento y «Agregar» del modal): verde propio para distinguirlos del azul de las demás acciones */
+.btn-asis, .asis-grid .btn-confirm { background: #15803d; color: #fff; border: 1px solid #15803d; font-weight: 700; }
+.btn-asis:hover:not(:disabled), .asis-grid .btn-confirm:hover:not(:disabled) { background: #166534; border-color: #166534; color: #fff; }
+.asis-grid .btn-confirm:disabled { opacity: 0.7; cursor: default; }
+.btn-ver.btn-asis { border: none; }

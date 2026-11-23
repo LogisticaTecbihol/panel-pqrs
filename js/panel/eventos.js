@@ -252,7 +252,7 @@
         '<td>' + badge(ESTADO_T[e.estado] || e.estado, ESTADO_COLOR[e.estado] || '#718096') + '</td>' +
         '<td>' + atencionHtml(e) + '</td>' +
         '<td><div class="mk-actions"><button class="btn-ver btn-pdf" data-act="evento-pdf" data-id="' + esc(e.id) + '" title="Ver todas las especificaciones de la solicitud en PDF" aria-label="Ver PDF de ' + esc(refEv(e)) + '">📄 PDF</button>' +
-        (EVENTO_ASISTENTES.disponible(e) ? '<button class="btn-ver" data-act="evento-asistentes" data-id="' + esc(e.id) + '" title="Registro de asistentes: digita la planilla de asistencia del evento" aria-label="Asistentes de ' + esc(refEv(e)) + (asisConteo[e.id] ? ' (' + asisConteo[e.id] + ' registrados)' : '') + '">👥 Asistentes' + (asisConteo[e.id] ? ' · ' + esc(asisConteo[e.id]) : '') + '</button>' : '') +
+        (EVENTO_ASISTENTES.disponible(e) ? '<button class="btn-ver btn-asis" data-act="evento-asistentes" data-id="' + esc(e.id) + '" title="Registro de asistentes: digita la planilla de asistencia del evento" aria-label="Asistentes de ' + esc(refEv(e)) + (asisConteo[e.id] ? ' (' + asisConteo[e.id] + ' registrados)' : '') + '">👥 Asistentes' + (asisConteo[e.id] ? ' · ' + esc(asisConteo[e.id]) : '') + '</button>' : '') +
         (mideImpacto(e) ? '<button class="btn-ver" data-act="evento-impacto" data-id="' + esc(e.id) + '" title="Cruza el evento con las ventas de Pedidos: antes y después, contra el resto de la empresa" aria-label="Ver el impacto en ventas de ' + esc(refEv(e)) + '">📈 Ventas</button>' : '') +
         '<button class="btn-ver" data-act="evento-abrir" data-id="' + esc(e.id) + '">' + (esFinal(e) ? 'Ver' : 'Abrir') + '</button></div></td>' +
         '</tr>';
