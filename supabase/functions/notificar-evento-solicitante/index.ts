@@ -13,7 +13,8 @@
 //                "Rechazada" para que el solicitante la corrija y la reenvíe
 //   respuesta -> Mercadeo escribió una respuesta al solicitante
 //
-// Permiso: sesión válida y módulo 'mercadeo' (user_has_module_pqrs; admin siempre).
+// Permiso: sesión válida y poder GESTIONAR Mercadeo (user_can_manage_mercadeo, migración 0043: admin, o módulo
+// 'mercadeo' con un rol distinto de 'lector'; un lector solo consulta, así que no puede avisar a nadie).
 // Secretos: PEDIDOS_BRIDGE_SECRET (ya existe). Opcional: PEDIDOS_EVENTO_AVISO_URL (por defecto, la
 // función de pedidos de producción). Desplegar con verify_jwt = true.
 
@@ -60,9 +61,9 @@ serve(async (req) => {
     const { data: { user } } = await supabaseUser.auth.getUser()
     if (!user) throw new Rechazo('No autenticado', 401)
 
-    const mod = await supabaseUser.rpc('user_has_module_pqrs', { p_modulo: 'mercadeo' })
+    const mod = await supabaseUser.rpc('user_can_manage_mercadeo')
     if (mod.error) throw mod.error
-    if (mod.data !== true) throw new Rechazo('Sin acceso al módulo Mercadeo', 403)
+    if (mod.data !== true) throw new Rechazo('Sin permiso para gestionar Mercadeo', 403)
 
     const body = await req.json()
     const eventoId = Number(body?.evento_id)

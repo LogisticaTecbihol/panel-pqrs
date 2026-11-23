@@ -270,6 +270,8 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, select:focus-vi
 .mk-pill.over { background: #fee2e2; color: #991b1b; } .mk-pill.none { background: #e2e8f0; color: #4a5568; }
 .mk-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.74rem; font-weight: 700; color: #fff; }
 .mk-flag { background: #fef3c7; color: #92400e; border-radius: 6px; padding: 6px 10px; font-size: 0.8rem; margin-bottom: 10px; }
+/* Aviso fijo de las páginas de Mercadeo para quien solo puede consultar (js/shared/solo-lectura.js). */
+.mk-lectura-banner { background: #ebf5fb; border: 1px solid #aed6f1; color: #1a5276; border-radius: 8px; padding: 8px 12px; font-size: 0.82rem; margin-bottom: 12px; }
 .mk-mini { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
 .mk-mini th { background: #f7fafc; padding: 6px 8px; text-align: left; font-size: 0.72rem; color: #4a5568; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
 .mk-mini td { padding: 6px 8px; border-bottom: 1px solid #edf2f7; }

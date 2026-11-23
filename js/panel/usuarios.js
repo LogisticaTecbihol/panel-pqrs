@@ -178,7 +178,10 @@
     if (rol !== 'admin') {
       // Lo que el rol trae por sí solo ya va en su 'acceso' (PQRS gestionar / solo lectura).
       MODULOS.forEach(function (m) {
-        if (m.porRol.indexOf(rol) < 0 && tieneModulo(rol, mods, m.key)) lista.push(m.acceso);
+        if (m.porRol.indexOf(rol) < 0 && tieneModulo(rol, mods, m.key)) {
+          // Mercadeo con rol Lector es solo lectura (migración 0043).
+          lista.push(m.key === 'mercadeo' && rol === 'lector' ? m.acceso + ' (solo lectura)' : m.acceso);
+        }
       });
     }
     return lista;
@@ -205,6 +208,9 @@
         : '<div class="us-nota">Sin cambios.</div>');
     html += '<div class="us-res-tit" style="margin-top:8px">Tendrá acceso a</div><ul>' +
       accesosDe(p.rol, p.modulos).map(function (a) { return '<li>' + escHtml(a) + '</li>'; }).join('') + '</ul>';
+    if (p.rol === 'lector' && p.modulos.indexOf('mercadeo') >= 0) {
+      html += '<div class="us-nota" style="margin-top:8px">Un Lector con Mercadeo solo consulta: no crea ni modifica nada, y no aparece como integrante del equipo en los filtros, la leyenda de color ni los Indicadores. Para que gestione, cámbialo a Gestor o Mercadeo.</div>';
+    }
     if (p.rol === 'admin' && u.rol !== 'admin') {
       html += '<div class="us-alerta">Un administrador tiene acceso total, incluida la gestión de usuarios.</div>';
     } else if (u.rol === 'admin' && p.rol !== 'admin') {

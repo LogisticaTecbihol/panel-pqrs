@@ -10,6 +10,7 @@
 // migración 0028). Cada página declara su módulo con
 // <body data-modulo="..."> y los enlaces/tarjetas con data-modulo se ocultan
 // si el usuario no lo tiene. La seguridad real es la RLS; esto es solo UX.
+// Mercadeo distingue ver de gestionar: un 'lector' con el módulo solo consulta (canManageMercadeo / soloLecturaMercadeo).
 var AUTH = (function () {
   var _user = null;
   var _profile = null;
@@ -323,6 +324,15 @@ var AUTH = (function () {
   // (mercadeo, sst) es solo lectura.
   function canEdit() { return !!_profile && (_profile.rol === 'admin' || _profile.rol === 'gestor'); }
   function isAdmin() { return !!_profile && _profile.rol === 'admin'; }
+
+  // Mercadeo (migración 0043): GESTIONAR (crear, mover, editar, borrar) = admin, o módulo 'mercadeo' con un rol distinto
+  // de 'lector'; igual que user_can_manage_mercadeo() en la BD. Un lector con el módulo ve todo Mercadeo pero no escribe
+  // (ver js/shared/solo-lectura.js) y tampoco figura en el directorio del equipo (list_equipo_mercadeo()).
+  function canManageMercadeo() {
+    if (!_profile) return false;
+    return _profile.rol === 'admin' || (hasModule('mercadeo') && _profile.rol !== 'lector');
+  }
+  function soloLecturaMercadeo() { return hasModule('mercadeo') && !canManageMercadeo(); }
   function canManageUsers() { return isAdmin(); }
   function getProfile() { return _profile; }
   function getUser() { return _user; }
@@ -343,6 +353,8 @@ var AUTH = (function () {
     logout: logout,
     canEdit: canEdit,
     isAdmin: isAdmin,
+    canManageMercadeo: canManageMercadeo,
+    soloLecturaMercadeo: soloLecturaMercadeo,
     canManageUsers: canManageUsers,
     hasModule: hasModule,
     getProfile: getProfile,

@@ -53,7 +53,8 @@ Panel interno del holding con dos áreas:
 - Roles del equipo interno: `admin` (todo, incluida gestión de usuarios),
   `gestor` (gestiona PQRS: estado, asignación, notas, adjuntos), `lector`
   (solo lectura), `mercadeo` (equipo de Mercadeo: Tablero y CRM, sin acceso a PQRS salvo que un admin le
-  asigne el módulo `pqrs`, que es de solo lectura).
+  asigne el módulo `pqrs`, que es de solo lectura). Un `lector` con el módulo `mercadeo` ve Mercadeo pero no gestiona
+  ni figura en el equipo (ver «Acceso de solo lectura a Mercadeo», migración 0043).
 - Permisos por módulo: `usuarios_pqrs.modulos` (`'pqrs'`, `'mercadeo'`, `'sst'`, `'encuestas'`); el rol
   `mercadeo` siempre lleva el suyo (CHECK), igual que `sst`. Un gestor/lector puede recibir un módulo sin
   cambiar de rol. `AUTH.hasModule(key)`; cada página declara su módulo con
@@ -201,6 +202,34 @@ Migraciones 0012–0014 (aplicadas con `apply_migration`; el MCP no las aplica c
 - **0014 Tablero**: `mercadeo_tareas`, `_tarea_bitacora` (eventos de sistema por trigger, no
   falsificables; el cliente solo inserta comentarios), `_tarea_adjuntos`, bucket privado
   `mercadeo-adjuntos`, Realtime sobre `mercadeo_tareas`.
+
+### Acceso de solo lectura a Mercadeo (migración 0043, aplicada el 2026-11-23)
+
+Antes, el módulo `mercadeo` daba lectura Y escritura a cualquiera que lo tuviera (todas las policies usaban `user_has_module_pqrs('mercadeo')`).
+Ahora se distingue **ver** de **gestionar**, con el mismo criterio que en PQRS («lector = solo lectura»), sin clave de módulo ni rol nuevos:
+
+- **Ve todo Mercadeo** (Tablero, CRM, Eventos, Indicadores, adjuntos, bitácoras, asistentes): `user_has_module_pqrs('mercadeo')`, sin cambios.
+- **Gestiona** (crear, mover, editar, borrar, subir, comentar, cambiar estados): `user_can_manage_mercadeo()` = admin, o módulo `mercadeo` con un rol
+  **distinto de `lector`**. Los roles `mercadeo`, `gestor` y `sst` con el módulo siguen igual. Todas las policies de INSERT/UPDATE/DELETE de las tablas
+  `mercadeo_*` y las de INSERT/DELETE del bucket `mercadeo-adjuntos` usan esa función. Las seis tablas del CRM que tenían una sola policy `FOR ALL`
+  (`_actividades`, `_comerciales`, `_leads`, `_leads_seguimiento`, `_presupuesto`, `_presupuesto_gastos`) ahora tienen `_select` / `_insert` / `_update` / `_delete`.
+- **No es parte del equipo**: `list_equipo_mercadeo()` excluye a los `lector`. Un lector no sale en el filtro de responsable, la leyenda de color, la
+  «Carga por responsable» de los Indicadores, los selectores de «asignar a» ni el checklist de eventos. Si alguien con tareas asignadas pasa a Lector, sus tareas
+  viejas mostrarán «Usuario inactivo» (no hay hoy ningún caso).
+- **No cambia**: la campanita (los triggers de aviso siguen llegando a quien tenga el módulo, lector incluido), `mercadeo_responsable_eventos()` (Laura) ni
+  `impacto-evento` (solo consulta; la usa también el lector).
+- **Edge Functions** `notificar-solicitante` y `notificar-evento-solicitante` (v2): exigen `user_can_manage_mercadeo()` en vez del módulo; un lector no puede avisar al solicitante.
+- **Interfaz** (`js/shared/solo-lectura.js`, cargado después de `auth.js` en `mercadeo.html`, `crm.html`, `eventos.html` e `indicadores.html`; `AUTH.canManageMercadeo()` /
+  `AUTH.soloLecturaMercadeo()`): aviso azul «Acceso de solo lectura», clase `mk-solo-lectura` en `<body>`, y se oculta todo `[data-act]` que NO esté en la lista blanca de
+  acciones de consulta de esa página (objeto `SEGURAS`; **al agregar un botón de consulta nuevo hay que sumarlo ahí**, uno de escritura queda oculto solo). Los campos de los
+  modales (`.overlay`) se deshabilitan con un `MutationObserver` (los de subida de archivos se ocultan; un campo que deba seguir activo lleva `data-lectura`, p. ej. `#asis-buscar`) y
+  las tarjetas del Tablero no se arrastran. `eventos-asistentes.js` oculta el formulario y avisa que el acceso es de solo lectura. La RLS es la seguridad real; esto es solo UX.
+- **Usuarios**: el resumen del modal Editar dice «… (solo lectura)» y explica la regla cuando el rol es Lector con Mercadeo. Para que alguien gestione basta cambiarlo a Gestor o Mercadeo.
+- Hoy: **Evelyn Jimenez** (`rol = 'lector'`, `modulos = ['mercadeo']`) es la única con este perfil.
+- Probado en SQL en una transacción revertida con la sesión simulada de Evelyn, Laura (gestor), Diana (rol mercadeo), Admin y un usuario SST sin el módulo: Evelyn lee 44 tareas
+  y 10 eventos pero INSERT → 42501, UPDATE/DELETE → 0 filas y Storage → 42501; Laura, Diana y Admin escriben igual que antes; SST no ve nada; el directorio no incluye a Evelyn. La interfaz con un
+  arnés de navegador y un Supabase simulado (Tablero con modal, Eventos con sus 7 pasos y asistentes, CRM en sus cuatro pestañas, Indicadores; y Laura sin cambios). **No probado con la
+  sesión real de Evelyn**, ni el flujo de subir archivos de un gestor tras el cambio de policies de Storage.
 
 ### Solicitudes desde panel-pedidos (migración 0019)
 

@@ -20,7 +20,10 @@ var EVENTO_ASISTENTES = (function () {
   function $(id) { return document.getElementById(id); }
   function esc(v) { return escHtml(v === null || v === undefined ? '' : String(v)); }
   function limpio(s) { return String(s === null || s === undefined ? '' : s).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim(); }
-  function editable() { return !!st && ESTADOS.indexOf(st.evento.estado) >= 0; }
+  // Un lector con el módulo Mercadeo (migración 0043) consulta y descarga, pero no digita: la BD tampoco lo deja escribir.
+  function soloLectura() { return typeof AUTH !== 'undefined' && !!AUTH.soloLecturaMercadeo && AUTH.soloLecturaMercadeo(); }
+  function enEstadoEditable() { return !!st && ESTADOS.indexOf(st.evento.estado) >= 0; }
+  function editable() { return enEstadoEditable() && !soloLectura(); }
   function fmtHa(v) { return Number(v).toLocaleString('es-CO', { maximumFractionDigits: 2 }); }
   function siNo(v) { return v === true ? 'Sí' : v === false ? 'No' : '—'; }
   function celda(v) { return v ? esc(v) : '<span class="mk-sin">—</span>'; }
@@ -92,6 +95,8 @@ var EVENTO_ASISTENTES = (function () {
     if (st.error) {
       html = '<div class="mk-flag">No se pudieron cargar los asistentes: ' + esc(st.error) +
         ' <button type="button" class="btn-secondary" data-aa="reintentar">Reintentar</button></div>';
+    } else if (enEstadoEditable() && !editable()) {
+      html = '<div class="mk-flag">Tu acceso a Mercadeo es de solo lectura: puedes consultar y descargar la lista, no modificarla.</div>';
     } else if (!editable()) {
       var t = (typeof EVENTO_PDF !== 'undefined' && EVENTO_PDF.ESTADO_T[e.estado]) || e.estado;
       html = '<div class="mk-flag">' + (e.estado === 'cerrada'
@@ -142,7 +147,8 @@ var EVENTO_ASISTENTES = (function () {
     $('asis-ct').textContent = st.filas.length ? '(' + lista.length + (lista.length !== st.filas.length ? ' de ' + st.filas.length : '') + ')' : '';
     if (!lista.length) {
       body.innerHTML = '<tr><td colspan="10" class="empty">' + (st.filas.length ? 'Nadie coincide con la búsqueda.'
-        : edit ? 'Aún no hay asistentes registrados. Digita la planilla de asistencia con el formulario de arriba.' : 'No se registraron asistentes en este evento.') + '</td></tr>';
+        : edit ? 'Aún no hay asistentes registrados. Digita la planilla de asistencia con el formulario de arriba.'
+          : enEstadoEditable() ? 'Aún no hay asistentes registrados.' : 'No se registraron asistentes en este evento.') + '</td></tr>';
       return;
     }
     body.innerHTML = lista.map(function (x) {
