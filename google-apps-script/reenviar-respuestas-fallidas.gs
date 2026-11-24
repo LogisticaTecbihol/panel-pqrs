@@ -50,6 +50,12 @@ function procesarRespuestasFallidas(enviar) {
     var esEncuesta = getRespuestaExacta(items, QUESTION_TITLES.branch) === QUESTION_TITLES.branchEncuesta;
     var payload = esEncuesta ? construirPayloadEncuesta(items) : construirPayloadPqrs(items);
 
+    if (esEncuesta) {
+      // La encuesta no genera aviso por correo ni folio: se guarda con la fecha REAL en que la
+      // respondio el cliente. Con la fecha de hoy quedaria en el mes equivocado de los Indicadores.
+      payload.creado_en = Utilities.formatDate(r.getTimestamp(), 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'");
+    }
+
     if (!esEncuesta) {
       // El panel la registra hoy como una solicitud nueva (así llega el aviso por correo
       // al equipo); la nota deja constancia de cuándo la envió realmente el cliente.
@@ -62,6 +68,26 @@ function procesarRespuestasFallidas(enviar) {
     }
 
     Logger.log('- ' + cuando + ' | ' + (esEncuesta ? 'ENCUESTA' : 'PQRS'));
+    if (esEncuesta) {
+      // Lo mismo que valida el panel: si algo sale vacio o fuera de 1-5, la funcion respondio 400 y la
+      // encuesta se perdio. Casi siempre es porque el texto de la pregunta en el Form ya no coincide
+      // con QUESTION_TITLES (ingest-template.gs).
+      var CAMPOS_ENCUESTA = ['calificacion_calidad_producto', 'calificacion_atencion_asesor_tecnico',
+        'calificacion_atencion_servicio_logistica', 'calificacion_tiempos_respuesta',
+        'calificacion_relacion_calidad_precio', 'calificacion_satisfaccion_general'];
+      var problemas = [];
+      if (!payload.municipio) problemas.push('municipio');
+      CAMPOS_ENCUESTA.forEach(function (k) {
+        var v = payload[k];
+        if (typeof v !== 'number' || v < 1 || v > 5) problemas.push(k);
+      });
+      Logger.log('    municipio: "' + payload.municipio + '"  canal: "' + payload.canal_adquisicion + '"');
+      Logger.log('    calificaciones: ' + CAMPOS_ENCUESTA.map(function (k) { return payload[k]; }).join(', '));
+      if (problemas.length) {
+        Logger.log('    <-- AVISO: el panel la RECHAZARIA. No se leyo o no es 1-5: ' + problemas.join(', ') +
+          '. Compara el texto de esa pregunta en el Form con QUESTION_TITLES.');
+      }
+    }
     if (!esEncuesta) {
       var tipoRaw = getRespuestaExacta(items, QUESTION_TITLES.tipoSolicitud);
       var areaRaw = getRespuestaExacta(items, QUESTION_TITLES.areaRelacionada);
