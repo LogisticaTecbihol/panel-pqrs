@@ -347,6 +347,14 @@ body.kb-page #main { max-width: 2200px; }
 .kb-card.um { overflow: hidden; }
 .kb-franja { display: flex; height: 6px; margin: -10px -12px 8px; }
 .kb-franja i { flex: 1; background: var(--uc); }
+/* Subgrupos por responsable dentro de cada columna. La cabecera se queda pegada arriba mientras se recorre su grupo (fondo opaco). */
+.kb-grupo { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+.kb-grupo + .kb-grupo { margin-top: 6px; }
+.kb-grupo-head { position: sticky; top: -8px; z-index: 1; display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 7px; background: var(--ut, #d3dce8); border: 1px solid var(--ub, #b8c4d4); color: #2d3748; font-size: 0.78rem; font-weight: 700; }
+.kb-grupo-head .kb-avatars { flex: none; padding-left: 6px; }
+.kb-grupo-head .kb-av { width: 22px; height: 22px; font-size: 0.6rem; }
+.kb-grupo-n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kb-grupo.sin .kb-grupo-head { background: #eef1f5; border-style: dashed; color: #718096; }
 /* Leyenda de colores (chips que filtran por responsable) */
 .kb-ley { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 10px; }
 .kb-ley:empty { display: none; }
@@ -449,6 +457,8 @@ textarea.ef { resize: vertical; min-height: 80px; }
    Se conservan los avisos que importan (🔥 urgente y ⏱ sin confirmar / vencidos); el resto de chips se ven al abrir la tarjeta. */
 .kb-compacto .kb-list { padding: 6px; gap: 6px; }
 .kb-compacto .kb-card, .kb-compacto .kb-ev { padding: 6px 10px; font-size: 0.8rem; }
+.kb-compacto .kb-grupo { gap: 6px; }
+.kb-compacto .kb-grupo-head { top: -6px; padding: 3px 8px; font-size: 0.74rem; }   /* -6px = el padding de .kb-list en compacta */
 .kb-compacto .kb-card-top { margin-bottom: 4px; }
 .kb-compacto .kb-card-top .kb-chip:not(.urg):not(.warn) { display: none; }
 .kb-compacto .kb-card-top:not(:has(.urg, .warn)) { display: none; }

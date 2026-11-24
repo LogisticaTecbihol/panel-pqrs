@@ -23,6 +23,8 @@
 // Indicadores; el clic abre la solicitud en Eventos, donde se revisa, aprueba o rechaza (ese flujo no cambia). Al aprobarse,
 // el trigger de la BD crea la tarea real en «Recibido» y la tarjeta provisional desaparece sola (Realtime sobre mercadeo_eventos).
 //
+// Agrupación: dentro de cada columna las tareas se agrupan por responsable (cabecera por persona; varios responsables = un grupo propio).
+//
 // Disposición: vista compacta (clase kb-compacto en el tablero) y columna «Por aprobar» plegable; las dos preferencias se guardan en
 // localStorage del navegador. Las columnas son fluidas y las tarjetas no se encogen (ver «Disposición del Tablero» en CLAUDE.md).
 (async function () {
@@ -321,6 +323,42 @@
       '</div>';
   }
 
+  // ── Agrupar por responsable (dentro de cada columna) ──
+  // Cada columna se divide en subgrupos con una cabecera por responsable. Una tarea con VARIOS responsables va en UN solo
+  // grupo (el de ese conjunto de personas, p. ej. «Ana, Luis»), no repetida en cada uno: así los conteos suman, y arrastrar
+  // o mover sigue operando sobre una única tarjeta. Los grupos van en orden alfabético y «Sin responsable» al final; dentro
+  // de cada grupo se conserva la cola por regla de `comparar` (urgente, clase, fecha límite, antigüedad).
+  function agruparPorResponsable(ts) {
+    var mapa = {}, grupos = [];
+    ts.forEach(function (t) {
+      var gente = (t.responsables || []).map(function (id) {
+        var u = equipo.filter(function (x) { return x.id === id; })[0];
+        return { id: id, nombre: u ? u.nombre : 'Usuario inactivo', activo: !!(u && u.activo) };
+      }).sort(function (a, b) { return a.nombre.localeCompare(b.nombre, 'es') || (a.id < b.id ? -1 : 1); });
+      var k = gente.map(function (p) { return p.id; }).join('+');
+      if (!mapa[k]) { mapa[k] = { gente: gente, nombres: gente.map(function (p) { return p.nombre; }).join(', '), tareas: [] }; grupos.push(mapa[k]); }
+      mapa[k].tareas.push(t);
+    });
+    return grupos.sort(function (a, b) {
+      if (!a.gente.length || !b.gente.length) return a.gente.length ? -1 : b.gente.length ? 1 : 0;
+      return a.nombres.localeCompare(b.nombres, 'es');
+    });
+  }
+
+  function grupoHtml(g, idxCol) {
+    var sin = !g.gente.length, n = g.tareas.length;
+    var nombres = sin ? 'Sin responsable' : g.nombres;
+    // Un solo responsable con color: la cabecera se tiñe de su color (mismo criterio que la tarjeta); varios o ninguno: neutra.
+    var estilo = g.gente.length === 1 && EQUIPO_COLOR.tiene(g.gente[0].id) ? ' style="' + EQUIPO_COLOR.estilo(g.gente[0].id) + '"' : '';
+    var avs = sin ? '<span class="kb-av inactivo" aria-hidden="true">–</span>' : g.gente.map(function (p) {
+      return '<span class="kb-av' + (p.activo ? '' : ' inactivo') + '" style="' + EQUIPO_COLOR.estilo(p.id) + '" aria-hidden="true">' + esc(iniciales(p.nombre)) + '</span>';
+    }).join('');
+    return '<div class="kb-grupo' + (sin ? ' sin' : '') + '" role="group" aria-label="' + esc(nombres) + ': ' + n + (n === 1 ? ' tarea' : ' tareas') + '">' +
+      '<div class="kb-grupo-head"' + estilo + ' title="' + esc(nombres) + '"><span class="kb-avatars">' + avs + '</span>' +
+      '<span class="kb-grupo-n">' + esc(nombres) + '</span><span class="kb-count">' + n + '</span></div>' +
+      g.tareas.map(function (t) { return tarjetaHtml(t, idxCol); }).join('') + '</div>';
+  }
+
   // Leyenda de colores: un chip por persona activa; al hacer clic filtra por ese responsable (el mismo filtro "Responsable").
   function renderLeyenda() {
     var activos = equipo.filter(function (u) { return u.activo; });
@@ -344,7 +382,7 @@
       return '<section class="kb-col" data-estado="' + c.k + '" aria-label="' + esc(c.t) + ': ' + ts.length + ' tareas">' +
         '<div class="kb-col-head"><span>' + esc(c.t) + '</span><span class="kb-count">' + ts.length + '</span></div>' +
         '<div class="kb-list" data-estado="' + c.k + '" role="list">' +
-        (ts.length ? ts.map(function (t) { return tarjetaHtml(t, idx); }).join('') : '<div class="kb-vacio">Sin tareas</div>') +
+        (ts.length ? agruparPorResponsable(ts).map(function (g) { return grupoHtml(g, idx); }).join('') : '<div class="kb-vacio">Sin tareas</div>') +
         '</div></section>';
     }).join('');
     renderCanceladas(lista);
