@@ -24,7 +24,7 @@
 // el trigger de la BD crea la tarea real en «Recibido» y la tarjeta provisional desaparece sola (Realtime sobre mercadeo_eventos).
 //
 // Agrupación: dentro de cada columna las tareas se agrupan por responsable (cabecera por persona; varios responsables = un grupo propio).
-// La cabecera de cada grupo contrae/despliega sus tarjetas (preferencia por navegador en localStorage).
+// La cabecera de cada grupo despliega/contrae sus tarjetas; POR DEFECTO todos los grupos están contraídos y lo que se abre se recuerda por navegador (localStorage).
 //
 // Disposición: vista compacta (clase kb-compacto en el tablero) y columna «Por aprobar» plegable; las dos preferencias se guardan en
 // localStorage del navegador. Las columnas son fluidas y las tarjetas no se encogen (ver «Disposición del Tablero» en CLAUDE.md).
@@ -207,15 +207,22 @@
   function prefGuardar(k, v) { try { localStorage.setItem(k, v ? '1' : '0'); } catch (e) { /* sin almacenamiento */ } }
   var vistaCompacta = prefLeer(PREF_COMPACTA);
   var porAprobarPlegada = prefLeer(PREF_PLEGADA);
-  // Grupos de responsable contraídos: claves '<estado>|<ids de los responsables>' (ver claveGrupo). Persisten en este navegador.
-  var PREF_GRUPOS = 'mk_tablero_grupos_plegados';
+  // Grupos de responsable DESPLEGADOS: claves '<estado>|<ids de los responsables>' (ver claveGrupo). Por defecto todo grupo está contraído, así que
+  // lo que se recuerda es lo que la persona abrió. Persiste en este navegador. (La clave anterior, 'mk_tablero_grupos_plegados', guardaba lo
+  // contrario —lo contraído, con todo desplegado por defecto— y ya no se lee.)
+  var PREF_GRUPOS = 'mk_tablero_grupos_abiertos';
   function gruposLeer() {
     var o = {};
     try { var a = JSON.parse(localStorage.getItem(PREF_GRUPOS) || '[]'); (Array.isArray(a) ? a : []).forEach(function (k) { if (typeof k === 'string') o[k] = true; }); } catch (e) { /* sin almacenamiento */ }
     return o;
   }
-  function gruposGuardar() { try { localStorage.setItem(PREF_GRUPOS, JSON.stringify(Object.keys(gruposPlegados))); } catch (e) { /* sin almacenamiento */ } }
-  var gruposPlegados = gruposLeer();
+  function gruposGuardar() { try { localStorage.setItem(PREF_GRUPOS, JSON.stringify(Object.keys(gruposAbiertos))); } catch (e) { /* sin almacenamiento */ } }
+  var gruposAbiertos = gruposLeer();
+  // Despliega el grupo donde cae una tarea (la que se acaba de mover, crear o editar): quien actúa tiene que verla llegar.
+  function abrirGrupo(estado, responsables) {
+    var k = estado + '|' + claveGrupo(personasDe({ responsables: responsables }));
+    if (!gruposAbiertos[k]) { gruposAbiertos[k] = true; gruposGuardar(); }
+  }
 
   // La vista compacta es una clase del tablero (no reconstruye las columnas, así que no mueve el scroll de ninguna).
   function aplicarVistaCompacta() {
@@ -369,7 +376,7 @@
       return '<span class="kb-av' + (p.activo ? '' : ' inactivo') + '" style="' + EQUIPO_COLOR.estilo(p.id) + '" aria-hidden="true">' + esc(iniciales(p.nombre)) + '</span>';
     }).join('');
     // La cabecera es un botón: contrae o despliega las tarjetas de ESE responsable en ESA columna (se recuerda por navegador).
-    var plegado = !!gruposPlegados[COLUMNAS[idxCol].k + '|' + g.clave];
+    var plegado = !gruposAbiertos[COLUMNAS[idxCol].k + '|' + g.clave];
     return '<div class="kb-grupo' + (sin ? ' sin' : '') + (plegado ? ' plegado' : '') + '" role="group" aria-label="' + esc(nombres) + ': ' + n + (n === 1 ? ' tarea' : ' tareas') + '">' +
       '<button type="button" class="kb-grupo-head"' + estilo + ' data-act="grupo-plegar" data-id="' + esc(COLUMNAS[idxCol].k + '|' + g.clave) + '" aria-expanded="' + !plegado +
       '" title="' + esc(nombres) + ' — clic para contraer o desplegar sus tareas"><span class="kb-grupo-chev" aria-hidden="true">▾</span><span class="kb-avatars">' + avs + '</span>' +
@@ -454,9 +461,7 @@
       return;
     }
     var previo = t.estado;
-    // Si el grupo de destino estaba contraído, se despliega: quien mueve la tarjeta tiene que verla llegar.
-    var kDestino = estado + '|' + claveGrupo(personasDe(t));
-    if (gruposPlegados[kDestino]) { delete gruposPlegados[kDestino]; gruposGuardar(); }
+    abrirGrupo(estado, t.responsables);     // el grupo de destino se despliega: quien mueve la tarjeta tiene que verla llegar
     t.estado = estado; render();            // optimista
     var res = await _sb.from('mercadeo_tareas').update({ estado: estado }).eq('id', Number(id)).select('id');
     if (res.error || !res.data || !res.data.length) {
@@ -694,6 +699,7 @@
     if (res.error) { fail('guardar la tarea', res.error); return; }
     if (!editId) await subirArchivos(nuevoId, $('t-files-nuevo').files);
     showToast(editId ? '✅ Tarea actualizada' : '✅ Tarea creada');
+    abrirGrupo(editId ? d.estado : 'solicitada', d.responsables);   // con los grupos contraídos por defecto, la tarea guardada debe quedar a la vista (antes de MODAL.close, que borra editId)
     // Si cambió el estado de una solicitud de Pedidos, se avisa al solicitante (se captura antes de cerrar el modal).
     var avisoEstado = editId && diff && diff.estado ? { id: editId, origen: orig ? orig.origen : null } : null;
     MODAL.close('tarea-overlay');
@@ -860,12 +866,12 @@
     },
     // Se cambia solo ese grupo (clase + aria-expanded), sin render(): las columnas conservan su scroll y el foco se queda en el botón.
     'grupo-plegar': function (clave, el) {
-      var plegar = !gruposPlegados[clave];
-      if (plegar) gruposPlegados[clave] = true; else delete gruposPlegados[clave];
+      var abrir = !gruposAbiertos[clave];
+      if (abrir) gruposAbiertos[clave] = true; else delete gruposAbiertos[clave];
       gruposGuardar();
       var g = el.closest('.kb-grupo');
-      if (g) g.classList.toggle('plegado', plegar);
-      el.setAttribute('aria-expanded', String(!plegar));
+      if (g) g.classList.toggle('plegado', !abrir);
+      el.setAttribute('aria-expanded', String(abrir));
     },
     'tarea-abrir': function (id) { abrirTarea(Number(id)); },
     // PDF con todas las especificaciones de la solicitud del evento (el mismo del módulo Eventos; js/panel/eventos-pdf.js).
