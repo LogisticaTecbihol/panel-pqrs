@@ -24,6 +24,7 @@
 // el trigger de la BD crea la tarea real en «Recibido» y la tarjeta provisional desaparece sola (Realtime sobre mercadeo_eventos).
 //
 // Agrupación: dentro de cada columna las tareas se agrupan por responsable (cabecera por persona; varios responsables = un grupo propio).
+// La cabecera de cada grupo contrae/despliega sus tarjetas (preferencia por navegador en localStorage).
 //
 // Disposición: vista compacta (clase kb-compacto en el tablero) y columna «Por aprobar» plegable; las dos preferencias se guardan en
 // localStorage del navegador. Las columnas son fluidas y las tarjetas no se encogen (ver «Disposición del Tablero» en CLAUDE.md).
@@ -206,6 +207,15 @@
   function prefGuardar(k, v) { try { localStorage.setItem(k, v ? '1' : '0'); } catch (e) { /* sin almacenamiento */ } }
   var vistaCompacta = prefLeer(PREF_COMPACTA);
   var porAprobarPlegada = prefLeer(PREF_PLEGADA);
+  // Grupos de responsable contraídos: claves '<estado>|<ids de los responsables>' (ver claveGrupo). Persisten en este navegador.
+  var PREF_GRUPOS = 'mk_tablero_grupos_plegados';
+  function gruposLeer() {
+    var o = {};
+    try { var a = JSON.parse(localStorage.getItem(PREF_GRUPOS) || '[]'); (Array.isArray(a) ? a : []).forEach(function (k) { if (typeof k === 'string') o[k] = true; }); } catch (e) { /* sin almacenamiento */ }
+    return o;
+  }
+  function gruposGuardar() { try { localStorage.setItem(PREF_GRUPOS, JSON.stringify(Object.keys(gruposPlegados))); } catch (e) { /* sin almacenamiento */ } }
+  var gruposPlegados = gruposLeer();
 
   // La vista compacta es una clase del tablero (no reconstruye las columnas, así que no mueve el scroll de ninguna).
   function aplicarVistaCompacta() {
@@ -328,15 +338,20 @@
   // grupo (el de ese conjunto de personas, p. ej. «Ana, Luis»), no repetida en cada uno: así los conteos suman, y arrastrar
   // o mover sigue operando sobre una única tarjeta. Los grupos van en orden alfabético y «Sin responsable» al final; dentro
   // de cada grupo se conserva la cola por regla de `comparar` (urgente, clase, fecha límite, antigüedad).
+  // Personas de una tarea, ordenadas por nombre; su unión de ids es la clave del grupo ('' = sin responsable).
+  function personasDe(t) {
+    return (t.responsables || []).map(function (id) {
+      var u = equipo.filter(function (x) { return x.id === id; })[0];
+      return { id: id, nombre: u ? u.nombre : 'Usuario inactivo', activo: !!(u && u.activo) };
+    }).sort(function (a, b) { return a.nombre.localeCompare(b.nombre, 'es') || (a.id < b.id ? -1 : 1); });
+  }
+  function claveGrupo(gente) { return gente.map(function (p) { return p.id; }).join('+'); }
+
   function agruparPorResponsable(ts) {
     var mapa = {}, grupos = [];
     ts.forEach(function (t) {
-      var gente = (t.responsables || []).map(function (id) {
-        var u = equipo.filter(function (x) { return x.id === id; })[0];
-        return { id: id, nombre: u ? u.nombre : 'Usuario inactivo', activo: !!(u && u.activo) };
-      }).sort(function (a, b) { return a.nombre.localeCompare(b.nombre, 'es') || (a.id < b.id ? -1 : 1); });
-      var k = gente.map(function (p) { return p.id; }).join('+');
-      if (!mapa[k]) { mapa[k] = { gente: gente, nombres: gente.map(function (p) { return p.nombre; }).join(', '), tareas: [] }; grupos.push(mapa[k]); }
+      var gente = personasDe(t), k = claveGrupo(gente);
+      if (!mapa[k]) { mapa[k] = { clave: k, gente: gente, nombres: gente.map(function (p) { return p.nombre; }).join(', '), tareas: [] }; grupos.push(mapa[k]); }
       mapa[k].tareas.push(t);
     });
     return grupos.sort(function (a, b) {
@@ -353,9 +368,12 @@
     var avs = sin ? '<span class="kb-av inactivo" aria-hidden="true">–</span>' : g.gente.map(function (p) {
       return '<span class="kb-av' + (p.activo ? '' : ' inactivo') + '" style="' + EQUIPO_COLOR.estilo(p.id) + '" aria-hidden="true">' + esc(iniciales(p.nombre)) + '</span>';
     }).join('');
-    return '<div class="kb-grupo' + (sin ? ' sin' : '') + '" role="group" aria-label="' + esc(nombres) + ': ' + n + (n === 1 ? ' tarea' : ' tareas') + '">' +
-      '<div class="kb-grupo-head"' + estilo + ' title="' + esc(nombres) + '"><span class="kb-avatars">' + avs + '</span>' +
-      '<span class="kb-grupo-n">' + esc(nombres) + '</span><span class="kb-count">' + n + '</span></div>' +
+    // La cabecera es un botón: contrae o despliega las tarjetas de ESE responsable en ESA columna (se recuerda por navegador).
+    var plegado = !!gruposPlegados[COLUMNAS[idxCol].k + '|' + g.clave];
+    return '<div class="kb-grupo' + (sin ? ' sin' : '') + (plegado ? ' plegado' : '') + '" role="group" aria-label="' + esc(nombres) + ': ' + n + (n === 1 ? ' tarea' : ' tareas') + '">' +
+      '<button type="button" class="kb-grupo-head"' + estilo + ' data-act="grupo-plegar" data-id="' + esc(COLUMNAS[idxCol].k + '|' + g.clave) + '" aria-expanded="' + !plegado +
+      '" title="' + esc(nombres) + ' — clic para contraer o desplegar sus tareas"><span class="kb-grupo-chev" aria-hidden="true">▾</span><span class="kb-avatars">' + avs + '</span>' +
+      '<span class="kb-grupo-n">' + esc(nombres) + '</span><span class="kb-count">' + n + '</span></button>' +
       g.tareas.map(function (t) { return tarjetaHtml(t, idxCol); }).join('') + '</div>';
   }
 
@@ -436,6 +454,9 @@
       return;
     }
     var previo = t.estado;
+    // Si el grupo de destino estaba contraído, se despliega: quien mueve la tarjeta tiene que verla llegar.
+    var kDestino = estado + '|' + claveGrupo(personasDe(t));
+    if (gruposPlegados[kDestino]) { delete gruposPlegados[kDestino]; gruposGuardar(); }
     t.estado = estado; render();            // optimista
     var res = await _sb.from('mercadeo_tareas').update({ estado: estado }).eq('id', Number(id)).select('id');
     if (res.error || !res.data || !res.data.length) {
@@ -836,6 +857,15 @@
       if (col) col.outerHTML = columnaPorAprobarHtml();
       var b = document.querySelector('.kb-plegar');
       if (b) b.focus({ preventScroll: true });
+    },
+    // Se cambia solo ese grupo (clase + aria-expanded), sin render(): las columnas conservan su scroll y el foco se queda en el botón.
+    'grupo-plegar': function (clave, el) {
+      var plegar = !gruposPlegados[clave];
+      if (plegar) gruposPlegados[clave] = true; else delete gruposPlegados[clave];
+      gruposGuardar();
+      var g = el.closest('.kb-grupo');
+      if (g) g.classList.toggle('plegado', plegar);
+      el.setAttribute('aria-expanded', String(!plegar));
     },
     'tarea-abrir': function (id) { abrirTarea(Number(id)); },
     // PDF con todas las especificaciones de la solicitud del evento (el mismo del módulo Eventos; js/panel/eventos-pdf.js).

@@ -350,7 +350,12 @@ body.kb-page #main { max-width: 2200px; }
 /* Subgrupos por responsable dentro de cada columna. La cabecera se queda pegada arriba mientras se recorre su grupo (fondo opaco). */
 .kb-grupo { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
 .kb-grupo + .kb-grupo { margin-top: 6px; }
-.kb-grupo-head { position: sticky; top: -8px; z-index: 1; display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 7px; background: var(--ut, #d3dce8); border: 1px solid var(--ub, #b8c4d4); color: #2d3748; font-size: 0.78rem; font-weight: 700; }
+.kb-grupo-head { position: sticky; top: -8px; z-index: 1; display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; margin: 0; padding: 5px 10px; border-radius: 7px; background: var(--ut, #d3dce8); border: 1px solid var(--ub, #b8c4d4); color: #2d3748; font: inherit; font-size: 0.78rem; font-weight: 700; text-align: left; cursor: pointer; }
+.kb-grupo-head:hover { border-color: var(--uc, #718096); }
+.kb-grupo-head:focus-visible { outline: 2px solid #2471a3; outline-offset: 1px; }
+.kb-grupo-chev { flex: none; width: 10px; font-size: 0.7rem; color: #4a5568; text-align: center; }
+.kb-grupo.plegado .kb-grupo-chev { transform: rotate(-90deg); }
+.kb-grupo.plegado > .kb-card { display: none; }
 .kb-grupo-head .kb-avatars { flex: none; padding-left: 6px; }
 .kb-grupo-head .kb-av { width: 22px; height: 22px; font-size: 0.6rem; }
 .kb-grupo-n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

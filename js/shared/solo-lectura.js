@@ -15,7 +15,7 @@
   // Acciones (data-act) que solo consultan: abrir, cerrar, filtrar, navegar, ver PDF/adjuntos/impacto.
   var SEGURAS = {
     comun: ['reintentar', 'limpiar', 'cerrar-modal'],
-    'mercadeo.html': ['ley-resp', 'vista-compacta', 'plegar-aprobar', 'tarea-abrir', 'evento-pdf', 'adj-abrir', 'rechazo-cerrar'],
+    'mercadeo.html': ['ley-resp', 'vista-compacta', 'plegar-aprobar', 'grupo-plegar', 'tarea-abrir', 'evento-pdf', 'adj-abrir', 'rechazo-cerrar'],
     'eventos.html': ['paso-ir', 'paso-ant', 'paso-sig', 'evento-abrir', 'evento-pdf', 'evento-impacto', 'impacto-cerrar',
       'evento-asistentes', 'chk-adj-abrir', 'adj-abrir', 'motivo-cerrar'],
     'crm.html': ['tab', 'leads-limpiar', 'quitar-filtro-actividad', 'lead-ver', 'act-ver-leads', 'pr-ver'],

@@ -449,13 +449,20 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
   de 46px (título vertical y contador; clic en cualquier parte de la tira la abre). Ambas preferencias se guardan en `localStorage` de ESE navegador (`mk_tablero_vista_compacta`,
   `mk_tablero_por_aprobar_plegada`). Probado con un arnés de navegador y una BD simulada a 1500px y en móvil.
 - **Agrupación por responsable** (nov-2026, sin migración; `mercadeo.js`: `agruparPorResponsable` / `grupoHtml`, CSS `.kb-grupo*`): dentro de cada columna las tarjetas van en subgrupos,
-  uno por responsable, cada uno con su cabecera (avatar, nombre y conteo; tinte del color de la persona si es una sola). Es la vista fija del Tablero (no hay interruptor). Una tarea con
+  uno por responsable, cada uno con su cabecera (avatar, nombre y conteo; tinte del color de la persona si es una sola). Es la vista fija del Tablero (no hay interruptor de agrupación). Una tarea con
   VARIOS responsables va en UN solo grupo propio (el de ese conjunto, p. ej. «Ana Pérez, Luis Gómez»), no repetida en cada persona: así los conteos de la columna suman y mover/arrastrar
   sigue operando sobre una única tarjeta. Los grupos van en orden alfabético por nombre y «Sin responsable» al final; un responsable que ya no está en el equipo sale como «Usuario inactivo». Dentro
   de cada grupo se conserva la cola por regla de `comparar` (urgente, clase, fecha límite, antigüedad), así que **la prioridad ya no se lee de arriba abajo de toda la columna, solo dentro de cada
   persona**. La cabecera queda pegada (`position: sticky; top: -8px`, el padding de `.kb-list`; `-6px` en compacta) mientras se recorre el grupo. El destino de soltar sigue siendo la
   `.kb-list[data-estado]` (los grupos son hijos suyos), así que soltar sobre una cabecera o una tarjeta funciona. No afecta a «Por aprobar» (no son tareas, no tienen responsable) ni a la tabla de
   canceladas. Probado con un arnés de navegador y una BD simulada (1500px, compacta, filtro por responsable, mover con ◀ ▶, soltar, tareas con 0/1/varios responsables y ex-integrante, móvil).
+  - **Contraer / desplegar por responsable** (acción `grupo-plegar`): la cabecera de cada grupo es un `<button>` (`aria-expanded`, con ▾/▸) que oculta o muestra las tarjetas de ESA persona en ESA columna;
+    el conteo de la cabecera sigue visible contraído. El estado es una clave `<estado>|<ids de los responsables>` (`claveGrupo`) y se guarda en `localStorage` de ese navegador
+    (`mk_tablero_grupos_plegados`, igual que las otras preferencias de vista; nada va a la BD ni lo comparte el equipo). Cambia solo ese grupo (clase `plegado`, sin `render()`), así que las columnas
+    conservan su scroll; las tarjetas contraídas siguen en el DOM con `display:none` (no se enfocan con Tab) y cualquier `render()` (filtros, Realtime) respeta el estado. **Mover una tarjeta a un
+    grupo contraído lo despliega** (`moverA`), para que quien la mueve la vea llegar. Una tarea que otra persona del equipo mueva a un grupo que tú tienes contraído solo suma al conteo.
+    Un grupo contraído puede ocultar urgentes o vencidas: no hay aviso en la cabecera. `grupo-plegar` está en la lista blanca `SEGURAS` de `solo-lectura.js` (es de consulta): el Lector también contrae y despliega.
+    Probado con el arnés (plegar, persistir tras recargar, `render()` por filtro, scroll de otra columna, mover a grupo contraído, Enter con teclado, Lector con acceso de solo lectura, compacta).
 - **Impacto en ventas** (nov-2026, sin migración; `js/panel/eventos-impacto.js` + modal `#impacto-overlay` de `eventos.html`): botón «📈 Ventas» en cada fila (salvo
   rechazados/cancelados) y «📈 Impacto en ventas» en el pie del modal. Cruza el evento con las ventas de panel-pedidos para ver si lo vendido cambió después de él. Solo lectura, nada se guarda.
   Cadena: navegador → Edge Function `impacto-evento` (`verify_jwt=true`, exige módulo `mercadeo`; solo recibe `evento_id` y lee de la BD fecha, empresa, municipio,
