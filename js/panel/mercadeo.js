@@ -68,6 +68,8 @@
 
   // ── Estado ──
   var tareas = [], actividades = [], equipo = [], eventosPend = [], eventosFallo = false;
+  // Quién asigna responsables (migración 0045): { id, nombre, yo } de mercadeo_quien_asigna(). Solo esa persona puede cambiarlos; la BD lo exige, esto solo deshabilita las casillas.
+  var asignador = null, asignadorFallo = false;
   var tareaById = {}, actById = {};
   var editId = null, orig = null, dragId = null, recargaTimer = null;
 
@@ -119,9 +121,13 @@
         fetchAll('mercadeo_actividades', 'id,nombre,en_calendario,estado', 'id'),
         _sb.rpc('list_equipo_mercadeo'),
         fetchAll('mercadeo_eventos', EV_COLS, 'id', function (q) { return q.in('estado', EV_PEND); }),
+        _sb.rpc('mercadeo_quien_asigna'),
       ]);
       for (var i = 0; i < 3; i++) if (rs[i].error) throw rs[i].error;
       tareas = rs[0].data; actividades = rs[1].data; equipo = rs[2].data || [];
+      // Si la consulta de «quién asigna» falla (p. ej. aún no se aplicó la migración 0045) no se deshabilita nada: la BD sigue siendo la que decide.
+      asignadorFallo = !!rs[4].error;
+      asignador = !rs[4].error && rs[4].data && rs[4].data[0] ? rs[4].data[0] : null;
       // Las solicitudes por aprobar son un añadido de solo lectura: si no cargan, el Tablero sigue funcionando con sus tareas.
       eventosFallo = !!rs[3].error;
       if (eventosFallo) { eventosPend = []; showToast('No se pudieron cargar las solicitudes de evento por aprobar: ' + errMsg(rs[3].error), '#e67e22'); }
@@ -489,11 +495,18 @@
     }).join('') + '<button class="btn-secondary" type="button" data-act="emp-todas">Todo el holding</button>';
   }
 
+  // Solo la persona asignadora (hoy Laura Sanchez, migración 0045) cambia los responsables. Si la consulta falló se deja editar y la BD decide.
+  function puedeAsignar() { return asignadorFallo ? true : !!(asignador && asignador.yo); }
+
   function checksResponsables(sel) {
+    var puede = puedeAsignar();
     var base = equipo.filter(function (u) { return u.activo || sel.indexOf(u.id) >= 0; });
     $('t-resp').innerHTML = base.length ? base.map(function (u) {
-      return '<label><input type="checkbox" class="t-resp-chk" value="' + esc(u.id) + '"' + (sel.indexOf(u.id) >= 0 ? ' checked' : '') + '> ' + esc(u.nombre) + (u.activo ? '' : ' (inactivo)') + '</label>';
+      return '<label><input type="checkbox" class="t-resp-chk" value="' + esc(u.id) + '"' + (sel.indexOf(u.id) >= 0 ? ' checked' : '') + (puede ? '' : ' disabled') + '> ' + esc(u.nombre) + (u.activo ? '' : ' (inactivo)') + '</label>';
     }).join('') : '<span class="mk-sin">No hay usuarios con acceso al módulo.</span>';
+    var ayuda = $('t-resp-ayuda');
+    ayuda.style.display = puede ? 'none' : '';
+    ayuda.textContent = puede ? '' : '🔒 Solo ' + (asignador ? asignador.nombre : 'la persona encargada') + ' asigna responsables a las tareas. Pídele la asignación si esta tarea la necesita.';
   }
 
   function opcionesActividad(actualId) {

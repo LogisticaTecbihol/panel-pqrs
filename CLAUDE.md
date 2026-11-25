@@ -300,6 +300,24 @@ de "solicitada". La cola de cada columna se ordena por regla (no a mano): arrast
 columna (HTML5 DnD; en táctil/teclado, botones ◀ ▶). Los KPI (pestaña Indicadores del CRM) se
 calculan en el cliente.
 
+### Asignación de responsables: solo Laura Sanchez (migración 0045, aplicada el 2026-11-25)
+
+Solo la persona asignadora (hoy **Laura Sanchez**) puede fijar o cambiar `mercadeo_tareas.responsables`; el resto del equipo sigue creando, moviendo y editando tareas, pero no toca ese campo.
+La regla es de la BD; la interfaz solo la refleja.
+
+- `mercadeo_asignador_id()` es el ÚNICO lugar con el id de quien asigna. Para cambiar de persona: `CREATE OR REPLACE` de esa función con otro `usuarios_pqrs.id` (igual que `mercadeo_responsable_eventos()`, 0037).
+- `trg_asignacion` (BEFORE INSERT OR UPDATE, `mercadeo_tareas_asignacion`): con sesión de usuario que no sea el asignador, si el CONJUNTO de responsables cambia (tarea nueva con responsables, o edición que agrega, quita o cambia),
+  rechaza con 42501 «Solo Laura Sanchez puede asignar responsables a las tareas del Tablero». El orden no cuenta (reenviar la misma lista no falla). **Ni el admin está exento** (la regla es «la única persona»); si debe poder asignar,
+  se agrega a la condición del trigger y a `mercadeo_quien_asigna()`. Pasan sin restricción el puente de Pedidos y el SQL de mantenimiento (sin `auth.uid()`) y la tarea que el trigger de eventos crea al aprobar, que nace asignada
+  por defecto a Laura (lleva el GUC `mercadeo.creando_tarea_evento`).
+- RPC `mercadeo_quien_asigna()` (`id`, `nombre`, `yo`; solo `authenticated` con acceso a Mercadeo): `mercadeo.js` la llama en `cargar` y, si `yo` es falso, `checksResponsables` deshabilita las casillas y muestra «🔒 Solo Laura Sanchez asigna
+  responsables…» (`#t-resp-ayuda`). Si el RPC falla (p. ej. migración sin aplicar) no se deshabilita nada y la BD decide. Las casillas deshabilitadas conservan lo marcado, así que guardar otros campos no envía `responsables`.
+- **No cambia** lo ya asignado, ni la bitácora (`asignacion`), ni el checklist de actividades de Eventos (su «responsable» es otra cosa), ni los filtros del Tablero.
+- Probado en SQL en una transacción revertida con sesiones simuladas: Diana (rol mercadeo) crea sin responsables y edita otros campos, pero asignar, crear con responsables y quitarlos → 42501; mismo conjunto en otro orden pasa; Laura asigna y
+  crea con responsables; Admin → 42501; Diana aprueba un evento y la tarea nace con Laura; sin sesión asigna; el RPC responde a Diana (`yo = false`) y a Laura (`yo = true`), vacío para SST sin el módulo y rechaza a `anon`. La interfaz con un
+  arnés de navegador y un Supabase simulado (Diana con casillas deshabilitadas y sin `responsables` en el UPDATE, Laura asignando, RPC caído). **No probado con las sesiones reales de Laura ni de Diana.**
+- Aplicar la migración ANTES de publicar el frontend: con la regla activa y el frontend viejo, quien no es Laura ve las casillas habilitadas y recibe el error al guardar.
+
 ### Color por responsable e Indicadores
 
 - **Color por responsable** (`js/shared/equipo-color.js`): paleta fija de 12 tonos asignada por POSICIÓN al ordenar los
