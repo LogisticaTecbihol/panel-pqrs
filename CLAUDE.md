@@ -344,7 +344,14 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
 - **Tarea automática**: al pasar a `aprobada` el trigger `trg_tarea` crea en el Tablero una tarea tipo `evento`, clase
   `soporte_ventas`, `fecha_limite = fecha_evento - 1`, empresa del evento y un brief armado con `mercadeo_evento_brief()`
   (materiales, canales, logística y objetivos pedidos); la bitácora del evento registra `tarea_creada`. Al `cancelada` se cancela
-  su tarea si sigue abierta. `evento_id` solo lo puede fijar ese trigger (GUC `mercadeo.creando_tarea_evento`). La tarjeta del
+  su tarea si sigue abierta. **Al `realizada` su tarea abierta pasa a `entregada`** (migración 0044, aplicada el 2026-11-25; antes la tarea se quedaba en «Recibido» para siempre y
+  figuraba como vencida): solo avanza, así que si el evento retrocede de Realizada la tarea NO se devuelve sola (se mueve la tarjeta a mano); no toca tareas ya entregadas, canceladas ni rechazadas;
+  y la sincronización nunca bloquea marcar el evento (si la tarea no se puede mover, p. ej. alguien le borró el brief en «Recibido», el evento queda realizado, la tarea donde estaba y sale un WARNING).
+  Efecto en Indicadores: `entregada_en` lo sella el servidor con la hora del cambio, y como `fecha_limite` de la tarea es el día ANTES del evento, una tarea de evento siempre cuenta como entregada
+  «tarde» (y confirmada fuera de 24 h, porque pasa de Recibido a Entregada de un salto). Si se quiere que cuenten a tiempo, hay que dejar que `mercadeo_tareas_reglas` respete una fecha de entrega
+  fijada por el trigger del evento (hoy no lo hace). La migración también pasó a Entregada las 5 tareas de eventos ya realizados (EV-5 a EV-9: tareas #80, #101, #102, #103 y #106; con la hora de la
+  migración, no la del evento). Probado en SQL en una transacción revertida (sesión de admin: evento a Realizada mueve la tarea y deja el `cambio_estado` en su bitácora; retroceso no la devuelve; tarea sin brief
+  no bloquea el evento; tarea cancelada no se toca). `evento_id` solo lo puede fijar ese trigger (GUC `mercadeo.creando_tarea_evento`). La tarjeta del
   La tarea nace ASIGNADA por defecto a Laura Sanchez (migración 0037): `mercadeo_responsable_eventos()` devuelve su id solo si sigue activa y con acceso a
   Mercadeo (si no, la tarea nace sin responsable como antes); para cambiar de persona basta un `CREATE OR REPLACE` de esa función con otro `usuarios_pqrs.id`.
   Solo aplica a eventos (no a las solicitudes generales a Mercadeo) y el equipo puede cambiar o ampliar el responsable desde la tarjeta. La tarjeta del
