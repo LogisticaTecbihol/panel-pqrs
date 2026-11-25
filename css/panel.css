@@ -652,3 +652,5 @@ textarea.ef { resize: vertical; min-height: 80px; }
 .btn-asis:hover:not(:disabled), .asis-grid .btn-confirm:hover:not(:disabled) { background: #166534; border-color: #166534; color: #fff; }
 .asis-grid .btn-confirm:disabled { opacity: 0.7; cursor: default; }
 .btn-ver.btn-asis { border: none; }
+/* Indicador «👥 N asistentes» junto al nombre del evento en la lista (verde claro, mismo verde que el botón de asistentes) */
+.kb-chip.asis-ok { background: #dcfce7; color: #166534; border: 1px solid #86efac; margin-left: 4px; white-space: nowrap; vertical-align: middle; }

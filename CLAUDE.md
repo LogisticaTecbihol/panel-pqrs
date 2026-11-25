@@ -416,6 +416,9 @@ y el *Manual de procesos y procedimiento de EVENTOS* (carpeta «PROCEDIMIENTOS M
   llega incompleta), el resumen (registrados, hectáreas, cuántos ya usaron orgánicos, cuántos sin cédula), buscador, editar (reusa el formulario) y eliminar, y **«⬇ Descargar para Excel»**
   (CSV con `;` y BOM, las mismas columnas de la planilla; celdas que empiezan por `= @` o `+ -` no numéricos llevan `'` delante). Cada persona se guarda al instante; el módulo se cargó como
   `var EVENTO_ASISTENTES` (igual que `EVENTO_IMPACTO`) y sus botones usan `data-aa`, no `data-act`, para no pasar por el despachador de `eventos.js`.
+  - **Indicador en la lista** (nov-2026, sin migración; `eventos.js` `render`, CSS `.kb-chip.asis-ok`): junto al nombre de cada evento que ya tiene al menos un asistente sale el chip verde «👥 N asistentes» (con
+    1, «👥 1 asistente»). Sale de `asisConteo` (el mismo RPC `mercadeo_evento_asistentes_conteo()` del botón), así que no depende del estado: un evento cancelado que alcanzó a tener planilla también lo muestra, y se
+    actualiza al instante al agregar o eliminar desde el modal. Si el RPC falla no hay indicador (la lista sigue). Probado con un arnés de navegador y un Supabase simulado; no contra el servidor real.
   - **Tabla** `mercadeo_evento_asistentes` (APARTE de `mercadeo_evento_adjuntos` y del checklist, a propósito: son DATOS PERSONALES —cédula, teléfono, correo— y la función puente
     `solicitud-evento-pedidos` y el PDF no los leen; el solicitante de Pedidos no los ve). Trigger `mercadeo_evento_asistentes_reglas` (BEFORE INSERT/UPDATE/DELETE): solo escribe con el
     evento **Aprobada / En preparación / Realizada** (Cerrada y las demás quedan de solo lectura; la lista queda congelada al cerrar); normaliza el texto (vacío = sin dato, correo en minúsculas);

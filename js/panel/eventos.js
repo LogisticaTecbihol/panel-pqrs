@@ -242,9 +242,14 @@
       var ant = e.extemporanea
         ? '<span class="kb-chip warn" title="Se pidió con menos de ' + DIAS_MINIMOS + ' días de anticipación (solo advertencia)">⚠ ' + esc(e.dias_anticipacion) + ' d</span>'
         : '<span class="kb-chip" title="Días de anticipación">✓ ' + esc(e.dias_anticipacion) + ' d</span>';
+      // Indicador de planilla con gente: solo los eventos que ya tienen al menos un asistente registrado (asisConteo solo trae esos).
+      var nAsis = asisConteo[e.id] || 0;
+      var conAsis = nAsis > 0
+        ? ' <span class="kb-chip asis-ok" title="La planilla de asistencia de este evento ya tiene ' + nAsis + (nAsis === 1 ? ' persona registrada' : ' personas registradas') + '">👥 ' + esc(nAsis) + (nAsis === 1 ? ' asistente' : ' asistentes') + '</span>'
+        : '';
       return '<tr class="mk-click" data-act="evento-abrir" data-id="' + esc(e.id) + '">' +
         '<td><strong>' + esc(refEv(e)) + '</strong>' + ped + '</td>' +
-        '<td><strong>' + esc(e.nombre) + '</strong><div class="ef-help">' + esc(e.solicitante_nombre) + (e.solicitante_area ? ' · ' + esc(e.solicitante_area) : '') + '</div></td>' +
+        '<td><strong>' + esc(e.nombre) + '</strong>' + conAsis + '<div class="ef-help">' + esc(e.solicitante_nombre) + (e.solicitante_area ? ' · ' + esc(e.solicitante_area) : '') + '</div></td>' +
         '<td>' + empresaDeEvento(e) + '</td>' +
         '<td>' + esc(fmtDateOnly(e.fecha_evento)) + (e.hora_inicio ? ' · ' + esc(hhmm(e.hora_inicio)) : '') +
           '<div class="ef-help">' + esc(MODALIDAD[e.modalidad] || e.modalidad) + (e.lugar ? ' · ' + esc(e.lugar) : '') + '</div></td>' +
